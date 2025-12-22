@@ -1,0 +1,18 @@
+# .dockerignore 文件内容
+
+# 忽略开发配置文件
+dev.properties.example
+
+# 忽略 Git 历史
+.git
+.gitignore
+
+# 忽略 IDE 配置
+.idea
+*.iml
+
+# 忽略不需要的日志
+logs/
+
+# 忽略文档
+*.md

@@ -13,7 +13,7 @@ spring:
         file-extension: yaml # 配置文件后缀
         group: DEFAULT_GROUP
         shared-configs:
-          - data-id: wisepen-common.yaml
+          - data-id: wisepen-common-${spring.profiles.active}.yaml
             group: DEFAULT_GROUP
             refresh: true
     inetutils:
