@@ -1,11 +1,11 @@
 package com.oriole.wisepen.user.service;
 
 import cn.dev33.satoken.SaManager;
+import com.oriole.wisepen.common.core.domain.R;
 import cn.dev33.satoken.stp.SaLoginConfig;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.crypto.digest.BCrypt;
-import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.enums.ResultCode;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.user.api.domain.dto.LoginBody;
@@ -36,7 +36,7 @@ public class AuthService {
     /**
      * 登录逻辑
      */
-    public R<String> login(LoginBody loginBody) {
+    public void login(LoginBody loginBody) {
         String account = loginBody.getAccount();
         String password = loginBody.getPassword();
 
@@ -76,19 +76,15 @@ public class AuthService {
                         .setExtra("exp", expTime)
         );
 
-        // 获取 Token 值
-        String tokenValue = StpUtil.getTokenValue();
         log.info("用户登录成功: username={}, id={}, groups={}", username, user.getId(), groupIdsStr);
 
-        return R.ok(tokenValue);
     }
 
     /**
      * 注销
      */
-    public R<Void> logout() {
+    public void logout() {
         StpUtil.logout();
-        return R.ok();
     }
 
     /**

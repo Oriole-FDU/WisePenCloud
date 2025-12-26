@@ -17,13 +17,15 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/login")
-    public R<String> login(@Valid @RequestBody LoginBody loginBody) {
-        return authService.login(loginBody);
+    public R<Void> login(@Valid @RequestBody LoginBody loginBody) {
+        authService.login(loginBody);
+        return R.ok();
     }
 
     @PostMapping("/logout")
     public R<Void> logout() {
-        return authService.logout();
+        authService.logout();
+        return R.ok();
     }
 
     @PostMapping("/register")
