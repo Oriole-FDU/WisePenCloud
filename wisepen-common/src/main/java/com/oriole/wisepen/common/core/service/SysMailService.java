@@ -95,9 +95,8 @@ public class SysMailService {
             MimeMessage message = staticMailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-            // 硬编码发件人地址以确保与用户名严格匹配
-            String fromEmail = "25300130028@m.fudan.edu.cn";
-            helper.setFrom(fromEmail);
+            // 使用从Nacos配置中加载的username作为发件人地址
+            helper.setFrom(staticFromEmail);
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(content, true);
