@@ -26,8 +26,13 @@ public interface UserMapper extends BaseMapper<User> {
     Integer verifyExistUsername(@Param("username") String username);
 
     @Select("SELECT COUNT(*) FROM sys_user_profile WHERE campus_no = #{campus_no} LIMIT 1")
-    Integer verifyExistCampusNum(@Param("username") String campus_no);
+    Integer verifyExistCampusNum(@Param("campus_no") String campus_no);
 
-    @Select("SELECT u.email FROM sys_user u  WHERE (u.campus_no = #{campus_no}) LIMIT 1")
+    @Select("SELECT COUNT(*) FROM sys_user_profile WHERE user_id = #{UserId} LIMIT 1")
+    Integer verifyExistUserId(@Param("user_id") String UserId);
+
+    @Select("SELECT u.email FROM sys_user u " +
+            "LEFT JOIN sys_user_profile p ON u.id = p.user_id " +
+            "WHERE p.campus_no = #{campus_no} LIMIT 1")
     String getUserEmailByCampusNum(@Param("campus_no") String campus_no);
 }

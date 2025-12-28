@@ -11,10 +11,19 @@ public interface UserService {
     void updateUserStatus(Long userId, Integer status);
 
     boolean verifyExistUsername(String username);
+    boolean verifyExistUserId(String account);
     boolean verifyExistCampusNum(String campusNum);
     boolean insertUser(User user);
     boolean insertUserProfile(UserProfile userProfile);
 
     Long getUserIdByCampusNum(String campusNum);
     String getUserEmailByCampusNum(String campusNum);
+
+    /**
+     * 根据用户ID更新密码
+     * @param userId 用户ID
+     * @param newPasswordHash 新密码的哈希值
+     * @return 更新是否成功
+     */
+    boolean updatePasswordByUserId(String userId, String newPasswordHash);
 }

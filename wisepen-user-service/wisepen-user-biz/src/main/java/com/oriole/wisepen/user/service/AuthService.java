@@ -8,9 +8,11 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.crypto.digest.BCrypt;
 import com.oriole.wisepen.common.core.domain.enums.ResultCode;
 import com.oriole.wisepen.common.core.exception.ServiceException;
+import com.oriole.wisepen.common.core.service.SysMailService;
 import com.oriole.wisepen.user.api.domain.dto.LoginBody;
 import com.oriole.wisepen.user.api.domain.dto.RegisterBody;
 import com.oriole.wisepen.user.api.domain.dto.ResetBody;
+import com.oriole.wisepen.user.api.domain.dto.ResetExecuteBody;
 import com.oriole.wisepen.user.domain.entity.User;
 import com.oriole.wisepen.user.domain.entity.UserProfile;
 import lombok.RequiredArgsConstructor;
@@ -115,8 +117,10 @@ public class AuthService {
             user.setIdentityType(1);
             user.setStatus(1);
             //创建时间
-            user.setCreateTime(LocalDateTime.MAX);
-            user.setUpdateTime(LocalDateTime.MAX);
+            //创建时间
+            LocalDateTime now = LocalDateTime.now();
+            user.setCreateTime(now);
+            user.setUpdateTime(now);
             // 插入用户基本信息
             boolean userSaved = userService.insertUser(user);
             if(!userSaved){
@@ -145,22 +149,95 @@ public class AuthService {
     StringRedisTemplate redisTemplate;
     public R<Void> sendResetMail(ResetBody resetBody){
         String campusNum = resetBody.getCampusNum();
+        String mailAppendix = resetBody.getMailAppendix();
         if(userService.verifyExistCampusNum(campusNum)){
             Long userId = userService.getUserIdByCampusNum(campusNum);
             String targetEmail = userService.getUserEmailByCampusNum(campusNum);
+            //没查到生成默认邮箱
+            if(targetEmail == null ){
+                targetEmail = campusNum + mailAppendix;
+            }
+
             String token = UUID.randomUUID().toString();
             String redisKey = "auth:reset:token:" + token;
             redisTemplate.opsForValue().set(redisKey, String.valueOf(userId),15, TimeUnit.MINUTES);
 
+            //重置链接
+            String resetUrl = "https://wisepen.fudan.edu.cn/reset-pwd?token=" + token;
 
+            try {
+                // 发送重置密码邮件（使用静态方法）
+                log.info("正在发送密码重置邮件：学号={}, 邮箱={}", campusNum, targetEmail);
+                SysMailService.sendResetMailStatic(targetEmail, campusNum, resetUrl);
+                log.info("密码重置邮件发送成功：学号={}, 邮箱={}", campusNum, targetEmail);
+            } catch (Exception e) {
+                log.error("发送密码重置邮件失败：学号={}, 邮箱={}, 错误={}", campusNum, targetEmail, e.getMessage(), e);
+                throw new ServiceException(ResultCode.EMAIL_SEND_ERROR);
+            }
         }
         return R.ok();
     }
 
     /**
-     * 执行重置密码
+     * 直接根据用户ID更新密码（管理员用）
+     * @param userId 用户ID
+     * @param newPassword 新密码明文
+     * @return 更新结果
      */
-    public R<Void> resetPassword(ResetBody resetBody){
-        return R.ok();
+    @Transactional(rollbackFor = Exception.class)
+    public R<Void> updatePasswordByUserId(String userId, String newPassword) {
+        // 验证用户是否存在
+        boolean userexist = userService.verifyExistUserId(userId);
+        if (!userexist) {
+            throw new ServiceException(ResultCode.USER_NOT_EXIST);
+        }
+
+        // 对新密码进行哈希处理
+        String newPasswordHash = BCrypt.hashpw(newPassword);
+
+        // 更新密码
+        boolean updated = userService.updatePasswordByUserId(userId, newPasswordHash);
+
+        if (updated) {
+            log.info("用户 {} 密码更新成功", userId);
+            return R.ok();
+        } else {
+            throw new ServiceException(ResultCode.PASSWORD_RESET_FAILED);
+        }
+    }
+
+    /**
+     * 检查用户名是否存在
+     * @param username 用户名
+     * @return true-存在，false-不存在
+     */
+    public boolean checkUsernameExists(String username) {
+        return userService.verifyExistUsername(username);
+    }
+
+    /**
+     * 执行重置密码（通过token）
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public R<Void> resetPassword(ResetExecuteBody resetExecuteBody){
+        String redisKey = "auth:reset:token:" + resetExecuteBody.getToken();
+        log.info("正在尝试从Redis读取Key: {}", redisKey);
+        String userId = redisTemplate.opsForValue().get(redisKey);
+        if(userId == null){
+            throw new ServiceException(ResultCode.USER_NOT_EXIST);
+        }
+        String newPasswordHash = BCrypt.hashpw(resetExecuteBody.getNewPassword());
+
+        boolean updated = userService.updatePasswordByUserId(userId, newPasswordHash);
+
+        if (updated) {
+            // 成功后立即清理 Token
+            redisTemplate.delete(redisKey);
+
+            log.info("用户 {} 密码重置成功", userId);
+            return R.ok();
+        }else{
+            throw new ServiceException(ResultCode.PASSWORD_RESET_FAILED);
+        }
     }
 }

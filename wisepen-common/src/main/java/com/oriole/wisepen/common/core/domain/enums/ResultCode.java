@@ -26,6 +26,8 @@ public enum ResultCode implements IErrorCode {
     USER_LOCKED(1003, "账号已禁用"),
     USERNAME_EXISTED(1004,"用户名已被占用"),
     USER_CAMPUS_NUM_EXISTED(1005,"该学号已注册，请通过找回密码找回"),
+    EMAIL_SEND_ERROR(1006,"邮件发送失败"),
+    PASSWORD_RESET_FAILED(1007,"密码重设失败"),
     //校验内容不合法(1300-1399)
     EMPTY(1300,"缺少必填内容"),
     USERNAME_INVALID(1301,"用户名必须是4-20位字母、数字或下划线"),

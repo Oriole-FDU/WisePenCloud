@@ -8,6 +8,6 @@ import org.apache.ibatis.annotations.Select;
 
 @Mapper
 public interface UserProfileMapper extends BaseMapper<UserProfile> {
-    @Select("SELECT p.user_id FROM sys_user_proflie p WHERE (p.campus_no = #{campus_no}) LIMIT 1")
+    @Select("SELECT p.user_id FROM sys_user_profile p WHERE (p.campus_no = #{campus_no}) LIMIT 1")
     Long getUserIdByCampusNum(@Param("campus_no") String campus_no);
 }

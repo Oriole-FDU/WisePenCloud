@@ -4,6 +4,7 @@ import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.user.api.domain.dto.LoginBody;
 import com.oriole.wisepen.user.api.domain.dto.RegisterBody;
 import com.oriole.wisepen.user.api.domain.dto.ResetBody;
+import com.oriole.wisepen.user.api.domain.dto.ResetExecuteBody;
 import com.oriole.wisepen.user.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -29,15 +30,17 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public R<String> register(@Valid @RequestBody RegisterBody registerBody){
+    public R<String> register(@Valid @RequestBody RegisterBody registerBody) {
         return authService.register(registerBody);
     }
+
     @PostMapping("/forgot-password/email")
-    public R<Void> forgotPassword(@RequestBody ResetBody resetBody){
+    public R<Void> forgotPassword(@Valid @RequestBody ResetBody resetBody) {
         return authService.sendResetMail(resetBody);
     }
+
     @PostMapping("/forgot-password/reset")
-    public R<Void> resetPassword(@RequestBody ResetBody resetBody){
-        return authService.resetPassword(resetBody);
+    public R<Void> resetPassword(@Valid @RequestBody ResetExecuteBody resetExecuteBody) {
+        return authService.resetPassword(resetExecuteBody);
     }
 }

@@ -13,7 +13,10 @@ import java.io.Serializable;
 public class RegisterBody implements Serializable {
     /** 用户名*/
     @NotBlank(message = "用户名不能为空")
-    @Username
+    @Username(
+        treatSpecialFormatAsExisting = true,
+        specialFormatMessage = "用户名已存在"
+    )
     private String username;
 
     /** 密码*/
