@@ -10,26 +10,29 @@ import org.apache.ibatis.annotations.Select;
 public interface UserMapper extends BaseMapper<User> {
 
     /**
-     * 根据用户名或学工号查询用户信息（联合查询）
-     * @param account 用户名或学工号
+     * 根据用户名查询用户信息
+     * @param username 用户名
+     * @return 用户实体类
+     */
+    @Select("SELECT u.* " +
+            "FROM sys_user u " +
+            "WHERE u.username = #{username} " +
+            "AND u.del_flag = 0 " +
+            "LIMIT 1")
+    User selectUserByUsername(@Param("username") String username);
+
+    /**
+     * 根据学工号查询用户信息（通过用户档案表）
+     * @param campusNo 学工号
      * @return 用户实体类（包含campusNo字段）
      */
     @Select("SELECT u.*, p.campus_no " +
             "FROM sys_user u " +
-            "LEFT JOIN sys_user_profile p ON u.id = p.user_id " +
-            "WHERE (u.username = #{account} OR p.campus_no = #{account}) " +
+            "INNER JOIN sys_user_profile p ON u.id = p.user_id " +
+            "WHERE p.campus_no = #{campusNo} " +
             "AND u.del_flag = 0 " +
             "LIMIT 1")
-    User selectUserByAccount(@Param("account") String account);
-
-    @Select("SELECT COUNT(*) FROM sys_user u WHERE (u.username = #{username}) LIMIT 1")
-    Integer verifyExistUsername(@Param("username") String username);
-
-    @Select("SELECT COUNT(*) FROM sys_user_profile WHERE campus_no = #{campus_no} LIMIT 1")
-    Integer verifyExistCampusNum(@Param("campus_no") String campus_no);
-
-    @Select("SELECT COUNT(*) FROM sys_user_profile WHERE user_id = #{UserId} LIMIT 1")
-    Integer verifyExistUserId(@Param("user_id") String UserId);
+    User selectUserByCampusNo(@Param("campusNo") String campusNo);
 
     @Select("SELECT u.email FROM sys_user u " +
             "LEFT JOIN sys_user_profile p ON u.id = p.user_id " +

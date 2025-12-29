@@ -8,11 +8,14 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.crypto.digest.BCrypt;
 import com.oriole.wisepen.common.core.domain.enums.ResultCode;
 import com.oriole.wisepen.common.core.exception.ServiceException;
-import com.oriole.wisepen.common.core.service.SysMailService;
-import com.oriole.wisepen.user.api.domain.dto.LoginBody;
-import com.oriole.wisepen.user.api.domain.dto.RegisterBody;
-import com.oriole.wisepen.user.api.domain.dto.ResetBody;
-import com.oriole.wisepen.user.api.domain.dto.ResetExecuteBody;
+import com.oriole.wisepen.user.exception.UserErrorCode;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import com.oriole.wisepen.user.api.domain.dto.LoginRequest;
+import com.oriole.wisepen.user.api.domain.dto.RegisterRequest;
+import com.oriole.wisepen.user.api.domain.dto.ResetRequest;
+import com.oriole.wisepen.user.api.domain.dto.ResetExecuteRequest;
 import com.oriole.wisepen.user.domain.entity.User;
 import com.oriole.wisepen.user.domain.entity.UserProfile;
 import lombok.RequiredArgsConstructor;
@@ -26,38 +29,50 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.Map;
+import java.util.HashMap;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
 
+    /**
+     * 内部Feign客户端，用于调用system-service的邮件发送接口
+     */
+    @FeignClient(value = "wisepen-system-service", contextId = "internalMailService")
+    interface InternalMailService {
+        @PostMapping("/system/mail/send-reset-password")
+        Map<String, Object> sendResetPasswordMail(@RequestBody Map<String, String> mailRequest);
+    }
+
     private final UserService userService;
     private final GroupService groupService;
+    private final InternalMailService internalMailService;
 
     /**
      * 登录逻辑
      */
-    public void login(LoginBody loginBody) {
-        String account = loginBody.getAccount();
-        String password = loginBody.getPassword();
+    public void login(LoginRequest loginRequest) {
+        String account = loginRequest.getAccount();
+        String password = loginRequest.getPassword();
 
         // 查询用户信息 (包含密码密文)
         User user = userService.getUserCoreInfoByAccount(account);
         // 账号不存在
         if (user == null) {
-            throw new ServiceException(ResultCode.USER_PASSWORD_ERROR);
+            throw new ServiceException(UserErrorCode.USER_PASSWORD_ERROR);
         }
         String username = user.getUsername();
 
         // 校验账号状态 除0，禁用状态外都允许登录
         if (user.getStatus() != null && user.getStatus() == 0) {
-            throw new ServiceException(ResultCode.USER_LOCKED);
+            throw new ServiceException(UserErrorCode.USER_LOCKED);
         }
 
         // 校验密码 (BCrypt)
         if (!BCrypt.checkpw(password, user.getPassword())) {
-            throw new ServiceException(ResultCode.USER_PASSWORD_ERROR);
+            throw new ServiceException(UserErrorCode.USER_PASSWORD_ERROR);
         }
 
         // 获取该用户所属的所有 Group ID
@@ -93,20 +108,20 @@ public class AuthService {
      * 注册
      */
     @Transactional(rollbackFor = Exception.class)//同生死
-    public R<String> register(RegisterBody registerBody) {
-            String username = registerBody.getUsername();
+    public String register(RegisterRequest registerRequest) {
+            String username = registerRequest.getUsername();
             //查询用户名是否存在
             if(userService.verifyExistUsername(username)){
-                throw new ServiceException(ResultCode.USERNAME_EXISTED);
+                throw new ServiceException(UserErrorCode.USERNAME_EXISTED);
             }
 
-            String campusNum =  registerBody.getCampusNum();
+            String campusNum =  registerRequest.getCampusNum();
             if(userService.verifyExistCampusNum(campusNum)){
-                throw new ServiceException(ResultCode.USER_CAMPUS_NUM_EXISTED);
+                throw new ServiceException(UserErrorCode.USER_CAMPUS_NUM_EXISTED);
             }
 
-            String password = registerBody.getPassword();
-            String realName = registerBody.getRealName();
+            String password = registerRequest.getPassword();
+            String realName = registerRequest.getRealName();
             // 创建用户对象
             User user = new User();
             user.setUsername(username);
@@ -139,7 +154,7 @@ public class AuthService {
             if(!userProfileSaved){
                 throw new ServiceException(ResultCode.SYSTEM_ERROR);
             }
-            return R.ok(userId.toString());
+            return userId.toString();
     }
 
     /**
@@ -147,9 +162,10 @@ public class AuthService {
      */
     @Autowired
     StringRedisTemplate redisTemplate;
-    public R<Void> sendResetMail(ResetBody resetBody){
-        String campusNum = resetBody.getCampusNum();
-        String mailAppendix = resetBody.getMailAppendix();
+
+    public R<Void> sendResetMail(ResetRequest resetRequest){
+        String campusNum = resetRequest.getCampusNum();
+        String mailAppendix = resetRequest.getMailAppendix();
         if(userService.verifyExistCampusNum(campusNum)){
             Long userId = userService.getUserIdByCampusNum(campusNum);
             String targetEmail = userService.getUserEmailByCampusNum(campusNum);
@@ -166,13 +182,32 @@ public class AuthService {
             String resetUrl = "https://wisepen.fudan.edu.cn/reset-pwd?token=" + token;
 
             try {
-                // 发送重置密码邮件（使用静态方法）
+                // 构建邮件发送请求数据
+                Map<String, String> mailRequest = new HashMap<>();
+                mailRequest.put("toEmail", targetEmail);
+                mailRequest.put("studentId", campusNum);
+                mailRequest.put("resetLink", resetUrl);
+
+                // 通过内部FeignClient调用system-service的邮件发送接口
                 log.info("正在发送密码重置邮件：学号={}, 邮箱={}", campusNum, targetEmail);
-                SysMailService.sendResetMailStatic(targetEmail, campusNum, resetUrl);
+                Map<String, Object> response = internalMailService.sendResetPasswordMail(mailRequest);
+
+                // 处理响应
+                if (response != null && response.get("data") != null) {
+                    Map<String, Object> data = (Map<String, Object>) response.get("data");
+                    Boolean success = (Boolean) data.get("success");
+                    if (success == null || !success) {
+                        String errorMsg = data.get("errorMessage") != null ? (String) data.get("errorMessage") : "邮件发送失败";
+                        throw new RuntimeException(errorMsg);
+                    }
+                } else {
+                    throw new RuntimeException("邮件服务返回数据格式错误");
+                }
+
                 log.info("密码重置邮件发送成功：学号={}, 邮箱={}", campusNum, targetEmail);
             } catch (Exception e) {
                 log.error("发送密码重置邮件失败：学号={}, 邮箱={}, 错误={}", campusNum, targetEmail, e.getMessage(), e);
-                throw new ServiceException(ResultCode.EMAIL_SEND_ERROR);
+                throw new ServiceException(UserErrorCode.EMAIL_SEND_ERROR);
             }
         }
         return R.ok();
@@ -185,11 +220,11 @@ public class AuthService {
      * @return 更新结果
      */
     @Transactional(rollbackFor = Exception.class)
-    public R<Void> updatePasswordByUserId(String userId, String newPassword) {
+    public void updatePasswordByUserId(String userId, String newPassword) {
         // 验证用户是否存在
         boolean userexist = userService.verifyExistUserId(userId);
         if (!userexist) {
-            throw new ServiceException(ResultCode.USER_NOT_EXIST);
+            throw new ServiceException(UserErrorCode.USER_NOT_EXIST);
         }
 
         // 对新密码进行哈希处理
@@ -198,46 +233,35 @@ public class AuthService {
         // 更新密码
         boolean updated = userService.updatePasswordByUserId(userId, newPasswordHash);
 
-        if (updated) {
-            log.info("用户 {} 密码更新成功", userId);
-            return R.ok();
-        } else {
-            throw new ServiceException(ResultCode.PASSWORD_RESET_FAILED);
+        if (!updated) {
+            throw new ServiceException(UserErrorCode.PASSWORD_RESET_FAILED);
         }
-    }
 
-    /**
-     * 检查用户名是否存在
-     * @param username 用户名
-     * @return true-存在，false-不存在
-     */
-    public boolean checkUsernameExists(String username) {
-        return userService.verifyExistUsername(username);
+        log.info("用户 {} 密码更新成功", userId);
     }
 
     /**
      * 执行重置密码（通过token）
      */
     @Transactional(rollbackFor = Exception.class)
-    public R<Void> resetPassword(ResetExecuteBody resetExecuteBody){
-        String redisKey = "auth:reset:token:" + resetExecuteBody.getToken();
+    public void resetPassword(ResetExecuteRequest resetExecuteRequest){
+        String redisKey = "auth:reset:token:" + resetExecuteRequest.getToken();
         log.info("正在尝试从Redis读取Key: {}", redisKey);
         String userId = redisTemplate.opsForValue().get(redisKey);
         if(userId == null){
-            throw new ServiceException(ResultCode.USER_NOT_EXIST);
+            throw new ServiceException(UserErrorCode.USER_NOT_EXIST);
         }
-        String newPasswordHash = BCrypt.hashpw(resetExecuteBody.getNewPassword());
+        String newPasswordHash = BCrypt.hashpw(resetExecuteRequest.getNewPassword());
 
         boolean updated = userService.updatePasswordByUserId(userId, newPasswordHash);
 
-        if (updated) {
-            // 成功后立即清理 Token
-            redisTemplate.delete(redisKey);
-
-            log.info("用户 {} 密码重置成功", userId);
-            return R.ok();
-        }else{
-            throw new ServiceException(ResultCode.PASSWORD_RESET_FAILED);
+        if (!updated) {
+            throw new ServiceException(UserErrorCode.PASSWORD_RESET_FAILED);
         }
+
+        // 成功后立即清理 Token
+        redisTemplate.delete(redisKey);
+
+        log.info("用户 {} 密码重置成功", userId);
     }
 }

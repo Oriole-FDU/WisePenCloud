@@ -78,15 +78,7 @@
             <artifactId>commons-pool2</artifactId>
         </dependency>
 
-        <!-- 邮件和模板支持 -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-mail</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-thymeleaf</artifactId>
-        </dependency>
+        <!-- 邮件服务通过FeignClient调用system-service，不再本地依赖 -->
     </dependencies>
 
     <build>

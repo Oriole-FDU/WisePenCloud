@@ -20,19 +20,8 @@ public enum ResultCode implements IErrorCode {
     NO_PERMISSION(403, "没有权限访问该资源"),   // 对应 NotPermissionException
     NO_ROLE(403, "没有角色权限访问该资源"),     // 对应 NotRoleException
 
-    // 用户/认证模块 (1000-1999)
-    USER_NOT_EXIST(1001, "用户不存在"),
-    USER_PASSWORD_ERROR(1002, "用户名或密码错误"),
-    USER_LOCKED(1003, "账号已禁用"),
-    USERNAME_EXISTED(1004,"用户名已被占用"),
-    USER_CAMPUS_NUM_EXISTED(1005,"该学号已注册，请通过找回密码找回"),
-    EMAIL_SEND_ERROR(1006,"邮件发送失败"),
-    PASSWORD_RESET_FAILED(1007,"密码重设失败"),
-    //校验内容不合法(1300-1399)
-    EMPTY(1300,"缺少必填内容"),
-    USERNAME_INVALID(1301,"用户名必须是4-20位字母、数字或下划线"),
-    PASSWORD_INVALID(1302,"密码长度必须大于8位且包含字母和数字"),
-    CAMPUS_NO_INVALID(1303,"学工号格式不正确");
+    // 校验内容不合法(1300-1399)
+    EMPTY(1300, "缺少必填内容");
 
 
 

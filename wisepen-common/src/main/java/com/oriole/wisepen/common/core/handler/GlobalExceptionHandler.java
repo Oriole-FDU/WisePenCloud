@@ -6,8 +6,6 @@ import cn.dev33.satoken.exception.NotRoleException;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.enums.ResultCode;
 import com.oriole.wisepen.common.core.exception.ServiceException;
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -70,19 +68,6 @@ public class GlobalExceptionHandler {
         log.warn("参数校验失败: {}", message);
         return R.fail(ResultCode.PARAM_ERROR.getCode(), message);
     }
-
-    /**
-     * 捕获 ConstraintViolationException 异常（方法参数校验失败）
-     */
-    @ExceptionHandler(ConstraintViolationException.class)
-    public R<Void> handleConstraintViolationException(ConstraintViolationException e) {
-        // 获取第一个违反的约束信息
-        ConstraintViolation<?> violation = e.getConstraintViolations().iterator().next();
-        String message = violation.getMessage();
-        log.warn("参数校验失败: {}", message);
-        return R.fail(ResultCode.PARAM_ERROR.getCode(), message);
-    }
-
     /**
      * 兜底异常，防止未知的空指针等错误直接把堆栈暴露给前端
      */

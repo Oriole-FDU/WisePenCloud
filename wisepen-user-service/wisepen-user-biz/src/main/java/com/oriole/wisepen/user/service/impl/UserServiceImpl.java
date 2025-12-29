@@ -59,24 +59,45 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         userMapper.updateById(user);
     }
 
-    @Override//联合查询
+    @Override
     public User getUserCoreInfoByAccount(String account) {
-        return userMapper.selectUserByAccount(account);
+        // 逻辑分层查询策略：先按用户名查询，再按学工号查询
+        // 避免跨表OR查询导致的索引失效问题
+
+        // 第一步：尝试按用户名查询（单表查询，能充分利用索引）
+        User user = userMapper.selectUserByUsername(account);
+        if (user != null) {
+            // 查询对应的学工号信息
+            UserProfile profile = userProfileMapper.selectById(user.getId());
+            if (profile != null) {
+                user.setCampusNo(profile.getCampusNo());
+            }
+            return user;
+        }
+
+        // 第二步：如果用户名未找到，再按学工号查询
+        return userMapper.selectUserByCampusNo(account);
     }
 
     @Override
     public boolean verifyExistCampusNum(String campusNum) {
-        return userMapper.verifyExistCampusNum(campusNum)>0;
+        // 使用MyBatis-Plus的lambdaQuery查询，避免手写SQL
+        return userProfileMapper.selectCount(Wrappers.<UserProfile>lambdaQuery()
+                .eq(UserProfile::getCampusNo, campusNum)) > 0;
     }
 
     @Override
     public boolean verifyExistUsername(String username) {
-        return userMapper.verifyExistUsername(username)>0;
+        // 使用MyBatis-Plus的lambdaQuery查询，避免手写SQL
+        return userMapper.selectCount(Wrappers.<User>lambdaQuery()
+                .eq(User::getUsername, username)) > 0;
     }
 
     @Override
     public boolean verifyExistUserId(String userId) {
-        return userMapper.verifyExistUserId(userId)>0;
+        // 使用MyBatis-Plus的lambdaQuery查询，避免手写SQL
+        return userProfileMapper.selectCount(Wrappers.<UserProfile>lambdaQuery()
+                .eq(UserProfile::getUserId, Long.valueOf(userId))) > 0;
     }
 
     @Override

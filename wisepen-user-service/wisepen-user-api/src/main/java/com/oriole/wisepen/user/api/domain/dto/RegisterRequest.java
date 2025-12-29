@@ -1,17 +1,17 @@
 package com.oriole.wisepen.user.api.domain.dto;
 
-import com.oriole.wisepen.user.api.validation.ValidCampusNo;
-import com.oriole.wisepen.user.api.validation.ValidPassword;
-import com.oriole.wisepen.user.api.validation.ValidUsername;
+import com.oriole.wisepen.user.api.constant.UserRegexPatterns;
 import com.oriole.wisepen.user.api.constant.UserValidationMsg;
+import com.oriole.wisepen.user.api.validation.ValidUsername;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.io.Serializable;
 
 @Data
-public class RegisterBody implements Serializable {
+public class RegisterRequest implements Serializable {
     /** 用户名*/
     @NotBlank(message = UserValidationMsg.USERNAME_EMPTY)
     @ValidUsername(
@@ -22,7 +22,7 @@ public class RegisterBody implements Serializable {
 
     /** 密码*/
     @NotBlank(message = UserValidationMsg.PASSWORD_EMPTY)
-    @ValidPassword
+    @Pattern(regexp = UserRegexPatterns.PASSWORD_PATTERN, message = UserValidationMsg.PASSWORD_INVALID)
     private String password;
 
     /** 真名*/
@@ -32,6 +32,6 @@ public class RegisterBody implements Serializable {
 
     /** 学工号*/
     @NotBlank(message = UserValidationMsg.CAMPUS_NO_EMPTY)
-    @ValidCampusNo
+    @Pattern(regexp = UserRegexPatterns.CAMPUS_NO_PATTERN, message = UserValidationMsg.CAMPUS_NO_INVALID)
     private String campusNum;
 }

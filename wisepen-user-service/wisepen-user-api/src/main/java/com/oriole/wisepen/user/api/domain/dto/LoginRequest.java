@@ -1,17 +1,18 @@
 package com.oriole.wisepen.user.api.domain.dto;
 
+import com.oriole.wisepen.user.api.constant.UserValidationMsg;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import java.io.Serializable;
 
 @Data
-public class LoginBody implements Serializable {
+public class LoginRequest implements Serializable {
     /** 用户名或学工号 */
-    @NotBlank(message = "用户名或学工号不能为空")
+    @NotBlank(message = UserValidationMsg.USERNAME_EMPTY)
     private String account;
 
     /** 密码 */
-    @NotBlank(message = "密码不能为空")
+    @NotBlank(message = UserValidationMsg.PASSWORD_EMPTY)
     private String password;
 
     /** 验证码 (预留) */
