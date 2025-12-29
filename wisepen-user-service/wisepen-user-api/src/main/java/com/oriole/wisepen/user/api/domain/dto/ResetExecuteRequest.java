@@ -1,17 +1,20 @@
 package com.oriole.wisepen.user.api.domain.dto;
 
-import com.oriole.wisepen.user.api.validation.CampusNo;
-import com.oriole.wisepen.user.api.validation.Password;
+import com.oriole.wisepen.user.api.validation.ValidPassword;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
 import lombok.Data;
 import java.io.Serializable;
 
+/**
+ * 重置密码执行请求体
+ *
+ * @author Oriole
+ */
 @Data
-public class ResetExecuteBody implements Serializable {
-    /** 学工号*/
+public class ResetExecuteVO implements Serializable {
+    /** 新密码*/
     @NotBlank(message = "新密码不能为空")
-    @Password
+    @ValidPassword
     private String newPassword;
     private String token;
 }

@@ -1,8 +1,7 @@
 package com.oriole.wisepen.user.api.domain.dto;
 
-import com.oriole.wisepen.user.api.validation.CampusNo;
+import com.oriole.wisepen.user.api.validation.ValidCampusNo;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
 import lombok.Data;
 import java.io.Serializable;
 
@@ -10,7 +9,7 @@ import java.io.Serializable;
 public class ResetBody implements Serializable {
     /** 学工号*/
     @NotBlank(message = "学工号不能为空")
-    @CampusNo
+    @ValidCampusNo
     private String campusNum;
 
     @NotBlank(message = "邮箱后缀不能为空")
