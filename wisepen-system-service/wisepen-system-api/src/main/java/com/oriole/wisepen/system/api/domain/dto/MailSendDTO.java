@@ -26,8 +26,6 @@ public class MailSendDTO implements Serializable {
     @NotBlank(message = MailValidationMessage.SUBJECT_EMPTY)
     private String subject;
 
-    @NotBlank(message = MailValidationMessage.TEMPLATE_EMPTY)
-    private String template;
-
-    private Map<String, Object> templateParams;
+    @NotBlank(message = MailValidationMessage.CONTENT_EMPTY)
+    private String content;
 }

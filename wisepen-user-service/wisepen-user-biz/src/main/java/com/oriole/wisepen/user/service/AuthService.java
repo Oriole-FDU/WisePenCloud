@@ -38,6 +38,7 @@ public class AuthService {
 
     private final UserService userService;
     private final GroupService groupService;
+    private final MailDrawingService mailDrawingService;
     private final RemoteMailService remoteMailService;
 
     public void login(LoginRequest loginRequest) {
@@ -137,49 +138,53 @@ public class AuthService {
     StringRedisTemplate redisTemplate;
 
     public R<Void> sendResetMail(ResetRequest resetRequest) {
-        String campusNum = resetRequest.getCampusNo();
+        String campusNo = resetRequest.getCampusNo();
 
-        //卫语句：校验学号是否存在
-        if (!userService.verifyExistCampusNo(campusNum)) {
-            return R.ok();
+        // 1. 卫语句：校验学号是否存在
+        if (!userService.verifyExistCampusNo(campusNo)) {
+            log.warn("重置密码申请：学号 {} 不存在，流程静默终止", campusNo);
+            return R.ok(); // 处于安全考虑，不存在也返回成功，防止撞库
         }
 
-        // 准备数据
-        Long userId = userService.getUserIdByCampusNo(campusNum);
-        String email = Optional.ofNullable(userService.getUserEmailByCampusNo(campusNum))
-                .orElse(campusNum + resetRequest.getMailAppendix());
+        // 2. 准备基础数据
+        Long userId = userService.getUserIdByCampusNo(campusNo);
+        String email = Optional.ofNullable(userService.getUserEmailByCampusNo(campusNo))
+                .orElse(campusNo + resetRequest.getMailAppendix());
         String token = IdUtil.fastSimpleUUID();
 
-        //存入 Redis (15分钟)
-        redisTemplate.opsForValue().set("auth:reset:token:" + token, String.valueOf(userId), 15, TimeUnit.MINUTES);
+        // 3. 存入 Redis (建议抽取 Key 常量)
+        String redisKey = "auth:reset:token:" + token;
+        redisTemplate.opsForValue().set(redisKey, String.valueOf(userId), 15, TimeUnit.MINUTES);
 
-        //构建邮件并发送
+        // 4. 构建重置链接
+        String resetLink = "https://wisepen.fudan.edu.cn/reset-pwd?token=" + token;
+
+        // 5. 调用之前写好的 MailDrawingService 本地渲染 HTML 内容
+        String htmlContent = mailDrawingService.resetMailDrawing(campusNo, resetLink);
+
+        // 6. 构造邮件 DTO 并发送
         MailSendDTO mailDTO = MailSendDTO.builder()
                 .toEmail(email)
                 .subject("【WisePen】密码重置申请")
-                .template("resetMailTemplate")
-                .templateParams(Map.of(
-                        "student_id", campusNum,
-                        "reset_link", "https://wisepen.fudan.edu.cn/reset-pwd?token=" + token,
-                        "current_date", DateUtil.now()
-                ))
+                .content(htmlContent) // 传递渲染后的 HTML 字符串
                 .build();
 
         try {
-            log.info("发送重置邮件：学号={}, 邮箱={}", campusNum, email);
+            log.info("开始发送重置邮件：学号={}, 目标邮箱={}", campusNo, email);
             R<MailResultDTO> res = remoteMailService.sendMail(mailDTO);
 
+            // 使用远程调用通用校验工具类或手动判断
             if (res == null || res.getCode() != 200) {
+                log.error("远程邮件服务返回异常: {}", res != null ? res.getMsg() : "响应为空");
                 throw new ServiceException(UserErrorCode.EMAIL_SEND_ERROR);
             }
         } catch (Exception e) {
-            log.error("邮件服务调用失败", e);
+            log.error("邮件服务 Feign 调用崩溃", e);
             throw new ServiceException(UserErrorCode.EMAIL_SEND_ERROR);
         }
 
         return R.ok();
     }
-
     /**
      * 直接根据用户ID更新密码（管理员用）
      * @param userId 用户ID

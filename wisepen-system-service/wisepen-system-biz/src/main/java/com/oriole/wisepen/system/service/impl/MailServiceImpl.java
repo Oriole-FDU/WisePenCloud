@@ -13,8 +13,6 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.thymeleaf.TemplateEngine;
-import org.thymeleaf.context.Context;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -30,7 +28,6 @@ import java.util.Map;
 public class MailServiceImpl implements MailService {
 
     private final JavaMailSender mailSender;
-    private final TemplateEngine templateEngine;
 
     @Value("${spring.mail.username:}")
     private String fromEmail;
@@ -42,19 +39,7 @@ public class MailServiceImpl implements MailService {
     @Transactional(rollbackFor = Exception.class)
     public R<MailResultDTO> sendMail(MailSendDTO mailSendDTO) {
         try {
-            // 构建模板参数
-            Context context = new Context();
-            if (mailSendDTO.getTemplateParams() != null) {
-                for (Map.Entry<String, Object> entry : mailSendDTO.getTemplateParams().entrySet()) {
-                    context.setVariable(entry.getKey(), entry.getValue());
-                }
-            }
-
-            // 使用Thymeleaf模板引擎渲染邮件内容
-            String content = templateEngine.process(mailSendDTO.getTemplate(), context);
-
-            // 发送邮件
-            sendMail(mailSendDTO.getToEmail(), mailSendDTO.getSubject(), content);
+            sendMail(mailSendDTO.getToEmail(), mailSendDTO.getSubject(), mailSendDTO.getContent());
 
             log.info("邮件发送成功：收件人={}, 主题={}", mailSendDTO.getToEmail(), mailSendDTO.getSubject());
 

@@ -22,9 +22,7 @@ public interface UserService {
 
     /**
      * 根据用户ID更新密码
-     * @param userId 用户ID
-     * @param newPasswordHash 新密码的哈希值
-     * @return 更新是否成功
      */
     boolean updatePasswordByUserId(String userId, String newPasswordHash);
+
 }

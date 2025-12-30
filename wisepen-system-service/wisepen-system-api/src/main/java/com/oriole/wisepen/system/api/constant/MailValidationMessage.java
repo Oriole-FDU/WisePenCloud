@@ -8,6 +8,6 @@ public interface MailValidationMessage{
     String  TO_EMAIL_EMPTY = "收件人邮箱不能为空";
     String  TO_EMAIL_INVALID = "邮箱格式不正确";
     String  SUBJECT_EMPTY = "邮件主题不能为空";
-    String  TEMPLATE_EMPTY = "邮件模板不能为空";
+    String  CONTENT_EMPTY = "邮件内容不能为空";
 }
 
