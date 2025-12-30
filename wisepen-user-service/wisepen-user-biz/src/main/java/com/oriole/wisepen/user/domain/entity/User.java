@@ -48,7 +48,11 @@ public class User implements Serializable {
     private String email;
     private String mobile;
 
+<<<<<<< HEAD
     /** 状态 1:正常 -2:禁用 -1:未验证*/
+=======
+    /** 状态 1:正常 0:禁用 */
+>>>>>>> 0c5e42f (feat(): 新增了注册、找回密码、重置密码相关功能，位于user-service的userService)
     private Status status;
 
     /** 逻辑删除 0:未删 1:已删 */
