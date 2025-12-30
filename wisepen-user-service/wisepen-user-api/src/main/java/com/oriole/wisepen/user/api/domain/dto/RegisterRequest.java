@@ -14,7 +14,11 @@ import java.io.Serializable;
 public class RegisterRequest implements Serializable {
     /** 用户名*/
     @NotBlank(message = UserValidationMsg.USERNAME_EMPTY)
+<<<<<<< HEAD
     @ValidUsername
+=======
+    @ValidUsername(message = UserValidationMsg.CAMPUS_NO_INVALID)
+>>>>>>> 2e7809a (feat(): 新增了注册、找回密码、重置密码相关功能，位于user-service的userService)
     private String username;
 
     /** 密码*/

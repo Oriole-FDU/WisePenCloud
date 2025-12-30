@@ -12,7 +12,10 @@ public interface UserValidationMsg {
      */
     String USERNAME_INVALID = "用户名必须是4-20位字母、数字或下划线";
     String USERNAME_EMPTY = "用户名不能为空";
+<<<<<<< HEAD
     String USERNAME_EXISTED = "用户名已存在";
+=======
+>>>>>>> 2e7809a (feat(): 新增了注册、找回密码、重置密码相关功能，位于user-service的userService)
 
     /**
      * 密码相关消息
