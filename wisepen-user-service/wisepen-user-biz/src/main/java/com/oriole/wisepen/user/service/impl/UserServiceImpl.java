@@ -66,7 +66,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     public User getUserCoreInfoByAccount(String account) {
         // 使用 MyBatis-Plus 的 Lambda 查询
         return userMapper.selectOne(new LambdaQueryWrapper<User>()
-                .eq(User::getDelFlag, 0)
                 .and(wrapper -> wrapper
                         .eq(User::getUsername, account)
                         .or()
@@ -103,7 +102,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
                 new LambdaQueryWrapper<User>()
                         .select(User::getId)             // SQL: SELECT id
                         .eq(User::getCampusNo, campusNo) // SQL: WHERE campus_no = ?
-                        .eq(User::getDelFlag, 0)         // SQL: AND del_flag = 0
                         .last("LIMIT 1")                 // SQL: LIMIT 1
         )).map(User::getId).orElse(null);
     }
