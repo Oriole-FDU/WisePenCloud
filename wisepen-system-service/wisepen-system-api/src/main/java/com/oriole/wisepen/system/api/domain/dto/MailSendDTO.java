@@ -1,43 +1,33 @@
 package com.oriole.wisepen.system.api.domain.dto;
 
+import com.oriole.wisepen.system.api.constant.MailValidationMessage;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 import java.util.Map;
 
-/**
- * 邮件发送DTO
- *
- * @author Oriole
- */
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class MailSendDTO implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    /**
-     * 收件人邮箱
-     */
-    @NotBlank(message = "收件人邮箱不能为空")
-    @Email(message = "邮箱格式不正确")
+    @NotBlank(message = MailValidationMessage.TO_EMAIL_EMPTY)
+    @Email(message = MailValidationMessage.TO_EMAIL_INVALID)
     private String toEmail;
 
-    /**
-     * 邮件主题
-     */
-    @NotBlank(message = "邮件主题不能为空")
+    @NotBlank(message = MailValidationMessage.SUBJECT_EMPTY)
     private String subject;
 
-    /**
-     * 模板名称
-     */
-    @NotBlank(message = "模板名称不能为空")
+    @NotBlank(message = MailValidationMessage.TEMPLATE_EMPTY)
     private String template;
 
-    /**
-     * 模板参数
-     */
     private Map<String, Object> templateParams;
 }

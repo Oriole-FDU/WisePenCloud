@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.oriole.wisepen.user.api.domain.dto.UserInfoDTO;
+import com.oriole.wisepen.user.api.enums.Status;
 import com.oriole.wisepen.user.domain.entity.User;
 import com.oriole.wisepen.user.domain.entity.UserProfile;
 import com.oriole.wisepen.user.service.UserService;
@@ -14,6 +15,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -52,7 +55,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     @Override
-    public void updateUserStatus(Long userId, Integer status) {
+    public void updateUserStatus(Long userId, Status status) {
         User user = new User();
         user.setId(userId);
         user.setStatus(status);
@@ -61,34 +64,27 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     @Override
     public User getUserCoreInfoByAccount(String account) {
-        // 逻辑分层查询策略：先按用户名查询，再按学工号查询
-        // 避免跨表OR查询导致的索引失效问题
-
-        // 第一步：尝试按用户名查询（单表查询，能充分利用索引）
-        User user = userMapper.selectUserByUsername(account);
-        if (user != null) {
-            // 查询对应的学工号信息
-            UserProfile profile = userProfileMapper.selectById(user.getId());
-            if (profile != null) {
-                user.setCampusNo(profile.getCampusNo());
-            }
-            return user;
-        }
-
-        // 第二步：如果用户名未找到，再按学工号查询
-        return userMapper.selectUserByCampusNo(account);
+        // 使用 MyBatis-Plus 的 Lambda 查询
+        return userMapper.selectOne(new LambdaQueryWrapper<User>()
+                .eq(User::getDelFlag, 0)
+                .and(wrapper -> wrapper
+                        .eq(User::getUsername, account)
+                        .or()
+                        .eq(User::getCampusNo, account)
+                )
+                .last("LIMIT 1"));
     }
 
     @Override
-    public boolean verifyExistCampusNum(String campusNum) {
-        // 使用MyBatis-Plus的lambdaQuery查询，避免手写SQL
+    public boolean verifyExistCampusNo(String campusNo) {
+        // 使用MyBatis-Plus的lambdaQuery查询
         return userProfileMapper.selectCount(Wrappers.<UserProfile>lambdaQuery()
-                .eq(UserProfile::getCampusNo, campusNum)) > 0;
+                .eq(UserProfile::getCampusNo, campusNo)) > 0;
     }
 
     @Override
     public boolean verifyExistUsername(String username) {
-        // 使用MyBatis-Plus的lambdaQuery查询，避免手写SQL
+        // 使用MyBatis-Plus的lambdaQuery查询
         return userMapper.selectCount(Wrappers.<User>lambdaQuery()
                 .eq(User::getUsername, username)) > 0;
     }
@@ -101,18 +97,29 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     @Override
-    public Long getUserIdByCampusNum(String campusNum){
-        return userProfileMapper.getUserIdByCampusNum(campusNum);
+    public Long getUserIdByCampusNo(String campusNo) {
+        // 用 Optional 处理查询结果，避免可能的空指针风险
+        return Optional.ofNullable(userMapper.selectOne(
+                new LambdaQueryWrapper<User>()
+                        .select(User::getId)             // SQL: SELECT id
+                        .eq(User::getCampusNo, campusNo) // SQL: WHERE campus_no = ?
+                        .eq(User::getDelFlag, 0)         // SQL: AND del_flag = 0
+                        .last("LIMIT 1")                 // SQL: LIMIT 1
+        )).map(User::getId).orElse(null);
     }
 
     @Override
-    public String getUserEmailByCampusNum(String campusNum){
-        return userMapper.getUserEmailByCampusNum(campusNum);
+    public String getUserEmailByCampusNo(String campusNo) {
+        User user = userMapper.selectOne(new LambdaQueryWrapper<User>()
+                .select(User::getEmail) // 只查询 email 这一列
+                .eq(User::getCampusNo, campusNo)
+                .eq(User::getDelFlag, 0)
+                .last("LIMIT 1"));
+
+        return user != null ? user.getEmail() : null;
     }
     /**
      * 插入用户基本信息到sys_user表
-     * @param user 用户实体对象
-     * @return 是否插入成功
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -122,8 +129,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     /**
      * 插入用户档案信息到sys_user_profile表
-     * @param userProfile 用户档案实体对象
-     * @return 是否插入成功
      */
     @Override
     @Transactional(rollbackFor = Exception.class)

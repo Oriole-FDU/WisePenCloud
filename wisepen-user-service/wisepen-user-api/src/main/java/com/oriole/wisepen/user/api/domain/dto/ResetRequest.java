@@ -1,6 +1,5 @@
 package com.oriole.wisepen.user.api.domain.dto;
 
-import com.oriole.wisepen.user.api.validation.ValidCampusNo;
 import com.oriole.wisepen.user.api.constant.UserValidationMsg;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
@@ -10,8 +9,7 @@ import java.io.Serializable;
 public class ResetRequest implements Serializable {
     /** 学工号*/
     @NotBlank(message = UserValidationMsg.CAMPUS_NO_EMPTY)
-    @ValidCampusNo
-    private String campusNum;
+    private String campusNo;
 
     @NotBlank(message = UserValidationMsg.EMAIL_APPENDIX_EMPTY)
     private String mailAppendix;

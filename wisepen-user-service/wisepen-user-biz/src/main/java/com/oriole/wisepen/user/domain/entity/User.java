@@ -1,7 +1,12 @@
 package com.oriole.wisepen.user.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.oriole.wisepen.user.api.enums.IdentityType;
+import com.oriole.wisepen.user.api.enums.Status;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -11,6 +16,9 @@ import java.time.LocalDateTime;
  * 核心用户账号实体
  */
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @TableName("sys_user")
 public class User implements Serializable {
 
@@ -24,20 +32,22 @@ public class User implements Serializable {
     /** 用户名 */
     private String username;
 
+    /** 学工号*/
+    @TableField("campus_no")
+    private String campusNo;
+
     /** 密码 (序列化时忽略，防止泄露) */
     private String password;
 
     /** 身份 1:学生 2:老师 3:管理员 */
     @TableField("identity_type")
-    private Integer identityType;
+    private IdentityType identityType;
 
     private String nickname;
     private String avatar;
     private String email;
     private String mobile;
-
-    /** 状态 1:正常 -1:未验证身份 -2:系统封禁 */
-    private Integer status;
+    private Status status;
 
     /** 逻辑删除 0:未删 1:已删 */
     @TableLogic
@@ -50,7 +60,5 @@ public class User implements Serializable {
     @TableField(value = "update_time", fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
 
-    /** 学工号（非数据库字段，用于登录查询时关联获取） */
-    @TableField(exist = false)
-    private String campusNo;
+
 }

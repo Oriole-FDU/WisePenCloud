@@ -33,5 +33,5 @@ public class RegisterRequest implements Serializable {
     /** 学工号*/
     @NotBlank(message = UserValidationMsg.CAMPUS_NO_EMPTY)
     @Pattern(regexp = UserRegexPatterns.CAMPUS_NO_PATTERN, message = UserValidationMsg.CAMPUS_NO_INVALID)
-    private String campusNum;
+    private String campusNo;
 }

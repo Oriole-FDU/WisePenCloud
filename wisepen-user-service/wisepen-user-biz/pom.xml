@@ -78,7 +78,10 @@
             <artifactId>commons-pool2</artifactId>
         </dependency>
 
-        <!-- 邮件服务通过FeignClient调用system-service，不再本地依赖 -->
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-all</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
