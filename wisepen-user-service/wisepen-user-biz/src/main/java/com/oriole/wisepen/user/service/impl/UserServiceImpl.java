@@ -1,34 +1,124 @@
 package com.oriole.wisepen.user.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.util.IdUtil;
+import cn.hutool.crypto.digest.BCrypt;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.oriole.wisepen.common.core.exception.ServiceException;
+import com.oriole.wisepen.system.api.domain.dto.MailSendDTO;
+import com.oriole.wisepen.system.api.feign.RemoteMailService;
+import com.oriole.wisepen.user.api.domain.dto.RegisterRequest;
+import com.oriole.wisepen.user.api.domain.dto.ResetExecuteRequest;
+import com.oriole.wisepen.user.api.domain.dto.ResetRequest;
 import com.oriole.wisepen.user.api.domain.dto.UserInfoDTO;
+import com.oriole.wisepen.user.api.enums.IdentityType;
 import com.oriole.wisepen.user.api.enums.Status;
 import com.oriole.wisepen.user.domain.entity.User;
 import com.oriole.wisepen.user.domain.entity.UserProfile;
+import com.oriole.wisepen.user.exception.UserErrorCode;
 import com.oriole.wisepen.user.service.UserService;
 import com.oriole.wisepen.user.mapper.UserMapper;
 import com.oriole.wisepen.user.mapper.UserProfileMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
 
-import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
+public class UserServiceImpl implements UserService {
 
     private final UserMapper userMapper;
     private final UserProfileMapper userProfileMapper;
 
+    @Autowired
+    StringRedisTemplate redisTemplate;
+
+    private final TemplateEngine templateEngine;
+
+    private final RemoteMailService remoteMailService;
+
     @Override
-    public User getUserCoreInfoByUsername(String username) {
-        return userMapper.selectOne(Wrappers.<User>lambdaQuery().eq(User::getUsername, username));
+    public User getUserCoreInfoByAccount(String account) {
+        return userMapper.selectOne(Wrappers.<User>lambdaQuery()
+                .and(w -> w.eq(User::getUsername, account).or().eq(User::getCampusNo, account))
+                .last("LIMIT 1"));
+    }
+
+    /**
+     * 注册
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void register(RegisterRequest registerRequest) {
+        // 校验用户名是否存在
+        if (userMapper.selectCount(Wrappers.<User>lambdaQuery().eq(User::getUsername, registerRequest.getUsername())) > 0) {
+            throw new ServiceException(UserErrorCode.USERNAME_EXISTED);
+        }
+
+        // 新建未验证的学生用户
+        User user = User.builder().username(registerRequest.getUsername()).identityType(IdentityType.STUDENT).status(Status.UNIDENTIFIED).build();
+        // 加密用户密码
+        user.setPassword(BCrypt.hashpw(registerRequest.getPassword()));
+        userMapper.insert(user);
+
+        // 新建档案
+        UserProfile userProfile = UserProfile.builder().userId(user.getId()).college("复旦大学").build();
+        userProfileMapper.insert(userProfile);
+    }
+
+    /**
+     * 发送重置邮件
+     */
+    @Override
+    public void sendResetMail(ResetRequest resetRequest) {
+        // 查询学号对应用户
+        String campusNo = resetRequest.getCampusNo();
+        User user = userMapper.selectOne(Wrappers.<User>lambdaQuery().eq(User::getCampusNo, campusNo).last("LIMIT 1"));
+
+        if(user==null){
+            log.warn("重置密码申请：学号 {} 不存在，流程静默终止", campusNo);
+            return; // 处于安全考虑，不存在也不报错，防止撞库
+        }
+
+        String token = IdUtil.fastSimpleUUID();
+
+        String redisKey = "auth:reset:token:" + token;
+        redisTemplate.opsForValue().set(redisKey, String.valueOf(user.getId()), 15, TimeUnit.MINUTES);
+
+        // 构建重置链接
+        String resetLink = "https://wisepen.fudan.edu.cn/reset-pwd?token=" + token;
+
+        // 构建重置邮件
+        Context context = new Context();
+        context.setVariable("student_id", campusNo);
+        context.setVariable("reset_link", resetLink);
+        context.setVariable("current_date", DateUtil.now());
+        // Thymeleaf 渲染
+        String emailContent = templateEngine.process("resetMailTemplate", context);
+
+        // 构造邮件 DTO 并发送
+        MailSendDTO mailDTO = MailSendDTO.builder()
+                .toEmail(user.getEmail())
+                .subject("密码重置申请")
+                .content(emailContent) // 传递渲染后的 HTML 字符串
+                .build();
+
+        try {
+            remoteMailService.sendMail(mailDTO);
+            log.info("Email sent. campusNo={}, email={}", campusNo, user.getEmail());
+        } catch (Exception e) {
+            log.error("Email sending failed.", e);
+            throw new ServiceException(UserErrorCode.EMAIL_SEND_ERROR);
+        }
     }
 
     @Override
@@ -54,108 +144,31 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         return dto;
     }
 
-    @Override
-    public void updateUserStatus(Long userId, Status status) {
-        User user = new User();
-        user.setId(userId);
-        user.setStatus(status);
-        userMapper.updateById(user);
-    }
-
-    @Override
-    public User getUserCoreInfoByAccount(String account) {
-        // 使用 MyBatis-Plus 的 Lambda 查询
-        return userMapper.selectOne(new LambdaQueryWrapper<User>()
-                .and(wrapper -> wrapper
-                        .eq(User::getUsername, account)
-                        .or()
-                        .eq(User::getCampusNo, account)
-                )
-                .last("LIMIT 1"));
-    }
-
-    @Override
-    public boolean verifyExistCampusNo(String campusNo) {
-        // 使用MyBatis-Plus的lambdaQuery查询
-        return userProfileMapper.selectCount(Wrappers.<UserProfile>lambdaQuery()
-                .eq(UserProfile::getCampusNo, campusNo)) > 0;
-    }
-
-    @Override
-    public boolean verifyExistUsername(String username) {
-        // 使用MyBatis-Plus的lambdaQuery查询
-        return userMapper.selectCount(Wrappers.<User>lambdaQuery()
-                .eq(User::getUsername, username)) > 0;
-    }
-
-    @Override
-    public boolean verifyExistUserId(String userId) {
-        // 使用MyBatis-Plus的lambdaQuery查询，避免手写SQL
-        return userProfileMapper.selectCount(Wrappers.<UserProfile>lambdaQuery()
-                .eq(UserProfile::getUserId, Long.valueOf(userId))) > 0;
-    }
-
-    @Override
-    public Long getUserIdByCampusNo(String campusNo) {
-        // 用 Optional 处理查询结果，避免可能的空指针风险
-        return Optional.ofNullable(userMapper.selectOne(
-                new LambdaQueryWrapper<User>()
-                        .select(User::getId)             // SQL: SELECT id
-                        .eq(User::getCampusNo, campusNo) // SQL: WHERE campus_no = ?
-                        .last("LIMIT 1")                 // SQL: LIMIT 1
-        )).map(User::getId).orElse(null);
-    }
-
-    @Override
-    public String getUserEmailByCampusNo(String campusNo) {
-        User user = userMapper.selectOne(new LambdaQueryWrapper<User>()
-                .select(User::getEmail) // 只查询 email 这一列
-                .eq(User::getCampusNo, campusNo)
-                .eq(User::getDelFlag, 0)
-                .last("LIMIT 1"));
-
-        return user != null ? user.getEmail() : null;
-    }
     /**
-     * 插入用户基本信息到sys_user表
+     * 执行重置密码（通过token）
      */
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    public boolean insertUser(User user) {
-        return this.save(user);
-    }
+    public void resetPassword(ResetExecuteRequest resetExecuteRequest){
+        String redisKey = "auth:reset:token:" + resetExecuteRequest.getToken();
+        String userId = redisTemplate.opsForValue().get(redisKey);
 
-    /**
-     * 插入用户档案信息到sys_user_profile表
-     */
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public boolean insertUserProfile(UserProfile userProfile) {
-        return userProfileMapper.insert(userProfile) > 0;
-    }
-
-    /**
-     * 根据用户ID更新密码
-     * @param userId 用户ID
-     * @param newPasswordHash 新密码的哈希值
-     * @return 更新是否成功
-     */
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public boolean updatePasswordByUserId(String userId, String newPasswordHash) {
-        try {
-            User user = new User();
-            user.setId(Long.valueOf(userId));
-            user.setPassword(newPasswordHash);
-            // 更新密码的同时更新时间戳
-            user.setUpdateTime(java.time.LocalDateTime.now());
-
-            int result = userMapper.updateById(user);
-            return result > 0;
-        } catch (NumberFormatException e) {
-            log.error("用户ID格式错误: {}", userId, e);
-            return false;
+        if(userId == null){
+            throw new ServiceException(UserErrorCode.PASSWORD_RESET_FAILED);
         }
+
+        updatePasswordByUserId(userId, resetExecuteRequest.getNewPassword());
+        // 成功后立即清理 Token
+        redisTemplate.delete(redisKey);
+        log.info("用户 {} 密码重置成功", userId);
     }
 
+    boolean updatePasswordByUserId(String userId, String newPassword) {
+        User user = User.builder()
+                .id(Long.valueOf(userId))
+                .password(BCrypt.hashpw(newPassword))
+                .updateTime(java.time.LocalDateTime.now())
+                .build();
+        int result = userMapper.updateById(user);
+        return result > 0;
+    }
 }

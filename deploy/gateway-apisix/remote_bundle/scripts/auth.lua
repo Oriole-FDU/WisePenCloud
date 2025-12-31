@@ -8,26 +8,11 @@ return function(conf, ctx)
     local core = require("apisix.core")
     local jwt = require("resty.jwt")
 
-    -- 获取 Authorization 头
-    -- Nginx 获取 Header 是大小写不敏感的，但通常标准是 Authorization
-    local auth_header = core.request.header(ctx, "Authorization")
+   local token = ctx.var.cookie_authorization
 
-    -- 如果没有 Token，直接 return 结束当前脚本。
-    -- 不要手动 return 401，因为后面的 jwt-auth 插件会发现缺失并返回标准的 401。
-    if not auth_header then
-        return
-    end
-
-    -- 处理 Bearer 前缀 (兼容性处理)
-    --有些客户端会发 "Bearer <token>"，有些只发 "<token>"
-    local token = auth_header
-    if string.sub(auth_header, 1, 7) == "Bearer " then
-        token = string.sub(auth_header, 8)
-    end
-
-    if not token or token == "" then
-        return
-    end
+   if not token or token == "" then
+       return
+   end
 
     -- load_jwt 不会验证签名，只解析内容
     -- 即使这里解析了假 Token，稍后执行的 jwt-auth 插件也会拦截请求，所以是安全的

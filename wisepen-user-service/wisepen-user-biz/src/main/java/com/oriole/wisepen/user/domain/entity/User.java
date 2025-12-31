@@ -1,7 +1,7 @@
 package com.oriole.wisepen.user.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
-import com.oriole.wisepen.user.api.enums.IdentityType;
+import com.oriole.wisepen.common.core.domain.enums.IdentityType;
 import com.oriole.wisepen.user.api.enums.Status;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -47,6 +47,8 @@ public class User implements Serializable {
     private String avatar;
     private String email;
     private String mobile;
+
+    /** 状态 1:正常 0:禁用 */
     private Status status;
 
     /** 逻辑删除 0:未删 1:已删 */
@@ -59,6 +61,4 @@ public class User implements Serializable {
 
     @TableField(value = "update_time", fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
-
-
 }

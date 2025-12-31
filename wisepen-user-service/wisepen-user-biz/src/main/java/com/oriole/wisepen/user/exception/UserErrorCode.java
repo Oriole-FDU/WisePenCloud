@@ -19,15 +19,9 @@ public enum UserErrorCode implements IErrorCode {
     USER_NOT_EXIST(1001, "用户不存在"),
     USER_PASSWORD_ERROR(1002, "用户名或密码错误"),
     USER_LOCKED(1003, "账号已禁用"),
-    USERNAME_EXISTED(1004, UserValidationMsg.USERNAME_EXISTED),
-    USER_CAMPUS_NUM_EXISTED(1005, "该学号已注册，请通过找回密码找回"),
-    EMAIL_SEND_ERROR(1006, "邮件发送失败"),
-    PASSWORD_RESET_FAILED(1007, "密码重设失败"),
-
-    // 校验内容不合法(1300-1399)
-    USERNAME_INVALID(1301, UserValidationMsg.USERNAME_INVALID),
-    PASSWORD_INVALID(1302, UserValidationMsg.PASSWORD_INVALID),
-    CAMPUS_NO_INVALID(1303, UserValidationMsg.CAMPUS_NO_INVALID);
+    USERNAME_EXISTED(1004, "用户名已存在"),
+    EMAIL_SEND_ERROR(1005, "邮件发送失败"),
+    PASSWORD_RESET_FAILED(1006, "密码重设失败");
 
     private final Integer code;
     private final String msg;

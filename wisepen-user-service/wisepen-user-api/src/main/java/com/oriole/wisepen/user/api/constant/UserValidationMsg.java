@@ -11,7 +11,6 @@ public interface UserValidationMsg {
      * 用户名相关消息
      */
     String USERNAME_INVALID = "用户名必须是4-20位字母、数字或下划线";
-    String USERNAME_EXISTED = "用户名已存在";
     String USERNAME_EMPTY = "用户名不能为空";
 
     /**
@@ -25,17 +24,4 @@ public interface UserValidationMsg {
      */
     String CAMPUS_NO_INVALID = "学工号格式不正确";
     String CAMPUS_NO_EMPTY = "学工号不能为空";
-
-    /**
-     * 邮箱相关消息
-     */
-    String EMAIL_INVALID = "邮箱格式不正确";
-    String EMAIL_APPENDIX_EMPTY = "邮箱后缀不能为空";
-    String EMAIL_EMPTY = "邮箱不能为空";
-
-    /**
-     * 真实姓名相关消息
-     */
-    String REAL_NAME_EMPTY = "真实姓名不能为空";
-    String REAL_NAME_TOO_LONG = "真实姓名长度不能超过64位";
 }

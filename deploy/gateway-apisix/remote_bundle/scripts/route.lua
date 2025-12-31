@@ -70,7 +70,30 @@ return function(conf, ctx)
         -- 强行指定本次请求的上游节点 (Pick Server)
         -- 这里简单粗暴取第一个，通常开发环境每个人也只起一个实例
         ctx.picked_server = match_nodes[1]
-        core.log.info("[Development Isolation] Traffic Hit: ", target_dev, " -> ", ctx.picked_server.host, ":", ctx.picked_server.port)
+
+        local ip = match_nodes[1].host or match_nodes[1].ip -- 兼容不同版本的字段
+        local port = match_nodes[1].port
+
+        ctx.upstream_conf = {
+            name = "dev-isolation-temp",
+            type = "roundrobin",
+            scheme = "http",
+            nodes = {
+                {
+                    host = match_nodes[1].host or match_nodes[1].ip,
+                    port = match_nodes[1].port,
+                    weight = 1
+                }
+            },
+            pass_host = "pass",
+            retries = 0,
+            timeout = {
+                connect = 2,
+                send = 2,
+                read = 10
+            }
+        }
+        core.log.warn("[Development Isolation] Traffic Hit: ", target_dev, " -> ", ctx.picked_server.host, ":", ctx.picked_server.port)
     else
         -- 没找到节点
         -- 打印警告，然后自动放行（Failover），流量会回退到正常的主干环境

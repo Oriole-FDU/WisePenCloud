@@ -1,6 +1,9 @@
 package com.oriole.wisepen.common.core.constant;
 
 public class SecurityConstants {
+    /** Cookie的Authorization Token */
+    public static final String COOKIE_AUTHORIZATION_TOKEN = "authorization";
+
     /** 网关透传的用户ID Header Key */
     public static final String HEADER_USER_ID = "X-User-Id";
 

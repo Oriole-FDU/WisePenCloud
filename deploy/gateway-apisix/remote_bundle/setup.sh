@@ -90,7 +90,9 @@ echo ">>> [2/4] 初始化 Consumer..."
             '{
                 desc: "WisePen Protected Template (Monitor + Routing + JWT + AuthHeaders)",
                 plugins: {
-                    "jwt-auth": {},
+                    "jwt-auth": {
+                        "cookie": "authorization"
+                    },
                     "prometheus": {},
                     "opentelemetry": {},
                     "serverless-pre-function": {

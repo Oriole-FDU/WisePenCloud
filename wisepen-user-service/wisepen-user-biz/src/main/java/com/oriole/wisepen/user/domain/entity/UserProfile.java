@@ -32,9 +32,6 @@ public class UserProfile implements Serializable {
 
     private String realName;
 
-    @TableField("campus_no")
-    private String campusNo;
-
     @TableField("sex")
     private GenderType sex;
 

@@ -11,8 +11,6 @@ public class ResetRequest implements Serializable {
     @NotBlank(message = UserValidationMsg.CAMPUS_NO_EMPTY)
     private String campusNo;
 
-    @NotBlank(message = UserValidationMsg.EMAIL_APPENDIX_EMPTY)
-    private String mailAppendix;
     /** 验证码 (预留) */
     private String code;
     /** 唯一标识 (预留，用于验证码校验) */

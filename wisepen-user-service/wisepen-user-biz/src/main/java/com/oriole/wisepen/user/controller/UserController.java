@@ -5,8 +5,12 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.core.domain.R;
+import com.oriole.wisepen.user.api.domain.dto.RegisterRequest;
+import com.oriole.wisepen.user.api.domain.dto.ResetExecuteRequest;
+import com.oriole.wisepen.user.api.domain.dto.ResetRequest;
 import com.oriole.wisepen.user.api.domain.dto.UserInfoDTO;
 import com.oriole.wisepen.user.service.UserService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,6 +20,24 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final UserService userService;
+
+    @PostMapping("/register")
+    public R<String> register(@Valid @RequestBody RegisterRequest registerRequest) {
+        userService.register(registerRequest);
+        return R.ok();
+    }
+
+    @PostMapping("/forgot-password/email")
+    public R<Void> forgotPassword(@Valid @RequestBody ResetRequest resetRequest) {
+        userService.sendResetMail(resetRequest);
+        return R.ok();
+    }
+
+    @PostMapping("/forgot-password/reset")
+    public R<Void> resetPassword(@Valid @RequestBody ResetExecuteRequest resetExecuteRequest) {
+        userService.resetPassword(resetExecuteRequest);
+        return R.ok();
+    }
 
     /**
      * 获取用户信息
