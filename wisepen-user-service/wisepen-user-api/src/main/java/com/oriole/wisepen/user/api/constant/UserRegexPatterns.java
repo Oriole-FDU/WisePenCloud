@@ -19,6 +19,7 @@ public interface UserRegexPatterns {
 
     /**
 <<<<<<< HEAD
+<<<<<<< HEAD
      * 学工号正则：11位数字或5位数字XH4位数字
      */
     String CAMPUS_NO_PATTERN = "^(\\d{11}|\\d{5}XH\\d{4})$";
@@ -27,6 +28,11 @@ public interface UserRegexPatterns {
      */
     String CAMPUS_NO_PATTERN = "^(\\d{11}|\\d{3}XH\\d{4})$";
 >>>>>>> 2e7809a (feat(): 新增了注册、找回密码、重置密码相关功能，位于user-service的userService)
+=======
+     * 学工号正则：11位数字或5位数字XH4位数字
+     */
+    String CAMPUS_NO_PATTERN = "^(\\d{11}|\\d{5}XH\\d{4})$";
+>>>>>>> a9b93c6 (fix(): 完善注册与密码找回逻辑，修复 User.status 依赖及验证问题)
 
     /**
      * 邮箱正则：基本邮箱格式验证
@@ -45,6 +51,7 @@ public interface UserRegexPatterns {
 
     /**
 <<<<<<< HEAD
+<<<<<<< HEAD
      * 特殊非法用户名格式（5位数字+XH+4位数字）
      */
     String XH_PATTERN = "^\\d{5}XH\\d{4}$";
@@ -53,4 +60,9 @@ public interface UserRegexPatterns {
      */
     String XH_PATTERN = "^\\d{3}XH\\d{4}$";
 >>>>>>> 2e7809a (feat(): 新增了注册、找回密码、重置密码相关功能，位于user-service的userService)
+=======
+     * 特殊非法用户名格式（5位数字+XH+4位数字）
+     */
+    String XH_PATTERN = "^\\d{5}XH\\d{4}$";
+>>>>>>> a9b93c6 (fix(): 完善注册与密码找回逻辑，修复 User.status 依赖及验证问题)
 }
