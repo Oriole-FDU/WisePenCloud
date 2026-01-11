@@ -48,7 +48,7 @@ public class User implements Serializable {
     private String email;
     private String mobile;
 
-    /** 状态 1:正常 0:禁用 */
+    /** 状态 1:正常 -2:禁用 -1:未验证*/
     private Status status;
 
     /** 逻辑删除 0:未删 1:已删 */

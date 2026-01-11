@@ -14,7 +14,7 @@ import java.io.Serializable;
 public class RegisterRequest implements Serializable {
     /** 用户名*/
     @NotBlank(message = UserValidationMsg.USERNAME_EMPTY)
-    @ValidUsername(message = UserValidationMsg.CAMPUS_NO_INVALID)
+    @ValidUsername
     private String username;
 
     /** 密码*/

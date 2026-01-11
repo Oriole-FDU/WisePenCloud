@@ -25,7 +25,7 @@ public enum IdentityType {
      * 根据 code 查找枚举
      */
     public static IdentityType getByCode(Integer code) {
-        if (code == null) return null;
+        if (code == null) {return null;}
         return Arrays.stream(values())
                 .filter(t -> t.getCode() == code)
                 .findFirst()
