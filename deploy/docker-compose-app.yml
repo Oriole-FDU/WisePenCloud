@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  user-service:
+    image: wisepen/user-service:latest
+    container_name: wisepen-user-service
+    restart: always
+    build:
+      context: ../
+      dockerfile: Dockerfile
+      args:
+        JAR_FILE: wisepen-user-service/wisepen-user-biz/target/*.jar
+    environment:
+      - TZ=Asia/Shanghai
+      - SPRING_PROFILES_ACTIVE=prod # 必须使用prod, 否则Nacos拉取的是dev的配置（默认），下同
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=nacos:8848
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=nacos:8848
+      - OTEL_SERVICE_NAME=wisepen-user-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS=
+    volumes:
+      - ../logs/user:/logs
+    networks:
+      - cloud-net
+
+  system-service:
+    image: wisepen/system-service:latest
+    container_name: wisepen-system-service
+    restart: always
+    build:
+      context: ../
+      dockerfile: Dockerfile
+      args:
+        JAR_FILE: wisepen-system-service/wisepen-system-biz/target/*.jar
+    environment:
+      - TZ=Asia/Shanghai
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=nacos:8848
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=nacos:8848
+      - OTEL_SERVICE_NAME=wisepen-system-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS=
+
+    volumes:
+      - ../logs/system:/logs
+    networks:
+      - cloud-net
+
+networks:
+  cloud-net:
+    external: true
+    name: cloud-infra_cloud-net

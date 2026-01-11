@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="SystemApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <module name="wisepen-system-biz" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.oriole.wisepen.system.SystemApplication" />
+    <option name="VM_PARAMETERS" value="-javaagent:$ProjectFileDir$/opentelemetry-javaagent.jar -Dotel.service.name=wisepen-system-service -Dotel.traces.sampler=always_on -Dotel.exporter.otlp.endpoint=http://wisepen-dev-server:4318" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
