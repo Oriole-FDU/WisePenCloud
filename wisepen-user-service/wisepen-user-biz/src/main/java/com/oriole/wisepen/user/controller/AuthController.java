@@ -3,14 +3,20 @@ package com.oriole.wisepen.user.controller;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.user.api.domain.dto.LoginRequest;
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> a72a49c (fix():将注册，密码找回逻辑移回/auth,解决了/user路径需要JWT Token的问题)
 import com.oriole.wisepen.user.api.domain.dto.RegisterRequest;
 import com.oriole.wisepen.user.api.domain.dto.ResetExecuteRequest;
 import com.oriole.wisepen.user.api.domain.dto.ResetRequest;
 import com.oriole.wisepen.user.service.AuthService;
 import com.oriole.wisepen.user.service.UserService;
+<<<<<<< HEAD
 =======
 import com.oriole.wisepen.user.service.AuthService;
 >>>>>>> 0c5e42f (feat(): 新增了注册、找回密码、重置密码相关功能，位于user-service的userService)
+=======
+>>>>>>> a72a49c (fix():将注册，密码找回逻辑移回/auth,解决了/user路径需要JWT Token的问题)
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;

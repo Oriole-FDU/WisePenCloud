@@ -49,10 +49,14 @@ public class User implements Serializable {
     private String mobile;
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     /** 状态 1:正常 -2:禁用 -1:未验证*/
 =======
     /** 状态 1:正常 0:禁用 */
 >>>>>>> 0c5e42f (feat(): 新增了注册、找回密码、重置密码相关功能，位于user-service的userService)
+=======
+    /** 状态 1:正常 -2:禁用 -1:未验证*/
+>>>>>>> a72a49c (fix():将注册，密码找回逻辑移回/auth,解决了/user路径需要JWT Token的问题)
     private Status status;
 
     /** 逻辑删除 0:未删 1:已删 */

@@ -6,9 +6,13 @@ import cn.hutool.core.util.IdUtil;
 import cn.hutool.crypto.digest.BCrypt;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 <<<<<<< HEAD
+<<<<<<< HEAD
 import com.oriole.wisepen.common.core.domain.enums.IdentityType;
 =======
 >>>>>>> 0c5e42f (feat(): 新增了注册、找回密码、重置密码相关功能，位于user-service的userService)
+=======
+import com.oriole.wisepen.common.core.domain.enums.IdentityType;
+>>>>>>> a72a49c (fix():将注册，密码找回逻辑移回/auth,解决了/user路径需要JWT Token的问题)
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.system.api.domain.dto.MailSendDTO;
 import com.oriole.wisepen.system.api.feign.RemoteMailService;
@@ -17,9 +21,12 @@ import com.oriole.wisepen.user.api.domain.dto.ResetExecuteRequest;
 import com.oriole.wisepen.user.api.domain.dto.ResetRequest;
 import com.oriole.wisepen.user.api.domain.dto.UserInfoDTO;
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 import com.oriole.wisepen.user.api.enums.IdentityType;
 >>>>>>> 0c5e42f (feat(): 新增了注册、找回密码、重置密码相关功能，位于user-service的userService)
+=======
+>>>>>>> a72a49c (fix():将注册，密码找回逻辑移回/auth,解决了/user路径需要JWT Token的问题)
 import com.oriole.wisepen.user.api.enums.Status;
 import com.oriole.wisepen.user.domain.entity.User;
 import com.oriole.wisepen.user.domain.entity.UserProfile;
@@ -36,10 +43,13 @@ import org.springframework.transaction.annotation.Transactional;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 <<<<<<< HEAD
+<<<<<<< HEAD
 import java.util.concurrent.TimeUnit;
 
 =======
 
+=======
+>>>>>>> a72a49c (fix():将注册，密码找回逻辑移回/auth,解决了/user路径需要JWT Token的问题)
 import java.util.concurrent.TimeUnit;
 
 >>>>>>> 0c5e42f (feat(): 新增了注册、找回密码、重置密码相关功能，位于user-service的userService)
@@ -78,29 +88,41 @@ public class UserServiceImpl implements UserService {
 
         // 新建未验证的学生用户
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> a72a49c (fix():将注册，密码找回逻辑移回/auth,解决了/user路径需要JWT Token的问题)
         User user = User.builder()
                 .username(registerRequest.getUsername())
                 .identityType(IdentityType.STUDENT)
                 .status(Status.UNIDENTIFIED)
                 .build();
 
+<<<<<<< HEAD
 =======
         User user = User.builder().username(registerRequest.getUsername()).identityType(IdentityType.STUDENT).status(Status.UNIDENTIFIED).build();
 >>>>>>> 0c5e42f (feat(): 新增了注册、找回密码、重置密码相关功能，位于user-service的userService)
+=======
+>>>>>>> a72a49c (fix():将注册，密码找回逻辑移回/auth,解决了/user路径需要JWT Token的问题)
         // 加密用户密码
         user.setPassword(BCrypt.hashpw(registerRequest.getPassword()));
         userMapper.insert(user);
 
         // 新建档案
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> a72a49c (fix():将注册，密码找回逻辑移回/auth,解决了/user路径需要JWT Token的问题)
         UserProfile userProfile = UserProfile.builder()
                 .userId(user.getId())
                 .university("复旦大学")
                 .college("复旦大学")
                 .build();
+<<<<<<< HEAD
 =======
         UserProfile userProfile = UserProfile.builder().userId(user.getId()).college("复旦大学").build();
 >>>>>>> 0c5e42f (feat(): 新增了注册、找回密码、重置密码相关功能，位于user-service的userService)
+=======
+>>>>>>> a72a49c (fix():将注册，密码找回逻辑移回/auth,解决了/user路径需要JWT Token的问题)
         userProfileMapper.insert(userProfile);
     }
 

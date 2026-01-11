@@ -21,24 +21,6 @@ public class UserController {
 
     private final UserService userService;
 
-    @PostMapping("/register")
-    public R<String> register(@Valid @RequestBody RegisterRequest registerRequest) {
-        userService.register(registerRequest);
-        return R.ok();
-    }
-
-    @PostMapping("/forgot-password/email")
-    public R<Void> forgotPassword(@Valid @RequestBody ResetRequest resetRequest) {
-        userService.sendResetMail(resetRequest);
-        return R.ok();
-    }
-
-    @PostMapping("/forgot-password/reset")
-    public R<Void> resetPassword(@Valid @RequestBody ResetExecuteRequest resetExecuteRequest) {
-        userService.resetPassword(resetExecuteRequest);
-        return R.ok();
-    }
-
     /**
      * 获取用户信息
      * 场景：用户登录后，前端需要获取自己的详细资料展示在右上角
