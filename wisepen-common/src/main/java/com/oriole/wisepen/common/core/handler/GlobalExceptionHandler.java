@@ -6,13 +6,23 @@ import cn.dev33.satoken.exception.NotRoleException;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.enums.ResultCode;
 import com.oriole.wisepen.common.core.exception.ServiceException;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RestControllerAdvice // 拦截所有 Controller
+@RequiredArgsConstructor
 public class GlobalExceptionHandler {
+
+    private final Environment environment;
 
     /**
      * 捕获业务异常 (ServiceException)，这是我们自己主动抛出的，不仅有 code 还有 msg，直接透传给前端
@@ -50,13 +60,30 @@ public class GlobalExceptionHandler {
         log.warn("角色不符: {}", e.getMessage());
         return R.fail(ResultCode.NO_ROLE);
     }
-
     /**
-     * 兜底异常，防止未知的空指针等错误直接把堆栈暴露给前端
+     * 捕获 Bean Validation 参数校验异常（@Valid注解校验失败）
+     */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public R<Void> handleMethodArgumentNotValidException(MethodArgumentNotValidException e) {
+        String message = e.getBindingResult().getFieldErrors().stream()
+                .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                .collect(Collectors.joining("; "));
+        log.warn("Validation failed: {}", message);
+        return R.fail(ResultCode.PARAM_ERROR, message);
+    }
+    /**
+     * 兜底异常
      */
     @ExceptionHandler(Exception.class)
     public R<Void> handleException(Exception e) {
-        log.error("系统未知错误", e);
-        return R.fail(ResultCode.SYSTEM_ERROR);
+        log.error("Unknow System Error", e);
+        // 判断当前是否处于 'dev' 或 'test' 环境
+        boolean isDev = environment.acceptsProfiles(Profiles.of("dev", "test"));
+        if (isDev) {
+            String errorMessage = String.format("System Error (%s): %s", e.getClass().getSimpleName(), e.getMessage());
+            return R.fail(ResultCode.SYSTEM_ERROR, errorMessage);
+        } else {
+            return R.fail(ResultCode.SYSTEM_ERROR);
+        }
     }
 }

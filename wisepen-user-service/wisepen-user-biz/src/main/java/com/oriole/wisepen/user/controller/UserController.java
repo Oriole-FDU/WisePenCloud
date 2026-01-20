@@ -5,8 +5,12 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.core.domain.R;
+import com.oriole.wisepen.user.api.domain.dto.RegisterRequest;
+import com.oriole.wisepen.user.api.domain.dto.ResetExecuteRequest;
+import com.oriole.wisepen.user.api.domain.dto.ResetRequest;
 import com.oriole.wisepen.user.api.domain.dto.UserInfoDTO;
 import com.oriole.wisepen.user.service.UserService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 

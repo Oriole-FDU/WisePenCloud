@@ -18,12 +18,8 @@ public enum ResultCode implements IErrorCode {
     // --- 认证/权限 (严格对应 Sa-Token 异常) ---
     NOT_LOGIN(401, "账号未登录"),             // 对应 NotLoginException
     NO_PERMISSION(403, "没有权限访问该资源"),   // 对应 NotPermissionException
-    NO_ROLE(403, "没有角色权限访问该资源"),     // 对应 NotRoleException
+    NO_ROLE(403, "没有角色权限访问该资源");     // 对应 NotRoleException
 
-    // 用户/认证模块 (1000-1999)
-    USER_NOT_EXIST(1001, "用户不存在"),
-    USER_PASSWORD_ERROR(1002, "账号或密码错误"),
-    USER_LOCKED(1003, "账号已被冻结");
 
     // 业务模块 (2000-2999)
     // ..暂无
