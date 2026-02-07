@@ -5,7 +5,6 @@ import com.oriole.wisepen.user.api.constant.UserValidationMsg;
 import com.oriole.wisepen.user.api.validation.ValidUsername;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.io.Serializable;
