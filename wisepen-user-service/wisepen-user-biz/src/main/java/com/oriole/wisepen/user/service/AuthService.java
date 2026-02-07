@@ -53,7 +53,7 @@ public class AuthService {
         long expTime = (System.currentTimeMillis() / 1000) + SaManager.getConfig().getTimeout();
 
         //Sa-Token 登录及 Extra 数据注入
-        StpUtil.login(user.getId(), SaLoginConfig.setExtra("identityType", user.getIdentityType())
+        StpUtil.login(user.getId().toString(), SaLoginConfig.setExtra("identityType", user.getIdentityType().getCode())
                 .setExtra("groupIds", groupIdsStr)
                 .setExtra("key", "wisepen-app")
                 .setExtra("exp", expTime));

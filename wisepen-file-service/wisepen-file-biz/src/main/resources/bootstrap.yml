@@ -1,0 +1,46 @@
+server:
+  port: 9200
+  tomcat:
+    connection-timeout: 60000
+    accept-count: 100
+
+spring:
+  application:
+    name: wisepen-file-service
+  main:
+    allow-bean-definition-overriding: true
+  cloud:
+    nacos:
+      discovery:
+        server-addr: wisepen-dev-server:8848
+      config:
+        server-addr: wisepen-dev-server:8848
+        file-extension: yaml
+        group: DEFAULT_GROUP
+        shared-configs:
+          - data-id: wisepen-common-${spring.profiles.active}.yaml
+            group: DEFAULT_GROUP
+            refresh: true
+    inetutils:
+      ignored-interfaces: [VMnet.*, vEthernet.*, docker0]
+      preferred-networks: [10]
+  profiles:
+    active: dev
+  
+jodconverter:
+  local:
+    enabled: true
+    office-home: /tmp/wisepen/LibreOffice.app/Contents
+    port-numbers: [2002]
+    process-timeout: 180000
+    task-execution-timeout: 180000
+    task-queue-timeout: 60000
+    max-tasks-per-process: 10
+    working-dir: /Users/xiong/wisepen_office_profile
+    process-manager-class: org.jodconverter.local.process.PureJavaProcessManager
+
+logging:
+  level:
+    root: INFO
+    org.jodconverter: INFO
+    com.oriole.wisepen.file: INFO
