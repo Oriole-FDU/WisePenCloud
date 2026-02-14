@@ -45,7 +45,6 @@ public class FileUploadConsumer implements CommandLineRunner {
 
                 } catch (Exception e) {
                     log.error("Error processing upload task", e);
-                    // 只有在真的遇到异常时才休眠，避免错误时陷入 CPU 高负载死循环
                     try {
                         TimeUnit.SECONDS.sleep(1);
                     } catch (InterruptedException ex) {
@@ -66,37 +65,47 @@ public class FileUploadConsumer implements CommandLineRunner {
 
         try {
             File targetFile = new File(task.getTargetPath());
-            
+
             // 模拟 OSS，需要物理路径存在
             cn.hutool.core.io.FileUtil.mkdir(targetFile.getParentFile());
-            
-            // 上传文件到“OSS”路径
+
+            // 上传文件到"OSS"路径
             cn.hutool.core.io.FileUtil.move(cacheFile, targetFile, true);
-            
-            log.info("Original file uploaded to simulated OSS: {}", task.getTargetPath());
 
-            // 更新状态
+            log.info("File uploaded to simulated OSS: {}", task.getTargetPath());
+
+            // 更新数据库状态
             FileInfo fileInfo = fileMapper.selectById(task.getFileId());
-            if (fileInfo != null) {
-                FileInfo update = new FileInfo();
-                update.setId(task.getFileId());
-                update.setUpdateTime(java.time.LocalDateTime.now());
-
-                if (Boolean.TRUE.equals(task.getIsConvertedPdf())) {
-                    // 如果是转换后的 PDF 上传完成
-                    update.setPdfUrl(task.getTargetPath());
-                    // PDF 上传完成通常意味着整个文件包（原件+PDF）在 OSS 侧完整可用
-                    update.setStatus(FileConstants.UPLOAD_STATUS_AVAILABLE);
-                } else {
-                    // 如果是原始文件上传完成
-                    update.setUrl(task.getTargetPath());
-                    // 如果不是 Office 文档（不需要转换），上传原件即为可用
-                    if (!isOfficeDocument(fileInfo.getType())) {
-                        update.setStatus(FileConstants.UPLOAD_STATUS_AVAILABLE);
-                    }
-                }
-                fileMapper.updateById(update);
+            if (fileInfo == null) {
+                log.error("FileInfo not found for fileId: {}", task.getFileId());
+                return;
             }
+
+            FileInfo update = new FileInfo();
+            update.setId(task.getFileId());
+            update.setUpdateTime(java.time.LocalDateTime.now());
+
+            if (Boolean.TRUE.equals(task.getIsConvertedPdf())) {
+                // 转换后的 PDF 上传完成 → url + pdfUrl + AVAILABLE
+                update.setPdfUrl(task.getTargetPath());
+                update.setStatus(FileConstants.UPLOAD_STATUS_AVAILABLE);
+
+            } else if (Boolean.TRUE.equals(task.getIsPdfDirect())) {
+                // PDF 直传：url 和 pdfUrl 写同一地址，直接 AVAILABLE
+                update.setUrl(task.getTargetPath());
+                update.setPdfUrl(task.getTargetPath());
+                update.setStatus(FileConstants.UPLOAD_STATUS_AVAILABLE);
+
+            } else {
+                // 原始文件上传完成
+                update.setUrl(task.getTargetPath());
+                // 非 Office 文档直接可用；Office 文档需等待转换完成
+                if (!isOfficeDocument(fileInfo.getType())) {
+                    update.setStatus(FileConstants.UPLOAD_STATUS_AVAILABLE);
+                }
+            }
+
+            fileMapper.updateById(update);
 
         } catch (Exception e) {
             log.error("Upload failed for fileId: {}", task.getFileId(), e);

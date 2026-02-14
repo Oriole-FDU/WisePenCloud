@@ -48,4 +48,9 @@ public class FileUploadTaskDTO implements Serializable {
      * 是否为转换后的 PDF 副本
      */
     private Boolean isConvertedPdf;
+
+    /**
+     * 是否为 PDF 直传（原文件即 PDF，url 和 pdfUrl 写同一地址）
+     */
+    private Boolean isPdfDirect;
 }

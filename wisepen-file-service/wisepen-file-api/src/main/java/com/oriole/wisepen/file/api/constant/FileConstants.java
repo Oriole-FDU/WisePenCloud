@@ -1,5 +1,7 @@
 package com.oriole.wisepen.file.api.constant;
 
+import java.util.Set;
+
 /**
  * 文件常量类
  *
@@ -7,16 +9,23 @@ package com.oriole.wisepen.file.api.constant;
  */
 public class FileConstants {
     public static final String BUCKET_NAME = "wisepen-files";
-    
+
+    /** 单文件最大体积：100MB */
+    public static final long MAX_FILE_SIZE = 100L * 1024 * 1024;
+
     // Upload status
     public static final Integer UPLOAD_STATUS_PROCESSING = 0;
     public static final Integer UPLOAD_STATUS_AVAILABLE = 1;
     public static final Integer UPLOAD_STATUS_FAILED = 2;
 
-    public static final java.util.Set<String> OFFICE_EXTENSIONS = java.util.Collections.unmodifiableSet(
-            new java.util.HashSet<>(java.util.Arrays.asList
-                            ("doc", "docx", "ppt",
-                            "pptx", "xls", "xlsx"))
+    /** 允许上传的文件扩展名白名单 */
+    public static final Set<String> ALLOWED_EXTENSIONS = Set.of(
+            "doc", "docx", "ppt", "pptx", "xls", "xlsx", "pdf"
+    );
+
+    /** Office 文档扩展名（需要转换 PDF） */
+    public static final Set<String> OFFICE_EXTENSIONS = Set.of(
+            "doc", "docx", "ppt", "pptx", "xls", "xlsx"
     );
 
     // Redis queue keys
