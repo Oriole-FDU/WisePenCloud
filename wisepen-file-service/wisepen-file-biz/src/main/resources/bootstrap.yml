@@ -37,10 +37,9 @@ jodconverter:
     task-queue-timeout: 60000
     max-tasks-per-process: 10
     working-dir: /Users/xiong/wisepen_office_profile
-    process-manager-class: org.jodconverter.local.process.PureJavaProcessManager
 
 logging:
   level:
     root: INFO
-    org.jodconverter: INFO
+    org.jodconverter: DEBUG
     com.oriole.wisepen.file: INFO

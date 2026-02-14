@@ -3,6 +3,8 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+scripts/
+
 dev.properties
 logs
 
@@ -39,3 +41,12 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+### Local Config ###
+rebel.xml
+*local.yml
+*local.yaml
+*.log
+opentelemetry-javaagent.jar
+tmp/
+temp/
