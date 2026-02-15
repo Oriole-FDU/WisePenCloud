@@ -53,4 +53,9 @@ public class FileUploadTaskDTO implements Serializable {
      * 是否为 PDF 直传（原文件即 PDF，url 和 pdfUrl 写同一地址）
      */
     private Boolean isPdfDirect;
+
+    /**
+     * Web 访问 URL (可选，若存在则优先使用此值更新 DB，而非 targetPath)
+     */
+    private String accessUrl;
 }

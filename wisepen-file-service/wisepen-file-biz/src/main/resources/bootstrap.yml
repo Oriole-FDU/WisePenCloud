@@ -43,3 +43,15 @@ logging:
     root: INFO
     org.jodconverter: DEBUG
     com.oriole.wisepen.file: INFO
+
+wisepen:
+  file:
+    storage-path: /tmp/wisepen/upload/oss/
+    domain: http://localhost:9200/file/download/
+    instance-id: dev-instance-1
+    oss:
+      enabled: false
+      endpoint: oss-cn-hangzhou.aliyuncs.com
+      access-key-id: your-access-key-id
+      access-key-secret: your-access-key-secret
+      bucket-name: wisepen-dev

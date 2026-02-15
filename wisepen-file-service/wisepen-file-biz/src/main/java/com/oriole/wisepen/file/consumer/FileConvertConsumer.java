@@ -4,6 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import com.oriole.wisepen.file.api.constant.FileConstants;
 import com.oriole.wisepen.file.api.domain.dto.FileConvertTaskDTO;
 import com.oriole.wisepen.file.api.domain.dto.FileUploadTaskDTO;
+import com.oriole.wisepen.file.config.FileProperties;
 import com.oriole.wisepen.file.domain.entity.FileInfo;
 import com.oriole.wisepen.file.mapper.FileMapper;
 import com.oriole.wisepen.file.service.OfficeConversionService;
@@ -29,14 +30,16 @@ public class FileConvertConsumer implements CommandLineRunner {
     private final StringRedisTemplate stringRedisTemplate;
     private final OfficeConversionService officeConversionService;
     private final FileMapper fileMapper;
+    private final FileProperties fileProperties;
 
     @Override
     public void run(String... args) {
         new Thread(() -> {
-            log.info("FileConvertConsumer started, listening to queue: {}", FileConstants.CONVERT_QUEUE_KEY);
+            String queueKey = FileConstants.CONVERT_QUEUE_KEY + ":" + fileProperties.getInstanceId();
+            log.info("FileConvertConsumer started, listening to instance-specific queue: {}", queueKey);
             while (true) {
                 try {
-                    String taskJson = stringRedisTemplate.opsForList().rightPop(FileConstants.CONVERT_QUEUE_KEY, 5, TimeUnit.SECONDS);
+                    String taskJson = stringRedisTemplate.opsForList().rightPop(queueKey, 5, TimeUnit.SECONDS);
                     
                     if (taskJson == null) {
                         continue;
@@ -74,11 +77,29 @@ public class FileConvertConsumer implements CommandLineRunner {
             log.info("Converting file {} to PDF...", task.getOriginalFilename());
             officeConversionService.convertToPdf(rawFile, tempPdf);
 
-            // 生成最终 PDF 路径 (存放于模拟 OSS 目录)
+            // 生成 ObjectKey: yyyy/MM/dd/{uuid}.pdf (与 FileService 保持一致)
             String uuId = java.util.UUID.randomUUID().toString();
-            String finalPath = "/tmp/wisepen/upload/oss/" + uuId + ".pdf";
-            
-            // 缓存转换后的 PDF 到本地缓存目录
+            String datePath = java.time.format.DateTimeFormatter.ofPattern("yyyy/MM/dd").format(java.time.LocalDateTime.now());
+
+
+            String objectKey = datePath + "/" + uuId + ".pdf";
+
+            // 物理存储路径 (模拟 OSS)
+            String storagePath = fileProperties.getStoragePath();
+            if (!storagePath.endsWith("/")) {
+                storagePath += "/";
+            }
+            String finalPath = storagePath + objectKey;
+
+            // 公网访问 URL
+            String domain = fileProperties.getDomain();
+            if (!domain.endsWith("/")) {
+                domain += "/";
+            }
+            String pdfWebUrl = domain + objectKey;
+
+            // 缓存转换后的 PDF 到本地缓存目录 (用于后续上传步骤)
+            // 注意：缓存文件名用 uuid 即可，不需要目录层级，只要全路径对 consumer 可见
             String cachePdfPath = "/tmp/wisepen/upload/cache/" + uuId + ".pdf";
             File cachePdfFile = new File(cachePdfPath);
             cn.hutool.core.io.FileUtil.mkdir(cachePdfFile.getParentFile());
@@ -86,17 +107,20 @@ public class FileConvertConsumer implements CommandLineRunner {
             
             log.info("Conversion successful, PDF cached at {}. Pushing upload task...", cachePdfPath);
 
-            // 推送 PDF 上传任务到 Redis 队列
+            // 推送 PDF 上传任务到 Redis 队列 (必须推送到同实例的 Upload Queue)
+            // 注意：因为 cachePdfPath 是本地路径，所以必须由本机消费
             FileUploadTaskDTO uploadTask = FileUploadTaskDTO.builder()
                     .fileId(task.getFileId())
                     .originalFilename(task.getOriginalFilename())
                     .tempFilePath(cachePdfPath)
                     .targetPath(finalPath)
+                    .accessUrl(pdfWebUrl) // 传递 Web URL
                     .md5(task.getMd5())
                     .isConvertedPdf(true)
                     .build();
             
-            stringRedisTemplate.opsForList().leftPush(FileConstants.UPLOAD_QUEUE_KEY, JSON.toJSONString(uploadTask));
+            String uploadQueueKey = FileConstants.UPLOAD_QUEUE_KEY + ":" + fileProperties.getInstanceId();
+            stringRedisTemplate.opsForList().leftPush(uploadQueueKey, JSON.toJSONString(uploadTask));
             log.info("Pushed PDF upload task for fileId: {}", task.getFileId());
 
         } catch (Exception e) {
