@@ -3,8 +3,10 @@ package com.oriole.wisepen.file.consumer;
 import com.alibaba.fastjson2.JSON;
 import com.oriole.wisepen.file.api.constant.FileConstants;
 import com.oriole.wisepen.file.api.domain.dto.FileUploadTaskDTO;
+import com.oriole.wisepen.file.config.FileProperties;
 import com.oriole.wisepen.file.domain.entity.FileInfo;
 import com.oriole.wisepen.file.mapper.FileMapper;
+import com.oriole.wisepen.file.util.AliyunOssTemplate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -26,14 +28,17 @@ public class FileUploadConsumer implements CommandLineRunner {
 
     private final StringRedisTemplate stringRedisTemplate;
     private final FileMapper fileMapper;
+    private final FileProperties fileProperties;
+    private final AliyunOssTemplate aliyunOssTemplate;
 
     @Override
     public void run(String... args) {
         new Thread(() -> {
-            log.info("FileUploadConsumer started, listening to queue: {}", FileConstants.UPLOAD_QUEUE_KEY);
+            String queueKey = FileConstants.UPLOAD_QUEUE_KEY + ":" + fileProperties.getInstanceId();
+            log.info("FileUploadConsumer started, listening to instance-specific queue: {}", queueKey);
             while (true) {
                 try {
-                    String taskJson = stringRedisTemplate.opsForList().rightPop(FileConstants.UPLOAD_QUEUE_KEY, 5, TimeUnit.SECONDS);
+                    String taskJson = stringRedisTemplate.opsForList().rightPop(queueKey, 5, TimeUnit.SECONDS);
 
                     if (taskJson == null) {
                         continue;
@@ -69,10 +74,25 @@ public class FileUploadConsumer implements CommandLineRunner {
             // 模拟 OSS，需要物理路径存在
             cn.hutool.core.io.FileUtil.mkdir(targetFile.getParentFile());
 
-            // 上传文件到"OSS"路径
-            cn.hutool.core.io.FileUtil.move(cacheFile, targetFile, true);
+            // 上传文件到"OSS"路径 (使用 copy 而非 move，保留本地缓存供 ConvertConsumer 使用)
+            cn.hutool.core.io.FileUtil.copy(cacheFile, targetFile, true);
 
             log.info("File uploaded to simulated OSS: {}", task.getTargetPath());
+
+            // 如果启用了真实 OSS，同步上传
+            if (fileProperties.getOss().isEnabled()) {
+                String storagePath = fileProperties.getStoragePath();
+                if (!storagePath.endsWith("/")) {
+                    storagePath += "/";
+                }
+                String objectKey = task.getTargetPath().replace(storagePath, "");
+                // 去除开头的斜杠（防卫性编程）
+                if (objectKey.startsWith("/")) {
+                    objectKey = objectKey.substring(1);
+                }
+                
+                aliyunOssTemplate.uploadFile(targetFile, objectKey);
+            }
 
             // 更新数据库状态
             FileInfo fileInfo = fileMapper.selectById(task.getFileId());
@@ -86,19 +106,29 @@ public class FileUploadConsumer implements CommandLineRunner {
             update.setUpdateTime(java.time.LocalDateTime.now());
 
             if (Boolean.TRUE.equals(task.getIsConvertedPdf())) {
-                // 转换后的 PDF 上传完成 → url + pdfUrl + AVAILABLE
-                update.setPdfUrl(task.getTargetPath());
+                // 转换后的 PDF 上传完成
+                // 优先使用 accessUrl (Web URL)，若无则降级为 targetPath (物理路径)
+                String finalPdfUrl = (task.getAccessUrl() != null && !task.getAccessUrl().isEmpty()) 
+                        ? task.getAccessUrl() 
+                        : task.getTargetPath();
+                
+                update.setPdfUrl(finalPdfUrl); 
                 update.setStatus(FileConstants.UPLOAD_STATUS_AVAILABLE);
 
             } else if (Boolean.TRUE.equals(task.getIsPdfDirect())) {
-                // PDF 直传：url 和 pdfUrl 写同一地址，直接 AVAILABLE
-                update.setUrl(task.getTargetPath());
-                update.setPdfUrl(task.getTargetPath());
+                // PDF 直传：
+                // URL 已经在 Service层生成并入库(accessUrl)
+                // pdfUrl 也应该存 Web URL
+                String finalPdfUrl = (task.getAccessUrl() != null && !task.getAccessUrl().isEmpty()) 
+                        ? task.getAccessUrl() 
+                        : task.getTargetPath();
+                        
+                update.setPdfUrl(finalPdfUrl);
                 update.setStatus(FileConstants.UPLOAD_STATUS_AVAILABLE);
 
             } else {
                 // 原始文件上传完成
-                update.setUrl(task.getTargetPath());
+                // update.setUrl(task.getTargetPath()); // Removed: Don't overwrite access URL with physical path
                 // 非 Office 文档直接可用；Office 文档需等待转换完成
                 if (!isOfficeDocument(fileInfo.getType())) {
                     update.setStatus(FileConstants.UPLOAD_STATUS_AVAILABLE);

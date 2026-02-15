@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
+import com.oriole.wisepen.file.config.FileProperties;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -40,6 +41,7 @@ public class FileServiceImpl implements FileService {
 
     private final FileMapper fileMapper;
     private final StringRedisTemplate stringRedisTemplate;
+    private final FileProperties fileProperties;
 
     // ==================== 上传 ====================
 
@@ -90,8 +92,25 @@ public class FileServiceImpl implements FileService {
 
         // 4. 正常落盘
         String uuId = UUID.randomUUID().toString();
+        // 生成 ObjectKey: yyyy/MM/dd/{uuid}.{ext}
+        String datePath = java.time.format.DateTimeFormatter.ofPattern("yyyy/MM/dd").format(LocalDateTime.now());
+        String objectKey = datePath + "/" + uuId + "." + extension;
+
         String localCachePath = uploadCache(file, extension, uuId);
-        String finalFilePath = "/tmp/wisepen/upload/oss/" + uuId + "." + extension;
+
+        // 物理存储路径 (Consumer 使用)
+        String storagePath = fileProperties.getStoragePath();
+        if (!storagePath.endsWith("/")) {
+            storagePath += "/";
+        }
+        String finalFilePath = storagePath + objectKey;
+
+        // 公网访问 URL (存入数据库)
+        String domain = fileProperties.getDomain();
+        if (!domain.endsWith("/")) {
+            domain += "/";
+        }
+        String accessUrl = domain + objectKey;
 
         boolean isOffice = FileConstants.OFFICE_EXTENSIONS.contains(extension.toLowerCase());
         boolean isPdf = "pdf".equalsIgnoreCase(extension);
@@ -102,7 +121,7 @@ public class FileServiceImpl implements FileService {
                 .md5(serverMd5)
                 .type(extension)
                 .size(file.getSize())
-                .url(finalFilePath)
+                .url(accessUrl) // 存入访问链接
                 .createBy(userId)
                 .status(FileConstants.UPLOAD_STATUS_PROCESSING)
                 .createTime(LocalDateTime.now())
@@ -121,11 +140,11 @@ public class FileServiceImpl implements FileService {
                         .fileId(fileId)
                         .originalFilename(originalFilename)
                         .tempFilePath(localCachePath)
-                        .targetPath(finalFilePath)
+                        .accessUrl(accessUrl) // 传递 Web URL
                         .md5(serverMd5)
                         .isPdfDirect(isPdf)
                         .build();
-                stringRedisTemplate.opsForList().leftPush(FileConstants.UPLOAD_QUEUE_KEY, JSON.toJSONString(uploadTask));
+                stringRedisTemplate.opsForList().leftPush(FileConstants.UPLOAD_QUEUE_KEY + ":" + fileProperties.getInstanceId(), JSON.toJSONString(uploadTask));
                 log.info("Pushed upload task to Redis for fileId: {}", fileId);
 
                 // Office 文档：额外推送转换任务
@@ -138,7 +157,7 @@ public class FileServiceImpl implements FileService {
                             .originalSize(file.getSize())
                             .md5(serverMd5)
                             .build();
-                    stringRedisTemplate.opsForList().leftPush(FileConstants.CONVERT_QUEUE_KEY, JSON.toJSONString(convertTask));
+                    stringRedisTemplate.opsForList().leftPush(FileConstants.CONVERT_QUEUE_KEY + ":" + fileProperties.getInstanceId(), JSON.toJSONString(convertTask));
                     log.info("Pushed conversion task to Redis for fileId: {}", fileId);
                 }
             }
