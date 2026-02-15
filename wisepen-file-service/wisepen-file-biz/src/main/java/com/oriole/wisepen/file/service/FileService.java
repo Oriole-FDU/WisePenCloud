@@ -1,8 +1,9 @@
 package com.oriole.wisepen.file.service;
 
 import com.oriole.wisepen.file.api.domain.dto.FileInfoVO;
+import com.oriole.wisepen.file.api.domain.dto.FileUploadResult;
 import com.oriole.wisepen.file.api.domain.dto.UploadRequest;
-import com.oriole.wisepen.file.api.domain.dto.UploadResponse;
+
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -18,7 +19,7 @@ public interface FileService {
     /**
      * 文件上传（含秒传逻辑）
      */
-    UploadResponse upload(MultipartFile file, UploadRequest uploadRequest) throws IOException;
+    FileUploadResult upload(MultipartFile file, UploadRequest uploadRequest) throws IOException;
 
     /**
      * 获取当前用户的文件列表（按上传时间倒序）

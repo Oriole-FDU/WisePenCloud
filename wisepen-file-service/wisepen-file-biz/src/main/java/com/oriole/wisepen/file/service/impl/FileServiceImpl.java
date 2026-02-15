@@ -9,6 +9,7 @@ import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.file.exception.FileErrorCode;
 import com.oriole.wisepen.file.api.constant.FileConstants;
 import com.oriole.wisepen.file.api.domain.dto.*;
+import com.oriole.wisepen.file.api.domain.dto.FileUploadResult;
 import com.oriole.wisepen.file.domain.entity.FileInfo;
 import com.oriole.wisepen.file.mapper.FileMapper;
 import com.oriole.wisepen.file.service.FileService;
@@ -45,9 +46,11 @@ public class FileServiceImpl implements FileService {
 
     // ==================== 上传 ====================
 
+
+
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public UploadResponse upload(MultipartFile file, UploadRequest uploadRequest) throws IOException {
+    public FileUploadResult upload(MultipartFile file, UploadRequest uploadRequest) throws IOException {
         String originalFilename = uploadRequest.getFilename();
         String extension = cn.hutool.core.io.FileUtil.extName(originalFilename);
         log.info("Uploading file: {}, MD5: {}, size: {} bytes", originalFilename, uploadRequest.getMd5(), file.getSize());
@@ -87,7 +90,10 @@ public class FileServiceImpl implements FileService {
                     .updateTime(LocalDateTime.now())
                     .build();
             fileMapper.insert(newRecord);
-            return UploadResponse.fastUpload();
+            return FileUploadResult.builder()
+                    .documentId(newRecord.getId())
+                    .filename(newRecord.getFilename())
+                    .build();
         }
 
         // 4. 正常落盘
@@ -163,7 +169,11 @@ public class FileServiceImpl implements FileService {
             }
         });
 
-        return UploadResponse.processing();
+        // 简化返回：仅返回 documentId 和 filename
+        return FileUploadResult.builder()
+                .documentId(fileInfo.getId())
+                .filename(fileInfo.getFilename())
+                .build();
     }
 
     // ==================== 文件列表 ====================
