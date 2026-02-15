@@ -2,8 +2,9 @@ package com.oriole.wisepen.file.controller;
 
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.file.api.domain.dto.FileInfoVO;
+import com.oriole.wisepen.file.api.domain.dto.FileUploadResult;
 import com.oriole.wisepen.file.api.domain.dto.UploadRequest;
-import com.oriole.wisepen.file.api.domain.dto.UploadResponse;
+
 import com.oriole.wisepen.file.service.FileService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -29,10 +30,10 @@ public class FileController {
      * 文件上传（含秒传逻辑）
      */
     @PostMapping("/upload")
-    public R<UploadResponse> upload(@RequestPart("file") MultipartFile file,
+    public R<FileUploadResult> upload(@RequestPart("file") MultipartFile file,
                                     @Valid @RequestPart("data") UploadRequest uploadRequest) {
         try {
-            UploadResponse response = fileService.upload(file, uploadRequest);
+            FileUploadResult response = fileService.upload(file, uploadRequest);
             return R.ok(response);
         } catch (IOException e) {
             throw new RuntimeException("Upload failed", e);
