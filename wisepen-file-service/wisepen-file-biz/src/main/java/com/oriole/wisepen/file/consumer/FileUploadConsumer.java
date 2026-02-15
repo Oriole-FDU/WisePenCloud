@@ -69,29 +69,25 @@ public class FileUploadConsumer implements CommandLineRunner {
         }
 
         try {
-            File targetFile = new File(task.getTargetPath());
+            String storagePath = fileProperties.getStoragePath();
+            if (!storagePath.endsWith("/")) {
+                storagePath += "/";
+            }
+            String objectKey = task.getTargetPath().replace(storagePath, "");
+            if (objectKey.startsWith("/")) {
+                objectKey = objectKey.substring(1);
+            }
 
-            // 模拟 OSS，需要物理路径存在
-            cn.hutool.core.io.FileUtil.mkdir(targetFile.getParentFile());
-
-            // 上传文件到"OSS"路径 (使用 copy 而非 move，保留本地缓存供 ConvertConsumer 使用)
-            cn.hutool.core.io.FileUtil.copy(cacheFile, targetFile, true);
-
-            log.info("File uploaded to simulated OSS: {}", task.getTargetPath());
-
-            // 如果启用了真实 OSS，同步上传
             if (fileProperties.getOss().isEnabled()) {
-                String storagePath = fileProperties.getStoragePath();
-                if (!storagePath.endsWith("/")) {
-                    storagePath += "/";
-                }
-                String objectKey = task.getTargetPath().replace(storagePath, "");
-                // 去除开头的斜杠（防卫性编程）
-                if (objectKey.startsWith("/")) {
-                    objectKey = objectKey.substring(1);
-                }
-                
-                aliyunOssTemplate.uploadFile(targetFile, objectKey);
+                // 真实 OSS 模式：直接从缓存上传到阿里云，不存储到本地
+                aliyunOssTemplate.uploadFile(cacheFile, objectKey);
+                log.info("File uploaded to Aliyun OSS: {}", objectKey);
+            } else {
+                // 本地模拟 OSS 模式：复制到本地存储路径
+                File targetFile = new File(task.getTargetPath());
+                cn.hutool.core.io.FileUtil.mkdir(targetFile.getParentFile());
+                cn.hutool.core.io.FileUtil.copy(cacheFile, targetFile, true);
+                log.info("File uploaded to simulated OSS: {}", task.getTargetPath());
             }
 
             // 更新数据库状态
