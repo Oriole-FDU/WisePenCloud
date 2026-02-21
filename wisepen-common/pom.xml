@@ -52,24 +52,6 @@
         </dependency>
 
         <dependency>
-            <groupId>cn.dev33</groupId>
-            <artifactId>sa-token-core</artifactId>
-            <version>1.37.0</version>
-        </dependency>
-
-        <dependency>
-            <groupId>cn.dev33</groupId>
-            <artifactId>sa-token-redis-jackson</artifactId>
-            <version>1.37.0</version>
-        </dependency>
-
-        <dependency>
-            <groupId>cn.dev33</groupId>
-            <artifactId>sa-token-jwt</artifactId>
-            <version>1.37.0</version>
-        </dependency>
-
-        <dependency>
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-annotation</artifactId>
             <version>${mybatis-plus.version}</version>

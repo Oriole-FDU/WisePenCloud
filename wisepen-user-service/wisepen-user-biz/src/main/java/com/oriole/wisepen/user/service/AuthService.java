@@ -1,20 +1,20 @@
 package com.oriole.wisepen.user.service;
 
-import cn.dev33.satoken.SaManager;
-import cn.hutool.core.collection.CollUtil;
-import cn.dev33.satoken.stp.SaLoginConfig;
-import cn.dev33.satoken.stp.StpUtil;
+import cn.hutool.core.util.IdUtil;
+import cn.hutool.core.util.StrUtil;
 import cn.hutool.crypto.digest.BCrypt;
+import cn.hutool.json.JSONUtil;
 import com.oriole.wisepen.common.core.exception.ServiceException;
+import com.oriole.wisepen.user.api.enums.Status;
 import com.oriole.wisepen.user.exception.UserErrorCode;
 import com.oriole.wisepen.user.api.domain.dto.LoginRequest;
 import com.oriole.wisepen.user.domain.entity.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import java.util.*;
-
-import static com.oriole.wisepen.user.api.enums.Status.BANNED;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -24,7 +24,12 @@ public class AuthService {
     private final UserService userService;
     private final GroupService groupService;
 
-    public void login(LoginRequest loginRequest) {
+    private final StringRedisTemplate stringRedisTemplate;
+
+    private static final String REDIS_SESSION_PREFIX = "wisepen:user:auth:session:";
+    private static final long SESSION_TIMEOUT_DAYS = 7;
+
+    public String login(LoginRequest loginRequest) {
         String account = loginRequest.getAccount();
 
         // 查询用户信息 (包含密码密文)
@@ -36,7 +41,7 @@ public class AuthService {
         }
 
         // 校验账号状态
-        if (user.getStatus()==BANNED) {
+        if (user.getStatus()== Status.BANNED) {
             throw new ServiceException(UserErrorCode.USER_LOCKED);
         }
 
@@ -45,26 +50,43 @@ public class AuthService {
             throw new ServiceException(UserErrorCode.USER_PASSWORD_ERROR);
         }
 
-        // 获取组信息并转换为逗号分隔字符串
-        List<Long> groupIds = groupService.getGroupIdsByUserId(user.getId());
-        String groupIdsStr = CollUtil.join(groupIds, ",");
+        Map<String, Integer> groupRoleMap = groupService.getGroupRoleMapByUserId(user.getId());
 
-        // 计算 APISIX/JWT 需要的过期时间戳
-        long expTime = (System.currentTimeMillis() / 1000) + SaManager.getConfig().getTimeout();
+        // 构建 Session 上下文数据
+        Map<String, Object> sessionData = new HashMap<>();
+        sessionData.put("userId", user.getId().toString());
+        sessionData.put("identityType", user.getIdentityType().getCode());
+        sessionData.put("groupRoleMap", groupRoleMap);
 
-        //Sa-Token 登录及 Extra 数据注入
-        StpUtil.login(user.getId(), SaLoginConfig.setExtra("identityType", user.getIdentityType())
-                .setExtra("groupIds", groupIdsStr)
-                .setExtra("key", "wisepen-app")
-                .setExtra("exp", expTime));
+        String sessionId = IdUtil.fastSimpleUUID();
+        String redisKey = REDIS_SESSION_PREFIX + sessionId;
 
-        log.info("用户登录成功: account={}, id={}, groups={}", account, user.getId(), groupIdsStr);
+        // 存入 Redis
+        stringRedisTemplate.opsForValue().set(
+                redisKey,
+                JSONUtil.toJsonStr(sessionData),
+                SESSION_TIMEOUT_DAYS,
+                TimeUnit.DAYS
+        );
+
+        log.info("用户登录成功: account={}, id={}, groupRoleMap={}", account, user.getId(), groupRoleMap);
+        return sessionId;
     }
 
     /**
      * 注销
      */
-    public void logout() {
-        StpUtil.logout();
+    public void logout(String sessionId) {
+        if (StrUtil.isBlank(sessionId)) {
+            return;
+        }
+        String redisKey = REDIS_SESSION_PREFIX + sessionId;
+        // 直接从 Redis 中物理删除该 Session
+        Boolean deleted = stringRedisTemplate.delete(redisKey);
+        if (deleted) {
+            log.info("用户主动注销成功，已清理 Redis 会话: sessionId={}", sessionId);
+        } else {
+            log.warn("用户注销时会话已不存在或已过期: sessionId={}", sessionId);
+        }
     }
 }
