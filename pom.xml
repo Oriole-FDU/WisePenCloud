@@ -17,6 +17,7 @@
         <module>wisepen-user-service</module>
         <module>wisepen-system-service</module>
         <module>wisepen-common-log</module>
+        <module>wisepen-resource-service</module>
     </modules>
 
     <properties>

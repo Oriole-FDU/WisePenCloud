@@ -1,0 +1,27 @@
+server:
+  port: 9400 # 本地启动占用 9400 端口
+
+spring:
+  application:
+    name: wisepen-resource-service # 服务名，也是 Nacos 里的 Data ID
+  cloud:
+    nacos:
+      discovery:
+        server-addr: wisepen-dev-server:8848 # Nacos 注册中心地址
+      config:
+        server-addr: wisepen-dev-server:8848 # Nacos 配置中心地址
+        file-extension: yaml # 配置文件后缀
+        group: DEFAULT_GROUP
+        shared-configs:
+          - data-id: wisepen-common-${spring.profiles.active}.yaml
+            group: DEFAULT_GROUP
+            refresh: true
+    inetutils:
+      ignored-interfaces:
+        - VMnet.*
+        - vEthernet.*
+        - docker0 # 忽略常见的虚拟机网卡名称 (正则匹配)
+      preferred-networks:
+        - 10 #指定首选的网络号段 (校园网段10开头)
+  profiles:
+    active: dev # 激活开发环境配置
