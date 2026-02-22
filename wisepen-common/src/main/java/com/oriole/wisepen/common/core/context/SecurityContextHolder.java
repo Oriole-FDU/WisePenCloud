@@ -81,11 +81,18 @@ public class SecurityContextHolder {
         return groupRole != null ? groupRole : GroupRoleType.NOT_MEMBER;
     }
 
-    public static void assertInGroup(String targetGroupId) {
+    public static void assertUserId(String userId) {
+        if (!userId.equals(getUserId())){
+            throw new PermissionException(PermissionErrorCode.OPERATION_UNAUTHORIZED);
+        }
+    }
+
+    public static GroupRoleType assertInGroup(String targetGroupId) {
         GroupRoleType currentRole = getGroupRole(targetGroupId);
         if (currentRole == GroupRoleType.NOT_MEMBER){
             throw new PermissionException(PermissionErrorCode.OPERATION_UNAUTHORIZED);
         }
+        return currentRole;
     }
 
     public static void assertGroupRole(String targetGroupId, List<GroupRoleType> requiredRoles) {
