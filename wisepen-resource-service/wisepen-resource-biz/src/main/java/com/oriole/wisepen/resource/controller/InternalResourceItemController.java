@@ -4,6 +4,7 @@ import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.resource.domain.dto.ResourceCheckPermissionDTO;
 import com.oriole.wisepen.resource.domain.dto.ResourceCreateDTO;
 import com.oriole.wisepen.resource.domain.dto.ResourceUpdateDTO;
+import com.oriole.wisepen.resource.feign.RemoteResourceService;
 import com.oriole.wisepen.resource.service.IResourceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
@@ -12,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/internal/resource")
 @RequiredArgsConstructor
-public class InternalResourceItemController {
+public class InternalResourceItemController implements RemoteResourceService {
 
     private final IResourceService resourceService;
 

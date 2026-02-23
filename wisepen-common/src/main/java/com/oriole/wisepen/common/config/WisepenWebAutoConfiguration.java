@@ -20,6 +20,11 @@ public class WisepenWebAutoConfiguration implements WebMvcConfigurer {
         // 注册头部拦截器，拦截所有路径
         registry.addInterceptor(new HeaderInterceptor(fromSource))
                 .addPathPatterns("/**")
-                .excludePathPatterns("/auth/login", "/auth/register");
+                .excludePathPatterns(
+                        "/auth/login", "/auth/register",
+                        "/v3/api-docs/**",     // 放行 OpenAPI 的 JSON 接口
+                        "/swagger-ui/**",      // 放行 Swagger 的 UI 静态资源
+                        "/swagger-ui.html"     // 放行 Swagger 的 UI 入口
+               );
     }
 }
