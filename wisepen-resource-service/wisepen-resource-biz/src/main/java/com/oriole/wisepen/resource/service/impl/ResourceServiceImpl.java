@@ -127,12 +127,38 @@ public class ResourceServiceImpl implements IResourceService {
         Page<ResourceItemEntity> entityPage = customResourceItemRepository.findAccessibleResources(
                 currentUserId, groupId, userGroupRole, tagIds, tagQueryLogicMode, resourceType, pageable);
 
+        // 批量获取当前页用到的所有 Tag 名称
+        Set<String> allTagIdsToFetch = new HashSet<>();
+        Map<String, List<String>> resourceTagIdsMap = new HashMap<>(); // 缓存 ResourceId -> TagIds
+
+        for (ResourceItemEntity entity : entityPage.getContent()) {
+            List<String> extractedTagIds = extractRelevantTagIds(entity, groupId);
+            resourceTagIdsMap.put(entity.getResourceId(), extractedTagIds);
+            allTagIdsToFetch.addAll(extractedTagIds);
+        }
+
+        Map<String, String> tagIdNameMap = new HashMap<>();
+        if (!allTagIdsToFetch.isEmpty()) {
+            Iterable<TagEntity> tagEntities = tagRepository.findAllById(allTagIdsToFetch);
+            for (TagEntity tag : tagEntities) {
+                tagIdNameMap.put(tag.getTagId(), tag.getTagName());
+            }
+        }
+
         List<ResourceItemResponse> responses = entityPage.getContent().stream().map(entity -> {
             ResourceItemResponse resp = new ResourceItemResponse();
             BeanUtil.copyProperties(entity, resp);
 
-            // 提取当前上下文的 Tag 回显给前端
-            resp.setCurrentTags(extractRelevantTagIds(entity, groupId));
+            List<String> myTagIds = resourceTagIdsMap.get(entity.getResourceId());
+
+            // 直接转为 Map<String, String>
+            Map<String, String> tagMap = new HashMap<>();
+            if (myTagIds != null) {
+                for (String id : myTagIds) {
+                    tagMap.put(id, tagIdNameMap.getOrDefault(id, "未知标签"));
+                }
+            }
+            resp.setCurrentTags(tagMap);
 
             return resp;
         }).collect(Collectors.toList());
