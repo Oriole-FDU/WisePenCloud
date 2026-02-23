@@ -77,6 +77,11 @@ public class ResourceServiceImpl implements IResourceService {
         entity.setUpdateTime(new Date());
         List<GroupTagBind> groupBinds = entity.getGroupBinds();
 
+        if (groupBinds == null) {
+            groupBinds = new ArrayList<>();
+            entity.setGroupBinds(groupBinds);
+        }
+
         if (tagIds == null || tagIds.isEmpty()) {
             // 本次操作清空了该组所有标签，从列表中移除该组
             groupBinds.removeIf(bind -> bind.getGroupId().equals(groupId));

@@ -7,6 +7,7 @@ import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -17,7 +18,7 @@ public class ResourceItemEntity extends ResourceItemInfoBase {
     @Id
     private String resourceId; // 资源全局唯一ID
 
-    private List<GroupTagBind> groupBinds;
+    private List<GroupTagBind> groupBinds = new ArrayList<>();
     private List<GroupAcl> computedAcls;
 
     private Date createTime;
