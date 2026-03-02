@@ -73,12 +73,6 @@
             <version>4.4.7</version>
         </dependency>
 
-        <!-- Sa-Token 鉴权框架 -->
-        <dependency>
-            <groupId>cn.dev33</groupId>
-            <artifactId>sa-token-spring-boot3-starter</artifactId>
-            <version>1.37.0</version>
-        </dependency>
         <!-- Aliyun OSS -->
         <dependency>
             <groupId>com.aliyun.oss</groupId>
