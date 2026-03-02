@@ -59,7 +59,6 @@
             <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
         </dependency>
 
-<<<<<<< HEAD
         <!--Redis-->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -68,13 +67,6 @@
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-pool2</artifactId>
-=======
-        <!--SaToken鉴权框架-->
-        <dependency>
-            <groupId>cn.dev33</groupId>
-            <artifactId>sa-token-spring-boot3-starter</artifactId>
-            <version>1.37.0</version>
->>>>>>> 2e7809a (feat(): 新增了注册、找回密码、重置密码相关功能，位于user-service的userService)
         </dependency>
 
         <!--测试框架-->
