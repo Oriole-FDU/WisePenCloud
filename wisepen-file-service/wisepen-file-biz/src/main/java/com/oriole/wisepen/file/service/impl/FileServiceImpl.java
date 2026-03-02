@@ -1,6 +1,6 @@
 package com.oriole.wisepen.file.service.impl;
 
-import cn.dev33.satoken.stp.StpUtil;
+import com.oriole.wisepen.common.core.context.SecurityContextHolder;
 import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -72,7 +72,7 @@ public class FileServiceImpl implements FileService {
                 .eq(FileInfo::getStatus, FileConstants.UPLOAD_STATUS_AVAILABLE)
                 .last("LIMIT 1"));
 
-        Long userId = StpUtil.getLoginIdAsLong();
+        Long userId = Long.parseLong(SecurityContextHolder.getUserId());
 
         if (existingFile != null) {
             // 秒传：拷贝 url + pdfUrl，创建全新记录
@@ -180,7 +180,7 @@ public class FileServiceImpl implements FileService {
 
     @Override
     public List<FileInfoVO> getMyFileList(int page, int size) {
-        Long userId = StpUtil.getLoginIdAsLong();
+        Long userId = Long.parseLong(SecurityContextHolder.getUserId());
 
         Page<FileInfo> pageParam = new Page<>(page, size);
         LambdaQueryWrapper<FileInfo> wrapper = Wrappers.<FileInfo>lambdaQuery()
@@ -199,7 +199,7 @@ public class FileServiceImpl implements FileService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deleteFile(Long fileId) {
-        Long userId = StpUtil.getLoginIdAsLong();
+        Long userId = Long.parseLong(SecurityContextHolder.getUserId());
 
         FileInfo fileInfo = fileMapper.selectById(fileId);
         if (fileInfo == null) {
