@@ -1,7 +1,11 @@
 # .dockerignore 文件内容
 
 # 忽略开发配置文件
+<<<<<<< HEAD
 dev.properties.example
+=======
+dev.properties
+>>>>>>> 77e859e (merge: 合并 origin/main，解决 RegisterRequest 和 AuthService 冲突)
 
 # 忽略 Git 历史
 .git
