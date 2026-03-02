@@ -1,7 +1,7 @@
 # .dockerignore 文件内容
 
 # 忽略开发配置文件
-dev.properties.example
+dev.properties
 
 # 忽略 Git 历史
 .git
