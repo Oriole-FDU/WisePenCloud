@@ -11,7 +11,7 @@ public class SecurityConstants {
     public static final String HEADER_IDENTITY_TYPE = "X-Identity-Type";
 
     /** 网关透传的组ID Header Key */
-    public static final String HEADER_GROUP_IDS = "X-Group-Ids";
+    public static final String HEADER_GROUP_ROLE_MAP = "X-Group-Role-Map";
 
     /** 内部服务调用时的鉴权 Header (防止绕过网关直连) */
     public static final String HEADER_FROM_SOURCE = "X-From-Source";
