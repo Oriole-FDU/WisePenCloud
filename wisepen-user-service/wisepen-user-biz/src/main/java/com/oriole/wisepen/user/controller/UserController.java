@@ -33,4 +33,38 @@ public class UserController {
         }
         return R.ok(userInfo);
     }
+
+    /**
+     * 更新用户资料
+     */
+    @CheckLogin
+    @PutMapping("/profile")
+    @Log(title = "更新用户资料", businessType = BusinessType.UPDATE)
+    public R<Void> updateProfile(@RequestBody UserInfoDTO profileDto) {
+        long userId = Long.parseLong(SecurityContextHolder.getUserId());
+        userService.updateProfile(userId, profileDto);
+        return R.ok();
+    }
+
+    /**
+     * 发起邮箱验证
+     */
+    @CheckLogin
+    @PostMapping("/verify/email")
+    @Log(title = "发起邮箱验证", businessType = BusinessType.OTHER)
+    public R<Void> initiateEmailVerify(@RequestParam("suffixType") int suffixType) {
+        long userId = Long.parseLong(SecurityContextHolder.getUserId());
+        userService.initiateEmailVerify(userId, suffixType);
+        return R.ok();
+    }
+
+    /**
+     * 学号验证回调
+     */
+    @GetMapping("/verify/check")
+    @Log(title = "学号验证回调", businessType = BusinessType.OTHER)
+    public R<Boolean> checkVerify(@RequestParam("token") String token) {
+        boolean ok = userService.checkVerifyToken(token);
+        return R.ok(ok);
+    }
 }

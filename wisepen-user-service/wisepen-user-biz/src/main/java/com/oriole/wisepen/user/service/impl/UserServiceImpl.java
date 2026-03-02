@@ -2,7 +2,9 @@ package com.oriole.wisepen.user.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.date.DateUtil;
-import cn.hutool.core.util.IdUtil;
+import cn.hutool.core.util.RandomUtil;
+import cn.hutool.core.bean.copier.CopyOptions;
+import java.util.UUID;
 import cn.hutool.crypto.digest.BCrypt;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.oriole.wisepen.common.core.domain.enums.IdentityType;
@@ -97,7 +99,7 @@ public class UserServiceImpl implements UserService {
             return; // 处于安全考虑，不存在也不报错，防止撞库
         }
 
-        String token = IdUtil.fastSimpleUUID();
+        String token = UUID.randomUUID().toString();
 
         String redisKey = "auth:reset:token:" + token;
         redisTemplate.opsForValue().set(redisKey, String.valueOf(user.getId()), 15, TimeUnit.MINUTES);
@@ -153,6 +155,51 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
+     * 更新用户资料（更新 sys_user 与 sys_user_profile）
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateProfile(Long userId, UserInfoDTO profileDto) {
+        // 加载现有实体
+        User existingUser = userMapper.selectById(userId);
+        if (existingUser == null) {
+            throw new ServiceException(UserErrorCode.USER_NOT_EXIST);
+        }
+        UserProfile existingProfile = userProfileMapper.selectById(userId);
+        if (existingProfile == null) {
+            // 若档案不存在则新建一个基础档案
+            existingProfile = UserProfile.builder().userId(userId).build();
+        }
+
+        IdentityType identity = existingUser.getIdentityType();
+
+        // 复制非空字段到现有实体
+        BeanUtil.copyProperties(profileDto, existingUser, CopyOptions.create().setIgnoreNullValue(true));
+        BeanUtil.copyProperties(profileDto, existingProfile, CopyOptions.create().setIgnoreNullValue(true));
+
+        // 按身份过滤字段
+        if (identity == IdentityType.STUDENT) {
+            existingProfile.setAcademicTitle(existingProfile.getAcademicTitle()); // 保持原值（无操作）
+        } else if (identity == IdentityType.TEACHER) {
+            existingProfile.setMajor(existingProfile.getMajor());
+            existingProfile.setClassName(existingProfile.getClassName());
+        }
+
+        // 更新两张表
+        int r1 = userMapper.updateById(existingUser);
+        int r2;
+        if (userProfileMapper.selectById(userId) == null) {
+            r2 = userProfileMapper.insert(existingProfile);
+        } else {
+            r2 = userProfileMapper.updateById(existingProfile);
+        }
+
+        if (r1 == 0 || r2 == 0) {
+            throw new ServiceException(UserErrorCode.UPDATE_FAILED);
+        }
+    }
+
+    /**
      * 执行重置密码（通过token）
      */
     @Override
@@ -160,7 +207,7 @@ public class UserServiceImpl implements UserService {
         String redisKey = "auth:reset:token:" + resetExecuteRequest.getToken();
         String userId = redisTemplate.opsForValue().get(redisKey);
 
-        if(userId == null){
+        if (userId == null) {
             throw new ServiceException(UserErrorCode.PASSWORD_RESET_FAILED);
         }
 
@@ -168,6 +215,92 @@ public class UserServiceImpl implements UserService {
         // 成功后立即清理 Token
         redisTemplate.delete(redisKey);
         log.info("用户 {} 密码重置成功", userId);
+    }
+
+    /**
+     * 发起邮箱验证（根据学号和后缀类型拼接邮箱，生成6位数字token并存 redis，发送邮件）
+     */
+    @Override
+    public void initiateEmailVerify(Long userId, int suffixType) {
+        // 获取邮箱
+        User user = userMapper.selectById(userId);
+        String email = getEmail(suffixType, user);
+
+        // 生成6位数字 token
+        String token = RandomUtil.randomNumbers(6);
+
+        String redisKey = "verify:token:" + token;
+        String redisValue = userId + ":" + email;
+        redisTemplate.opsForValue().set(redisKey, redisValue, 15, TimeUnit.MINUTES);
+
+        // 构建邮件内容
+        String content = "您的验证码为: " + token + "\n(该验证码15分钟内有效)";
+
+        MailSendDTO mailDTO = MailSendDTO.builder()
+                .toEmail(email)
+                .subject("邮箱验证验证码")
+                .content(content)
+                .build();
+
+        try {
+            remoteMailService.sendMail(mailDTO);
+            log.info("Verify email sent. userId={}, email={}", userId, email);
+        } catch (Exception e) {
+            log.error("Verify email sending failed.", e);
+            throw new ServiceException(UserErrorCode.EMAIL_SEND_ERROR);
+        }
+    }
+
+    private static String getEmail(int suffixType, User user) {
+        if (user == null) {
+            throw new ServiceException(UserErrorCode.USER_NOT_EXIST);
+        }
+
+        if (user.getStatus() != Status.UNIDENTIFIED) {
+            throw new ServiceException(UserErrorCode.USER_STATUS_ERROR);
+        }
+
+        String campusNo = user.getCampusNo();
+        if (campusNo == null) {
+            throw new ServiceException(UserErrorCode.USER_NOT_EXIST);
+        }
+
+        // 简单后缀映射：0 -> @m.fudan.edu.cn, 1 -> @fudan.edu.cn
+        String suffix = suffixType == 1 ? "@fudan.edu.cn" : "@m.fudan.edu.cn";
+        return campusNo + suffix;
+    }
+
+    /**
+     * 验证 token 并更新用户状态和邮箱
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean checkVerifyToken(String token) {
+        String redisKey = "verify:token:" + token;
+        String val = redisTemplate.opsForValue().get(redisKey);
+        if (val == null) {
+            return false;
+        }
+
+        // 删除 key 防止复用
+        redisTemplate.delete(redisKey);
+
+        String[] parts = val.split(":", 2);
+        if (parts.length < 2) {
+            return false;
+        }
+
+        Long userId = Long.valueOf(parts[0]);
+        String email = parts[1];
+
+        User updateUser = new User();
+        updateUser.setId(userId);
+        updateUser.setEmail(email);
+        updateUser.setStatus(Status.NORMAL);
+        updateUser.setUpdateTime(java.time.LocalDateTime.now());
+
+        int r = userMapper.updateById(updateUser);
+        return r > 0;
     }
 
     boolean updatePasswordByUserId(String userId, String newPassword) {

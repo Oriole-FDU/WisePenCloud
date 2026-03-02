@@ -1,7 +1,6 @@
 package com.oriole.wisepen.user.exception;
 
 import com.oriole.wisepen.common.core.exception.IErrorCode;
-import com.oriole.wisepen.user.api.constant.UserValidationMsg;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -21,7 +20,9 @@ public enum UserErrorCode implements IErrorCode {
     USER_LOCKED(1003, "账号已禁用"),
     USERNAME_EXISTED(1004, "用户名已存在"),
     EMAIL_SEND_ERROR(1005, "邮件发送失败"),
-    PASSWORD_RESET_FAILED(1006, "密码重设失败");
+    PASSWORD_RESET_FAILED(1006, "密码重设失败"),
+    UPDATE_FAILED(1007, "更新失败"),
+    USER_STATUS_ERROR(1008, "用户状态错误");
 
     private final Integer code;
     private final String msg;
