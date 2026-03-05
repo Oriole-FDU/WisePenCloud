@@ -6,8 +6,8 @@ import com.oriole.wisepen.file.api.domain.dto.UploadRequest;
 
 import org.springframework.web.multipart.MultipartFile;
 
+import com.oriole.wisepen.common.core.domain.PageResult;
 import java.io.IOException;
-import java.util.List;
 
 /**
  * 文件服务接口
@@ -24,7 +24,7 @@ public interface FileService {
     /**
      * 获取当前用户的文件列表（按上传时间倒序）
      */
-    List<FileInfoVO> getMyFileList(int page, int size);
+    PageResult<FileInfoVO> getMyFileList(int page, int size);
 
     /**
      * 删除文件（校验所有权）
