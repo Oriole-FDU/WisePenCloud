@@ -5,6 +5,7 @@ import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.oriole.wisepen.common.core.domain.PageResult;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.file.exception.FileErrorCode;
 import com.oriole.wisepen.file.api.constant.FileConstants;
@@ -179,7 +180,7 @@ public class FileServiceImpl implements FileService {
     // ==================== 文件列表 ====================
 
     @Override
-    public List<FileInfoVO> getMyFileList(int page, int size) {
+    public PageResult<FileInfoVO> getMyFileList(int page, int size) {
         Long userId = Long.parseLong(SecurityContextHolder.getUserId());
 
         Page<FileInfo> pageParam = new Page<>(page, size);
@@ -189,9 +190,13 @@ public class FileServiceImpl implements FileService {
 
         Page<FileInfo> result = fileMapper.selectPage(pageParam, wrapper);
 
-        return result.getRecords().stream()
+        List<FileInfoVO> records = result.getRecords().stream()
                 .map(this::toFileInfoVO)
                 .collect(Collectors.toList());
+        
+        PageResult<FileInfoVO> pageResult = new PageResult<>(result.getTotal(), page, size);
+        pageResult.addAll(records);
+        return pageResult;
     }
 
     // ==================== 删除文件 ====================
