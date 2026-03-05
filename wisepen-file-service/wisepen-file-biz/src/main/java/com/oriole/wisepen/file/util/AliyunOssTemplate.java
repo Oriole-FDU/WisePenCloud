@@ -3,6 +3,8 @@ package com.oriole.wisepen.file.util;
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSClientBuilder;
 import com.oriole.wisepen.file.config.FileProperties;
+import com.oriole.wisepen.common.core.exception.ServiceException;
+import com.oriole.wisepen.file.exception.FileErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -37,7 +39,7 @@ public class AliyunOssTemplate {
 
         } catch (Exception e) {
             log.error("Failed to upload file to Aliyun OSS", e);
-            throw new RuntimeException("Aliyun OSS upload failed", e);
+            throw new ServiceException(FileErrorCode.FILE_UPLOAD_ERROR);
         }
     }
     

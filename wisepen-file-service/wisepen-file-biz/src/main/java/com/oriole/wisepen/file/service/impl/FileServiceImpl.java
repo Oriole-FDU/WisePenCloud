@@ -26,7 +26,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.multipart.MultipartFile;
 import com.oriole.wisepen.file.config.FileProperties;
 
-import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -53,7 +52,7 @@ public class FileServiceImpl implements FileService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public FileUploadResult upload(MultipartFile file, UploadRequest uploadRequest) throws IOException {
+    public FileUploadResult upload(MultipartFile file, UploadRequest uploadRequest) {
         String originalFilename = uploadRequest.getFilename();
         String extension = cn.hutool.core.io.FileUtil.extName(originalFilename);
         log.info("Uploading file: {}, MD5: {}, size: {} bytes", originalFilename, uploadRequest.getMd5(), file.getSize());
@@ -218,8 +217,12 @@ public class FileServiceImpl implements FileService {
 
     // ==================== 私有方法 ====================
 
-    private String uploadCache(MultipartFile file, String extension, String uuId) throws IOException {
-        String cacheFilePath = "/tmp/wisepen/upload/cache/" + uuId + "." + extension;
+    private String uploadCache(MultipartFile file, String extension, String uuId) {
+        String cacheDir = fileProperties.getCachePath();
+        if (!cacheDir.endsWith("/")) {
+            cacheDir += "/";
+        }
+        String cacheFilePath = cacheDir + uuId + "." + extension;
         java.io.File dest = new java.io.File(cacheFilePath);
         cn.hutool.core.io.FileUtil.touch(dest);
         try {

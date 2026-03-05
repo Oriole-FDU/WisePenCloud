@@ -5,6 +5,8 @@ import com.oriole.wisepen.common.core.domain.PageResult;
 import com.oriole.wisepen.file.api.domain.dto.FileInfoVO;
 import com.oriole.wisepen.file.api.domain.dto.FileUploadResult;
 import com.oriole.wisepen.file.api.domain.dto.UploadRequest;
+import com.oriole.wisepen.common.core.exception.ServiceException;
+import com.oriole.wisepen.file.exception.FileErrorCode;
 
 import com.oriole.wisepen.file.service.FileService;
 import jakarta.validation.Valid;
@@ -32,12 +34,8 @@ public class FileController {
     @PostMapping("/upload")
     public R<FileUploadResult> upload(@RequestPart("file") MultipartFile file,
                                     @Valid @RequestPart("data") UploadRequest uploadRequest) {
-        try {
-            FileUploadResult response = fileService.upload(file, uploadRequest);
-            return R.ok(response);
-        } catch (IOException e) {
-            throw new RuntimeException("Upload failed", e);
-        }
+        FileUploadResult response = fileService.upload(file, uploadRequest);
+        return R.ok(response);
     }
 
     /**

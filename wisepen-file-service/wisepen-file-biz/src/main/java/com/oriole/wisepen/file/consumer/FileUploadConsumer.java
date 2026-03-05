@@ -33,14 +33,20 @@ public class FileUploadConsumer implements CommandLineRunner {
     private final AliyunOssTemplate aliyunOssTemplate;
     private final FileAvailabilityService fileAvailabilityService;
 
+    private static final long POP_TIMEOUT_SECONDS = 5L;
+    private static final long ERROR_RETRY_DELAY_SECONDS = 1L;
+
+    private volatile boolean isRunning = true;
+    private final java.util.concurrent.ExecutorService executorService = java.util.concurrent.Executors.newSingleThreadExecutor(r -> new Thread(r, "File-Upload-Consumer"));
+
     @Override
     public void run(String... args) {
-        new Thread(() -> {
+        executorService.submit(() -> {
             String queueKey = FileConstants.UPLOAD_QUEUE_KEY + ":" + fileProperties.getInstanceId();
             log.info("FileUploadConsumer started, listening to instance-specific queue: {}", queueKey);
-            while (true) {
+            while (isRunning) {
                 try {
-                    String taskJson = stringRedisTemplate.opsForList().rightPop(queueKey, 5, TimeUnit.SECONDS);
+                    String taskJson = stringRedisTemplate.opsForList().rightPop(queueKey, POP_TIMEOUT_SECONDS, TimeUnit.SECONDS);
 
                     if (taskJson == null) {
                         continue;
@@ -53,14 +59,30 @@ public class FileUploadConsumer implements CommandLineRunner {
                 } catch (Exception e) {
                     log.error("Error processing upload task", e);
                     try {
-                        TimeUnit.SECONDS.sleep(1);
+                        TimeUnit.SECONDS.sleep(ERROR_RETRY_DELAY_SECONDS);
                     } catch (InterruptedException ex) {
                         Thread.currentThread().interrupt();
                         break;
                     }
                 }
             }
-        }, "File-Upload-Consumer").start();
+            log.info("FileUploadConsumer stopped.");
+        });
+    }
+
+    @jakarta.annotation.PreDestroy
+    public void destroy() {
+        log.info("Shutting down FileUploadConsumer...");
+        isRunning = false;
+        executorService.shutdown();
+        try {
+            if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
+                executorService.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executorService.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 
     private void processTask(FileUploadTaskDTO task) {

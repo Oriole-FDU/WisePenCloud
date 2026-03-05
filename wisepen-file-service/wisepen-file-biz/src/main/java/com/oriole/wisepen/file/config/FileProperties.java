@@ -21,6 +21,12 @@ public class FileProperties {
     private String storagePath = "/tmp/wisepen/upload/oss/";
 
     /**
+     * 本地缓存路径 (临时文件存储)
+     * e.g. /tmp/wisepen/upload/cache/
+     */
+    private String cachePath = "/tmp/wisepen/upload/cache/";
+
+    /**
      * 公网访问域名 (Web URL 使用)
      * e.g. http://localhost:9200/file/download/
      */

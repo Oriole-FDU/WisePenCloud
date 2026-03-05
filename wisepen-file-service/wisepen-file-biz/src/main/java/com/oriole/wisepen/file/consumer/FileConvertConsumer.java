@@ -32,14 +32,20 @@ public class FileConvertConsumer implements CommandLineRunner {
     private final FileMapper fileMapper;
     private final FileProperties fileProperties;
 
+    private static final long POP_TIMEOUT_SECONDS = 5L;
+    private static final long ERROR_RETRY_DELAY_SECONDS = 1L;
+
+    private volatile boolean isRunning = true;
+    private final java.util.concurrent.ExecutorService executorService = java.util.concurrent.Executors.newSingleThreadExecutor(r -> new Thread(r, "File-Convert-Consumer"));
+
     @Override
     public void run(String... args) {
-        new Thread(() -> {
+        executorService.submit(() -> {
             String queueKey = FileConstants.CONVERT_QUEUE_KEY + ":" + fileProperties.getInstanceId();
             log.info("FileConvertConsumer started, listening to instance-specific queue: {}", queueKey);
-            while (true) {
+            while (isRunning) {
                 try {
-                    String taskJson = stringRedisTemplate.opsForList().rightPop(queueKey, 5, TimeUnit.SECONDS);
+                    String taskJson = stringRedisTemplate.opsForList().rightPop(queueKey, POP_TIMEOUT_SECONDS, TimeUnit.SECONDS);
                     
                     if (taskJson == null) {
                         continue;
@@ -52,14 +58,30 @@ public class FileConvertConsumer implements CommandLineRunner {
                 } catch (Exception e) {
                     log.error("Error processing conversion task", e);
                     try {
-                        TimeUnit.SECONDS.sleep(1);
+                        TimeUnit.SECONDS.sleep(ERROR_RETRY_DELAY_SECONDS);
                     } catch (InterruptedException ex) {
                         Thread.currentThread().interrupt();
                         break;
                     }
                 }
             }
-        }, "File-Convert-Consumer").start();
+            log.info("FileConvertConsumer stopped.");
+        });
+    }
+
+    @jakarta.annotation.PreDestroy
+    public void destroy() {
+        log.info("Shutting down FileConvertConsumer...");
+        isRunning = false;
+        executorService.shutdown();
+        try {
+            if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
+                executorService.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executorService.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 
     private void processTask(FileConvertTaskDTO task) {
@@ -99,8 +121,11 @@ public class FileConvertConsumer implements CommandLineRunner {
             String pdfWebUrl = domain + objectKey;
 
             // 缓存转换后的 PDF 到本地缓存目录 (用于后续上传步骤)
-            // 注意：缓存文件名用 uuid 即可，不需要目录层级，只要全路径对 consumer 可见
-            String cachePdfPath = "/tmp/wisepen/upload/cache/" + uuId + ".pdf";
+            String cacheDir = fileProperties.getCachePath();
+            if (!cacheDir.endsWith("/")) {
+                cacheDir += "/";
+            }
+            String cachePdfPath = cacheDir + uuId + ".pdf";
             File cachePdfFile = new File(cachePdfPath);
             cn.hutool.core.io.FileUtil.mkdir(cachePdfFile.getParentFile());
             cn.hutool.core.io.FileUtil.move(tempPdf, cachePdfFile, true);

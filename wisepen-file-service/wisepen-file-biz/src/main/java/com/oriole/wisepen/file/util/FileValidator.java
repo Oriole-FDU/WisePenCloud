@@ -23,6 +23,7 @@ public class FileValidator {
 
     private static final Map<String, String> MAGIC_NUMBER_MAP = new HashMap<>();
     private static final int MAGIC_NUMBER_LENGTH = 8;
+    private static final int BUFFER_SIZE = 8192;
 
     static {
         MAGIC_NUMBER_MAP.put("doc", "D0CF11E0A1B11AE1");
@@ -92,7 +93,7 @@ public class FileValidator {
     public static String calculateMd5(MultipartFile file) {
         try {
             MessageDigest md = MessageDigest.getInstance("MD5");
-            byte[] buffer = new byte[8192];
+            byte[] buffer = new byte[BUFFER_SIZE];
             int read;
             try (InputStream is = file.getInputStream()) {
                 while ((read = is.read(buffer)) != -1) {
@@ -109,7 +110,7 @@ public class FileValidator {
     public static String calculateMd5(File file) {
         try {
             MessageDigest md = MessageDigest.getInstance("MD5");
-            byte[] buffer = new byte[8192];
+            byte[] buffer = new byte[BUFFER_SIZE];
             int read;
             try (InputStream is = Files.newInputStream(file.toPath())) {
                 while ((read = is.read(buffer)) != -1) {
