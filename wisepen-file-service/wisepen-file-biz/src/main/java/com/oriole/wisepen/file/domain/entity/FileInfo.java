@@ -61,4 +61,10 @@ public class FileInfo implements Serializable {
      * 状态 0:处理中 1:成功 2:失败
      */
     private Integer status;
+
+    /**
+     * 对应 resource-service 的资源 ID（注册完成后写入）
+     */
+    @TableField("resource_id")
+    private String resourceId;
 }
