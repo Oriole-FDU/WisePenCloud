@@ -30,14 +30,7 @@ public class AliyunOssTemplate {
         }
 
         try {
-            // Lazy initialization or check if client is null/shutdown
-            if (ossClient == null) {
-                ossClient = new OSSClientBuilder().build(
-                        ossConfig.getEndpoint(),
-                        ossConfig.getAccessKeyId(),
-                        ossConfig.getAccessKeySecret());
-            }
-
+            ensureClient();
             log.info("Uploading file to Aliyun OSS: bucket={}, key={}", ossConfig.getBucketName(), objectKey);
             ossClient.putObject(ossConfig.getBucketName(), objectKey, file);
             log.info("Aliyun OSS upload successful: {}", objectKey);
@@ -48,7 +41,21 @@ public class AliyunOssTemplate {
         }
     }
     
-    // Note: In a real production scenario, you might want to manage the OSSClient lifecycle more carefully 
-    // (e.g., using a Bean with @PreDestroy to shutdown), or use a pool if high concurrency.
-    // For this implementation, we keep it simple.
+    private synchronized void ensureClient() {
+        if (ossClient == null) {
+            FileProperties.OssConfig ossConfig = fileProperties.getOss();
+            ossClient = new OSSClientBuilder().build(
+                    ossConfig.getEndpoint(),
+                    ossConfig.getAccessKeyId(),
+                    ossConfig.getAccessKeySecret());
+        }
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        if (ossClient != null) {
+            log.info("Shutting down Aliyun OSS Client...");
+                ossClient.shutdown();
+        }
+    }
 }
