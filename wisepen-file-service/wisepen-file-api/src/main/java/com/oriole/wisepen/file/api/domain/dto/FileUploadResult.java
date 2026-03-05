@@ -19,9 +19,9 @@ import java.io.Serializable;
 public class FileUploadResult implements Serializable {
     private static final long serialVersionUID = 1L;
 
-    /** 文档ID */
+    // 文档ID
     private Long documentId;
 
-    /** 文件名 */
+    // 文件名
     private String filename;
 }

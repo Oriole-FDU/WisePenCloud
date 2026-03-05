@@ -20,18 +20,18 @@ import java.time.LocalDateTime;
 public class FileInfoVO implements Serializable {
     private static final long serialVersionUID = 1L;
 
-    /** 文档ID */
+    // 文档ID
     private Long documentId;
 
-    /** 文件名 */
+    // 文件名
     private String fileName;
 
-    /** 文件大小（字节） */
+    // 文件大小（字节）
     private Long fileSize;
 
-    /** 上传时间 */
+    // 上传时间
     private LocalDateTime createTime;
 
-    /** 状态：0=处理中, 1=可用, 2=失败 */
+    // 状态：0=处理中, 1=可用, 2=失败
     private Integer status;
 }

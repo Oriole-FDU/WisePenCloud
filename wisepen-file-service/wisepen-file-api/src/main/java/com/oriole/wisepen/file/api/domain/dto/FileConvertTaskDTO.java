@@ -1,11 +1,13 @@
 package com.oriole.wisepen.file.api.domain.dto;
 
 import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.Data;
+import lombok.experimental.SuperBuilder;
 
 import java.io.Serializable;
+
+import lombok.EqualsAndHashCode;
 
 /**
  * 文件转换任务 DTO
@@ -13,37 +15,16 @@ import java.io.Serializable;
  * @author Ian.Xiong
  */
 @Data
-@Builder
+@EqualsAndHashCode(callSuper = true)
+@SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-public class FileConvertTaskDTO implements Serializable {
-    /**
-     * 文件ID
-     */
-    private Long fileId;
+public class FileConvertTaskDTO extends FileTaskBase {
+    private static final long serialVersionUID = 1L;
 
-    /**
-     * 原始文件名
-     */
-    private String originalFilename;
-
-    /**
-     * 文件扩展名
-     */
+    // 文件扩展名
     private String extension;
-
-    /**
-     * 临时文件存储路径
-     */
-    private String tempFilePath;
     
-    /**
-     * 原始文件大小
-     */
+    // 原始文件大小
     private Long originalSize;
-    
-    /**
-     * md5
-     */
-    private String md5;
 }
