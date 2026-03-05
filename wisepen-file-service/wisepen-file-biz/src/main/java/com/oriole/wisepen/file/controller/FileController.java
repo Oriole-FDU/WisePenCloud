@@ -1,6 +1,7 @@
 package com.oriole.wisepen.file.controller;
 
 import com.oriole.wisepen.common.core.domain.R;
+import com.oriole.wisepen.common.core.domain.PageResult;
 import com.oriole.wisepen.file.api.domain.dto.FileInfoVO;
 import com.oriole.wisepen.file.api.domain.dto.FileUploadResult;
 import com.oriole.wisepen.file.api.domain.dto.UploadRequest;
@@ -12,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.util.List;
+import java.io.IOException;
 
 /**
  * 文件管理接口
@@ -44,10 +45,19 @@ public class FileController {
      * 获取当前用户的文件列表
      */
     @GetMapping("/list")
-    public R<List<FileInfoVO>> getMyFileList(
+    public R<PageResult<FileInfoVO>> getMyFileList(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
         return R.ok(fileService.getMyFileList(page, size));
+    }
+    
+    /**
+     * 重命名文件
+     */
+    @PostMapping("/rename/{id}")
+    public R<Void> renameFile(@PathVariable Long id, @RequestParam("name") String name) {
+        fileService.renameFile(id, name);
+        return R.ok();
     }
 
     /**
@@ -58,4 +68,6 @@ public class FileController {
         fileService.deleteFile(id);
         return R.ok();
     }
+
+    
 }
