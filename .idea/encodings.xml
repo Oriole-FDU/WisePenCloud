@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="Encoding">
+    <file url="file://$PROJECT_DIR$/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wisepen-common-log/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wisepen-common-log/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wisepen-common/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wisepen-common/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wisepen-system-service/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wisepen-system-service/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wisepen-system-service/wisepen-system-api/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wisepen-system-service/wisepen-system-api/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wisepen-system-service/wisepen-system-biz/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wisepen-system-service/wisepen-system-biz/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wisepen-user-service/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wisepen-user-service/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wisepen-user-service/wisepen-user-api/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wisepen-user-service/wisepen-user-api/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wisepen-user-service/wisepen-user-biz/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wisepen-user-service/wisepen-user-biz/src/main/resources" charset="UTF-8" />
+  </component>
+</project>
