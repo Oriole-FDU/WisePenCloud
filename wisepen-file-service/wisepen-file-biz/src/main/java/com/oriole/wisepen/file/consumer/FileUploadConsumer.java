@@ -6,6 +6,7 @@ import com.oriole.wisepen.file.api.domain.dto.FileUploadTaskDTO;
 import com.oriole.wisepen.file.config.FileProperties;
 import com.oriole.wisepen.file.domain.entity.FileInfo;
 import com.oriole.wisepen.file.mapper.FileMapper;
+import com.oriole.wisepen.file.service.FileAvailabilityService;
 import com.oriole.wisepen.file.util.AliyunOssTemplate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +31,7 @@ public class FileUploadConsumer implements CommandLineRunner {
     private final FileMapper fileMapper;
     private final FileProperties fileProperties;
     private final AliyunOssTemplate aliyunOssTemplate;
+    private final FileAvailabilityService fileAvailabilityService;
 
     @Override
     public void run(String... args) {
@@ -79,18 +81,15 @@ public class FileUploadConsumer implements CommandLineRunner {
             }
 
             if (fileProperties.getOss().isEnabled()) {
-                // 真实 OSS 模式：直接从缓存上传到阿里云，不存储到本地
                 aliyunOssTemplate.uploadFile(cacheFile, objectKey);
                 log.info("File uploaded to Aliyun OSS: {}", objectKey);
             } else {
-                // 本地模拟 OSS 模式：复制到本地存储路径
                 File targetFile = new File(task.getTargetPath());
                 cn.hutool.core.io.FileUtil.mkdir(targetFile.getParentFile());
                 cn.hutool.core.io.FileUtil.copy(cacheFile, targetFile, true);
                 log.info("File uploaded to simulated OSS: {}", task.getTargetPath());
             }
 
-            // 更新数据库状态
             FileInfo fileInfo = fileMapper.selectById(task.getFileId());
             if (fileInfo == null) {
                 log.error("FileInfo not found for fileId: {}", task.getFileId());
@@ -102,36 +101,24 @@ public class FileUploadConsumer implements CommandLineRunner {
             update.setUpdateTime(java.time.LocalDateTime.now());
 
             if (Boolean.TRUE.equals(task.getIsConvertedPdf())) {
-                // 转换后的 PDF 上传完成
-                // 优先使用 accessUrl (Web URL)，若无则降级为 targetPath (物理路径)
-                String finalPdfUrl = (task.getAccessUrl() != null && !task.getAccessUrl().isEmpty()) 
-                        ? task.getAccessUrl() 
-                        : task.getTargetPath();
-                
-                update.setPdfUrl(finalPdfUrl); 
-                update.setStatus(FileConstants.UPLOAD_STATUS_AVAILABLE);
+                // PDF 副本转换完成：仅补充 pdfUrl，不更改状态（原件上传时已设为 AVAILABLE）
+                String finalPdfUrl = (task.getAccessUrl() != null && !task.getAccessUrl().isEmpty())
+                        ? task.getAccessUrl() : task.getTargetPath();
+                update.setPdfUrl(finalPdfUrl);
+                fileMapper.updateById(update);
 
             } else if (Boolean.TRUE.equals(task.getIsPdfDirect())) {
-                // PDF 直传：
-                // URL 已经在 Service层生成并入库(accessUrl)
-                // pdfUrl 也应该存 Web URL
-                String finalPdfUrl = (task.getAccessUrl() != null && !task.getAccessUrl().isEmpty()) 
-                        ? task.getAccessUrl() 
-                        : task.getTargetPath();
-                        
+                // PDF 原件直传：设为 AVAILABLE 并注册资源
+                String finalPdfUrl = (task.getAccessUrl() != null && !task.getAccessUrl().isEmpty())
+                        ? task.getAccessUrl() : task.getTargetPath();
                 update.setPdfUrl(finalPdfUrl);
-                update.setStatus(FileConstants.UPLOAD_STATUS_AVAILABLE);
+                fileAvailabilityService.markAvailableAndRegister(update, fileInfo);
 
             } else {
-                // 原始文件上传完成
-                // update.setUrl(task.getTargetPath()); // Removed: Don't overwrite access URL with physical path
-                // 非 Office 文档直接可用；Office 文档需等待转换完成
-                if (!isOfficeDocument(fileInfo.getType())) {
-                    update.setStatus(FileConstants.UPLOAD_STATUS_AVAILABLE);
-                }
+                // 非 PDF 原始文件（含 Office 原件）：统一触发 markAvailableAndRegister
+                // Office 文件虽仍需转换 PDF，但原件已可注册进资源系统，状态由 isConvertedPdf 回调更新
+                fileAvailabilityService.markAvailableAndRegister(update, fileInfo);
             }
-
-            fileMapper.updateById(update);
 
         } catch (Exception e) {
             log.error("Upload failed for fileId: {}", task.getFileId(), e);
@@ -139,9 +126,7 @@ public class FileUploadConsumer implements CommandLineRunner {
     }
 
     private boolean isOfficeDocument(String extension) {
-        if (extension == null) {
-            return false;
-        }
+        if (extension == null) return false;
         return FileConstants.OFFICE_EXTENSIONS.contains(extension.toLowerCase());
     }
 }

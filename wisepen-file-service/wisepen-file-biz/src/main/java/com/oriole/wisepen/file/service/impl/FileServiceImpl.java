@@ -14,6 +14,7 @@ import com.oriole.wisepen.file.api.domain.dto.FileUploadResult;
 import com.oriole.wisepen.file.domain.entity.FileInfo;
 import com.oriole.wisepen.file.mapper.FileMapper;
 import com.oriole.wisepen.file.service.FileService;
+import com.oriole.wisepen.file.service.FileAvailabilityService;
 import com.oriole.wisepen.file.util.FileValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +45,7 @@ public class FileServiceImpl implements FileService {
     private final FileMapper fileMapper;
     private final StringRedisTemplate stringRedisTemplate;
     private final FileProperties fileProperties;
+    private final FileAvailabilityService fileAvailabilityService;
 
     // ==================== 上传 ====================
 
@@ -91,6 +93,8 @@ public class FileServiceImpl implements FileService {
                     .updateTime(LocalDateTime.now())
                     .build();
             fileMapper.insert(newRecord);
+            // 秒传直接 AVAILABLE，触发统一资源注册
+            fileAvailabilityService.registerResource(newRecord);
             return FileUploadResult.builder()
                     .documentId(newRecord.getId())
                     .filename(newRecord.getFilename())
