@@ -245,4 +245,25 @@ public class FileServiceImpl implements FileService {
                 .status(fileInfo.getStatus())
                 .build();
     }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void renameFile(Long fileId, String name) {
+        Long userId = Long.parseLong(SecurityContextHolder.getUserId());
+
+        FileInfo fileInfo = fileMapper.selectById(fileId);
+        if (fileInfo == null) {
+            throw new ServiceException(FileErrorCode.FILE_NOT_FOUND);
+        }
+
+        // 越权防御：createdBy 必须匹配当前用户
+        if (!userId.equals(fileInfo.getCreateBy())) {
+            throw new ServiceException(FileErrorCode.FILE_OPERATION_FORBIDDEN);
+        }
+
+        fileInfo.setFilename(name);
+        fileInfo.setUpdateTime(LocalDateTime.now());
+        fileMapper.updateById(fileInfo);
+        log.info("File renamed: fileId={}, userId={}, newName={}", fileId, userId, name);
+    }
 }
