@@ -30,4 +30,9 @@ public interface FileService {
      * 删除文件（校验所有权）
      */
     void deleteFile(Long fileId);
+
+    /**
+     * 重命名文件
+     */
+    void renameFile(Long fileId, String newName);
 }

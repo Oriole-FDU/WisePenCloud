@@ -28,6 +28,17 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- 通过 Feign 调用 resource-service（仅依赖 api 模块，符合微服务契约规范） -->
+        <dependency>
+            <groupId>com.oriole</groupId>
+            <artifactId>wisepen-resource-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-bootstrap</artifactId>
