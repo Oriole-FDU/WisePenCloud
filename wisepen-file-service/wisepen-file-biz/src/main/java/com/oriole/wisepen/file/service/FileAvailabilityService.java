@@ -53,7 +53,15 @@ public class FileAvailabilityService {
             dto.setSize(fileInfo.getSize());
 
             R<String> result = remoteResourceService.createResource(dto);
-            log.info("资源已注册: fileId={}, resourceId={}", fileInfo.getId(), result.getData());
+            String resourceId = result.getData();
+            log.info("资源已注册: fileId={}, resourceId={}", fileInfo.getId(), resourceId);
+
+            // 将 resourceId 写回 sys_file，建立 file ↔ resource 的唯一映射
+            FileInfo update = new FileInfo();
+            update.setId(fileInfo.getId());
+            update.setResourceId(resourceId);
+            fileMapper.updateById(update);
+
         } catch (Exception e) {
             log.warn("资源注册失败: fileId={}, reason={}", fileInfo.getId(), e.getMessage());
         }
