@@ -13,10 +13,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.io.IOException;
 
 /**
- * 文件管理接口
+ * 文件管理接口（对外开放）
  *
  * @author Ian.Xiong
  */
@@ -50,24 +49,4 @@ public class FileController {
             @RequestParam(defaultValue = "20") int size) {
         return R.ok(fileService.getMyFileList(page, size));
     }
-    
-    /**
-     * 重命名文件
-     */
-    @PostMapping("/rename/{id}")
-    public R<Void> renameFile(@PathVariable Long id, @RequestParam("name") String name) {
-        fileService.renameFile(id, name);
-        return R.ok();
-    }
-
-    /**
-     * 删除文件
-     */
-    @DeleteMapping("/{id}")
-    public R<Void> deleteFile(@PathVariable Long id) {
-        fileService.deleteFile(id);
-        return R.ok();
-    }
-
-    
 }
