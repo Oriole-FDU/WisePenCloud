@@ -23,6 +23,5 @@ public class FileUploadRequest implements Serializable {
     @NotBlank(message = FileValidationMsg.MD5_EMPTY)
     private String md5;
 
-    @NotNull(message = FileValidationMsg.FILESIZE_NULL)
     private Long fileSize;
 }

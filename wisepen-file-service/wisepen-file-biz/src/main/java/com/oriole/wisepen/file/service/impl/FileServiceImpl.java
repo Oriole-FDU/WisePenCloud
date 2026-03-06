@@ -63,9 +63,9 @@ public class FileServiceImpl implements FileService {
         FileValidator.validateFileSize(file);
         FileValidator.validateFileType(file, extension);
         
-        if (!Long.valueOf(file.getSize()).equals(uploadRequest.getFileSize())) {
+        if (uploadRequest.getFileSize() != null && !Long.valueOf(file.getSize()).equals(uploadRequest.getFileSize())) {
             log.warn("File size mismatch! Declared: {}, Actual: {}", uploadRequest.getFileSize(), file.getSize());
-            throw new ServiceException(FileErrorCode.FILE_SIZE_EXCEEDED); // 借用 FileSize 错误码
+            throw new ServiceException(FileErrorCode.FILE_SIZE_EXCEEDED);
         }
 
         // 为避免流被重复读取或消耗，先将其写入本地缓存，再对本地 File 计算 MD5
