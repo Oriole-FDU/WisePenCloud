@@ -34,7 +34,7 @@ public class FileUploadConsumer implements CommandLineRunner {
     private final AliyunOssTemplate aliyunOssTemplate;
     private final FileAvailabilityService fileAvailabilityService;
 
-    private static final long POP_TIMEOUT_SECONDS = 5L;
+    private static final long POP_TIMEOUT_SECONDS = 2L;
     private static final long ERROR_RETRY_DELAY_SECONDS = 1L;
 
     private volatile boolean isRunning = true;

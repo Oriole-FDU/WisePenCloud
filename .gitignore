@@ -9,6 +9,7 @@ dev.properties
 logs
 
 ### IntelliJ IDEA ###
+.idea/
 !.idea/runConfigurations/
 .gitignore
 .idea/modules.xml

@@ -32,7 +32,7 @@ public class FileConvertConsumer implements CommandLineRunner {
     private final FileMapper fileMapper;
     private final FileProperties fileProperties;
 
-    private static final long POP_TIMEOUT_SECONDS = 5L;
+    private static final long POP_TIMEOUT_SECONDS = 2L;
     private static final long ERROR_RETRY_DELAY_SECONDS = 1L;
 
     private volatile boolean isRunning = true;

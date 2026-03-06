@@ -34,10 +34,10 @@ public class GroupController {
 		group.setDescription(req.getDescription());
 		group.setCoverUrl(req.getCoverUrl());
 
-		group.setOwnerId(SecurityContextHolder.getUserId());
+		group.setOwnerId(Long.valueOf(SecurityContextHolder.getUserId()));
 		groupService.createGroup(group);
 
-		Long userId = SecurityContextHolder.getUserId();
+		Long userId = Long.valueOf(SecurityContextHolder.getUserId());
 		groupMemberService.becomeGroupOwner(userId, group.getId());
 
 		return R.ok();
@@ -70,7 +70,7 @@ public class GroupController {
 			@RequestParam("page") @NonNull @Min(1) Integer page,
 			@RequestParam("size") @NonNull @Min(1) Integer size
 	) {
-		Long userId = SecurityContextHolder.getUserId();
+		Long userId = Long.valueOf(SecurityContextHolder.getUserId());
 		return R.ok(groupService.getGroupIds(userId, relationType, page, size));
 	}
 }

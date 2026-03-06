@@ -16,6 +16,9 @@ public class GroupMember implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
+    private Long id;
+
+
     /** 组ID */
     private Long groupId;
 

@@ -24,7 +24,7 @@ public class GroupMemberController {
 	@SaCheckLogin
 	@PostMapping("/join")
 	public R<Void> joinGroup(@RequestBody @Valid JoinGroupReq req) {
-		Long userId = SecurityContextHolder.getUserId();
+		Long userId = Long.valueOf(SecurityContextHolder.getUserId());
 		groupMemberService.joinGroup(userId, req.getInviteCode());
 		return R.ok();
 	}
@@ -32,7 +32,7 @@ public class GroupMemberController {
 	@SaCheckLogin
 	@PostMapping("/quit")
 	public R<Void> quitGroup(@RequestBody @Valid QuitGroupReq req) {
-		Long userId = SecurityContextHolder.getUserId();
+		Long userId = Long.valueOf(SecurityContextHolder.getUserId());
 		groupMemberService.leaveGroup(userId, req.getGroupId());
 		return R.ok();
 	}
@@ -40,7 +40,7 @@ public class GroupMemberController {
 	@SaCheckLogin
 	@PostMapping("/kick")
 	public R<Void> kickGroup(@RequestBody @Valid KickGroupReq req) {
-		Long userId = SecurityContextHolder.getUserId();
+		Long userId = Long.valueOf(SecurityContextHolder.getUserId());
 		groupMemberService.kickGroupMembers(userId, req.getGroupId(), req.getTargetUserIds());
 		return R.ok();
 	}
