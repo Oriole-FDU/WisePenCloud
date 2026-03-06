@@ -17,4 +17,10 @@ public interface GroupService {
 
     // 获取组的详情
     Group getGroupById(Long id);
+
+    void updateGroup(Group group);
+
+    void deleteGroup(Long groupId);
+
+    com.oriole.wisepen.user.api.domain.dto.PageResp<com.oriole.wisepen.user.api.domain.dto.GroupQueryResp> getGroupIds(Long userId, Integer relationType, Integer page, Integer size);
 }

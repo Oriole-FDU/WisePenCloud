@@ -59,4 +59,45 @@ public class GroupServiceImpl implements GroupService {
     public Group getGroupById(Long id) {
         return groupMapper.selectById(id);
     }
+
+    @Override
+    public void updateGroup(Group group) {
+        groupMapper.updateById(group);
+    }
+
+    @Override
+    public void deleteGroup(Long groupId) {
+        groupMapper.deleteById(groupId);
+    }
+
+    @Override
+    public com.oriole.wisepen.user.api.domain.dto.PageResp<com.oriole.wisepen.user.api.domain.dto.GroupQueryResp> getGroupIds(Long userId, Integer relationType, Integer page, Integer size) {
+        // Simple dummy implementation or return empty page just to pass compilation, 
+        // since the user wants it to run for file-service test, but let's do a basic query.
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<GroupMember> mpPage = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page, size);
+        LambdaQueryWrapper<GroupMember> wrapper = new LambdaQueryWrapper<GroupMember>().eq(GroupMember::getUserId, userId);
+        if (relationType != null && relationType == 1) {
+            wrapper.eq(GroupMember::getRole, com.oriole.wisepen.common.core.domain.enums.GroupRoleType.OWNER);
+        } else if (relationType != null && relationType == 2) {
+            wrapper.ne(GroupMember::getRole, com.oriole.wisepen.common.core.domain.enums.GroupRoleType.OWNER);
+        }
+        com.baomidou.mybatisplus.core.metadata.IPage<GroupMember> memberRecords = groupMemberMapper.selectPage(mpPage, wrapper);
+        
+        List<com.oriole.wisepen.user.api.domain.dto.GroupQueryResp> resps = memberRecords.getRecords().stream().map(gm -> {
+            Group g = groupMapper.selectById(gm.getGroupId());
+            com.oriole.wisepen.user.api.domain.dto.GroupQueryResp resp = new com.oriole.wisepen.user.api.domain.dto.GroupQueryResp();
+            if (g != null) {
+                resp.setId(g.getId());
+                resp.setName(g.getName());
+                resp.setOwnerId(g.getOwnerId());
+                resp.setType(g.getType());
+                resp.setDescription(g.getDescription());
+                resp.setCoverUrl(g.getCoverUrl());
+                resp.setInviteCode(g.getInviteCode());
+                resp.setMemberCount(groupMemberMapper.selectCount(new LambdaQueryWrapper<GroupMember>().eq(GroupMember::getGroupId, g.getId())).intValue());
+            }
+            return resp;
+        }).collect(Collectors.toList());
+        return new com.oriole.wisepen.user.api.domain.dto.PageResp<>((int) memberRecords.getPages(), resps);
+    }
 }

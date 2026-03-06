@@ -13,6 +13,7 @@ spring:
     nacos:
       discovery:
         server-addr: wisepen-dev-server:8848
+        ip: 10.230.37.65
       config:
         server-addr: wisepen-dev-server:8848
         file-extension: yaml

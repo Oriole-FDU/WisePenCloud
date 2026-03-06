@@ -180,7 +180,7 @@ public class GroupMemberServiceImpl implements GroupMemberService {
 			Long uid = gm.getUserId();
 
 			resp.setUserId(uid);
-			resp.setRole(gm.getRole());
+			resp.setRole(gm.getRole().getCode());
 			resp.setJoinTime(gm.getJoinTime());
 
 			User u = userMap.get(uid);

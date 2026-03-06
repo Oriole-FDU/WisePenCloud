@@ -109,6 +109,8 @@ register_route 2 "user-service" "/user/*" "wisepen-user-service"
 register_route 3 "group-service" "/group/*" "wisepen-user-service"
 # res-permission-service
 register_route 4 "res-permission-service" "/resource/*" "wisepen-res-permission-service"
+# file-service
+register_route 5 "file-service" "/file/*" "wisepen-file-service"
 
 echo -e "\n========================================="
 echo "所有配置已推送到 APISIX !"
