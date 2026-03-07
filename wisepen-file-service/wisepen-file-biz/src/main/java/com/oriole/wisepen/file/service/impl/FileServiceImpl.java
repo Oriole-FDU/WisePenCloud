@@ -217,28 +217,13 @@ public class FileServiceImpl implements FileService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deleteFile(Long fileId) {
-        Long userId = Long.parseLong(SecurityContextHolder.getUserId());
         FileInfo existingFile = fileMapper.selectById(fileId);
         if (existingFile == null) {
             throw new ServiceException(FileErrorCode.FILE_NOT_FOUND);
         }
         
-        // 1. 本地删除的鉴权：如果有关联 resourceId，则交给 resource-service 鉴权
+        // 1. 同步删除 resource-service 中的主记录，由 Resource 侧校验权限
         if (cn.hutool.core.util.StrUtil.isNotBlank(existingFile.getResourceId())) {
-            com.oriole.wisepen.resource.domain.dto.ResourceCheckPermissionDTO authDto = 
-                    new com.oriole.wisepen.resource.domain.dto.ResourceCheckPermissionDTO();
-            authDto.setResourceId(existingFile.getResourceId());
-            authDto.setResourceType(existingFile.getType().toUpperCase());
-            authDto.setUserId(userId.toString());
-            authDto.setGroupRoles(java.util.Collections.emptyMap()); // 此处如果需要群组权限，可以传入真实群组，暂传空表示仅个人权限
-            
-            com.oriole.wisepen.common.core.domain.R<Boolean> authResult = remoteResourceService.checkResPermission(authDto);
-            if (authResult.getCode() != 200 || Boolean.FALSE.equals(authResult.getData())) {
-                log.warn("Permission denied by Resource Service to delete file: {}", fileId);
-                throw new ServiceException("当前用户无权删除该资源");
-            }
-
-            // 同步删除 resource-service 中的主记录
             com.oriole.wisepen.common.core.domain.R<Void> result = 
                 remoteResourceService.removeResource(existingFile.getResourceId());
             if (result.getCode() != 200) {
@@ -246,7 +231,8 @@ public class FileServiceImpl implements FileService {
                 throw new ServiceException("Failed to delete resource: " + result.getMsg());
             }
         } else {
-            // 没有 resourceId（可能由于历史遗留/注册失败），降级为校验文件上传者
+            // 无 resourceId 兜底校验
+            Long userId = Long.parseLong(SecurityContextHolder.getUserId());
             if (!existingFile.getCreateBy().equals(userId)) {
                 throw new ServiceException(FileErrorCode.FILE_NOT_FOUND);
             }
@@ -294,28 +280,13 @@ public class FileServiceImpl implements FileService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void renameFile(Long fileId, String name) {
-        Long userId = Long.parseLong(SecurityContextHolder.getUserId());
         FileInfo existingFile = fileMapper.selectById(fileId);
         if (existingFile == null) {
             throw new ServiceException(FileErrorCode.FILE_NOT_FOUND);
         }
         
-        // 1. 本地重命名的鉴权：如果有关联 resourceId，则交给 resource-service 鉴权
+        // 1. 同步修改 resource-service 中的记录名，由 Resource 侧校验权限
         if (cn.hutool.core.util.StrUtil.isNotBlank(existingFile.getResourceId())) {
-            com.oriole.wisepen.resource.domain.dto.ResourceCheckPermissionDTO authDto = 
-                    new com.oriole.wisepen.resource.domain.dto.ResourceCheckPermissionDTO();
-            authDto.setResourceId(existingFile.getResourceId());
-            authDto.setResourceType(existingFile.getType().toUpperCase());
-            authDto.setUserId(userId.toString());
-            authDto.setGroupRoles(java.util.Collections.emptyMap()); // 暂无群组支持，传空
-            
-            com.oriole.wisepen.common.core.domain.R<Boolean> authResult = remoteResourceService.checkResPermission(authDto);
-            if (authResult.getCode() != 200 || Boolean.FALSE.equals(authResult.getData())) {
-                log.warn("Permission denied by Resource Service to rename file: {}", fileId);
-                throw new ServiceException("当前用户无权重命名该资源");
-            }
-
-            // 同步修改 resource-service 中的记录名
             com.oriole.wisepen.resource.domain.dto.ResourceUpdateDTO updateDTO = new com.oriole.wisepen.resource.domain.dto.ResourceUpdateDTO();
             updateDTO.setResourceId(existingFile.getResourceId());
             updateDTO.setResourceName(name); // 仅更新名字
@@ -325,7 +296,8 @@ public class FileServiceImpl implements FileService {
                 throw new ServiceException("Failed to rename resource: " + result.getMsg());
             }
         } else {
-            // 没有 resourceId（可能由于历史遗留/注册失败），降级为校验文件上传者
+            // 无 resourceId 兜底校验
+            Long userId = Long.parseLong(SecurityContextHolder.getUserId());
             if (!existingFile.getCreateBy().equals(userId)) {
                 throw new ServiceException(FileErrorCode.FILE_NOT_FOUND);
             }
