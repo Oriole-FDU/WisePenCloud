@@ -120,8 +120,16 @@ public class FileServiceImpl implements FileService {
 
         // 物理存储路径 (Consumer 使用)
 
-        // 公网访问 URL (存入数据库)
-        String accessUrl = formatBasePath(fileProperties.getDomain()) + objectKey;
+        String accessUrl;
+        if (fileProperties.getOss().isEnabled()) {
+            // OSS 公网访问 URL: https://bucket.endpoint/objectKey
+            String bucket = fileProperties.getOss().getBucketName();
+            String endpoint = fileProperties.getOss().getEndpoint();
+            accessUrl = "https://" + bucket + "." + endpoint + "/" + objectKey;
+        } else {
+            // 本地访问 URL
+            accessUrl = formatBasePath(fileProperties.getDomain()) + objectKey;
+        }
 
         boolean isOffice = FileConstants.OFFICE_EXTENSIONS.contains(extension.toLowerCase());
         boolean isPdf = "pdf".equalsIgnoreCase(extension);

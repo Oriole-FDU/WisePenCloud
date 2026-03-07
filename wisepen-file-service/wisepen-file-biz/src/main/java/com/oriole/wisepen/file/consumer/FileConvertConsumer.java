@@ -111,7 +111,16 @@ public class FileConvertConsumer implements CommandLineRunner {
             String finalPath = formatBasePath(fileProperties.getStoragePath()) + objectKey;
 
             // 公网访问 URL
-            String pdfWebUrl = formatBasePath(fileProperties.getDomain()) + objectKey;
+            String pdfWebUrl;
+            if (fileProperties.getOss().isEnabled()) {
+                // OSS 公网访问 URL: https://bucket.endpoint/objectKey
+                String bucket = fileProperties.getOss().getBucketName();
+                String endpoint = fileProperties.getOss().getEndpoint();
+                pdfWebUrl = "https://" + bucket + "." + endpoint + "/" + objectKey;
+            } else {
+                // 本地访问 URL
+                pdfWebUrl = formatBasePath(fileProperties.getDomain()) + objectKey;
+            }
 
             // 缓存转换后的 PDF 到本地缓存目录 (用于后续上传步骤)
             String cachePdfPath = formatBasePath(fileProperties.getCachePath()) + uuId + ".pdf";

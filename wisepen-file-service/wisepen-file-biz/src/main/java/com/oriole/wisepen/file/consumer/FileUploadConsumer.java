@@ -94,19 +94,26 @@ public class FileUploadConsumer implements CommandLineRunner {
         }
 
         try {
-            String storagePath = fileProperties.getStoragePath();
-            if (!storagePath.endsWith("/")) {
-                storagePath += "/";
-            }
-            String objectKey = task.getTargetPath().replace(storagePath, "");
-            if (objectKey.startsWith("/")) {
-                objectKey = objectKey.substring(1);
-            }
-
             if (fileProperties.getOss().isEnabled()) {
+                // OSS 模式：从 accessUrl 中截取 objectKey（去掉 domain 前缀）
+                String domain = fileProperties.getDomain();
+                if (!domain.endsWith("/")) domain += "/";
+                String objectKey = task.getAccessUrl().replace(domain, "");
+                if (objectKey.startsWith("/")) {
+                    objectKey = objectKey.substring(1);
+                }
                 aliyunOssTemplate.uploadFile(cacheFile, objectKey);
                 log.info("File uploaded to Aliyun OSS: {}", objectKey);
             } else {
+                // 本地模拟 OSS 模式：依赖 targetPath
+                String storagePath = fileProperties.getStoragePath();
+                if (!storagePath.endsWith("/")) {
+                    storagePath += "/";
+                }
+                String objectKey = task.getTargetPath().replace(storagePath, "");
+                if (objectKey.startsWith("/")) {
+                    objectKey = objectKey.substring(1);
+                }
                 File targetFile = new File(task.getTargetPath());
                 cn.hutool.core.io.FileUtil.mkdir(targetFile.getParentFile());
                 cn.hutool.core.io.FileUtil.copy(cacheFile, targetFile, true);

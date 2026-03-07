@@ -22,6 +22,7 @@ logs
 .apt_generated
 .classpath
 .factorypath
+**/FeignAuthInterceptorConfig.java
 .project
 .settings
 .springBeans

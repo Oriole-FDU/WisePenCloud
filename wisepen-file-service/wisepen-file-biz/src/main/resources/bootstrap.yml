@@ -51,8 +51,8 @@ wisepen:
     domain: http://localhost:9200/file/download/
     instance-id: dev-instance-1
     oss:
-      enabled: false
-      endpoint: oss-cn-hangzhou.aliyuncs.com
-      access-key-id: your-access-key-id
-      access-key-secret: your-access-key-secret
-      bucket-name: wisepen-dev
+      enabled: true
+      endpoint: oss-cn-shanghai.aliyuncs.com
+      access-key-id: 
+      access-key-secret: 
+      bucket-name: wisepen-cloud-aliyunoss
