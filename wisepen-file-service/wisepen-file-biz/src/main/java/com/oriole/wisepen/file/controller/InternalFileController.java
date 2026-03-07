@@ -17,21 +17,5 @@ public class InternalFileController {
 
     private final FileService fileService;
 
-    /**
-     * 重命名文件（由 resource-service 在用户重命名资源后同步调用（保留））
-     */
-    @PostMapping("/rename/{id}")
-    public R<Void> renameFile(@PathVariable Long id, @RequestParam("name") String name) {
-        fileService.renameFile(id, name);
-        return R.ok();
-    }
-
-    /**
-     * 删除文件（由上层业务服务调用，校验所有权）
-     */
-    @DeleteMapping("/delete/{id}")
-    public R<Void> deleteFile(@PathVariable Long id) {
-        fileService.deleteFile(id);
-        return R.ok();
-    }
+    
 }
