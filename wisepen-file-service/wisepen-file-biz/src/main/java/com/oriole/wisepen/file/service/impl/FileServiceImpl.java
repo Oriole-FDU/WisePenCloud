@@ -191,7 +191,7 @@ public class FileServiceImpl implements FileService {
     // ==================== 文件列表 ====================
 
     @Override
-    public PageResult<FileInfoVO> getMyFileList(int page, int size, Long userId) {
+    public PageResult<FileInfoResource> getMyFileList(int page, int size, Long userId) {
 
         Page<FileInfo> pageParam = new Page<>(page, size);
         LambdaQueryWrapper<FileInfo> wrapper = Wrappers.<FileInfo>lambdaQuery()
@@ -200,11 +200,11 @@ public class FileServiceImpl implements FileService {
 
         Page<FileInfo> result = fileMapper.selectPage(pageParam, wrapper);
 
-        List<FileInfoVO> records = result.getRecords().stream()
+        List<FileInfoResource> records = result.getRecords().stream()
                 .map(this::toFileInfoVO)
                 .collect(Collectors.toList());
         
-        PageResult<FileInfoVO> pageResult = new PageResult<>(result.getTotal(), page, size);
+        PageResult<FileInfoResource> pageResult = new PageResult<>(result.getTotal(), page, size);
         pageResult.addAll(records);
         return pageResult;
     }
@@ -255,8 +255,8 @@ public class FileServiceImpl implements FileService {
         return cacheFilePath;
     }
 
-    private FileInfoVO toFileInfoVO(FileInfo fileInfo) {
-        FileInfoVO vo = new FileInfoVO();
+    private FileInfoResource toFileInfoVO(FileInfo fileInfo) {
+        FileInfoResource vo = new FileInfoResource();
         cn.hutool.core.bean.BeanUtil.copyProperties(fileInfo, vo, cn.hutool.core.bean.copier.CopyOptions.create()
                 .setFieldMapping(java.util.Map.of(
                         "id", "documentId",

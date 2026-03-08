@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class FileInfoVO implements Serializable {
+public class FileInfoResource implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 

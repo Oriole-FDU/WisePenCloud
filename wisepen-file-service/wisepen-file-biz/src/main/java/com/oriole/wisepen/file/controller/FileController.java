@@ -2,7 +2,7 @@ package com.oriole.wisepen.file.controller;
 
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.PageResult;
-import com.oriole.wisepen.file.api.domain.dto.FileInfoVO;
+import com.oriole.wisepen.file.api.domain.dto.FileInfoResource;
 import com.oriole.wisepen.file.api.domain.dto.FileUploadResult;
 import com.oriole.wisepen.file.api.domain.dto.FileUploadRequest;
 
@@ -40,7 +40,7 @@ public class FileController {
      * 获取当前用户的文件列表
      */
     @GetMapping("/list")
-    public R<PageResult<FileInfoVO>> getMyFileList(
+    public R<PageResult<FileInfoResource>> getMyFileList(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
         Long userId = Long.parseLong(SecurityContextHolder.getUserId());

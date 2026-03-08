@@ -1,7 +1,7 @@
 package com.oriole.wisepen.file.controller;
 
 import com.oriole.wisepen.common.core.domain.R;
-import com.oriole.wisepen.file.api.domain.dto.FileInfoVO;
+import com.oriole.wisepen.file.api.domain.dto.FileInfoResource;
 import com.oriole.wisepen.file.domain.entity.FileInfo;
 import com.oriole.wisepen.file.exception.FileErrorCode;
 import com.oriole.wisepen.file.mapper.FileMapper;
@@ -22,7 +22,7 @@ public class RemoteFileController {
     private final FileMapper fileMapper;
 
     @GetMapping("/info/{fileId}")
-    public R<FileInfoVO> getFileInfo(@PathVariable Long fileId) {
+    public R<FileInfoResource> getFileInfo(@PathVariable Long fileId) {
         FileInfo fileInfo = fileMapper.selectById(fileId);
         if (fileInfo == null) {
             return R.fail(FileErrorCode.FILE_NOT_FOUND);
@@ -30,8 +30,8 @@ public class RemoteFileController {
         return R.ok(toFileInfoVO(fileInfo));
     }
 
-    private FileInfoVO toFileInfoVO(FileInfo fileInfo) {
-        FileInfoVO vo = new FileInfoVO();
+    private FileInfoResource toFileInfoVO(FileInfo fileInfo) {
+        FileInfoResource vo = new FileInfoResource();
         cn.hutool.core.bean.BeanUtil.copyProperties(fileInfo, vo, cn.hutool.core.bean.copier.CopyOptions.create()
                 .setFieldMapping(java.util.Map.of(
                         "id", "documentId",

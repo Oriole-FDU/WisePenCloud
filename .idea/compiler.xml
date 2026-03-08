@@ -11,17 +11,14 @@
         <module name="wisepen-common-log" />
         <module name="wisepen-user-api" />
         <module name="wisepen-file-biz" />
+        <module name="wisepen-resource-api" />
         <module name="wisepen-system-biz" />
+        <module name="wisepen-resource-biz" />
         <module name="wisepen-common" />
         <module name="wisepen-user-biz" />
         <module name="wisepen-file-api" />
       </profile>
     </annotationProcessing>
-    <bytecodeTargetLevel>
-      <module name="wisepen-resource-api" target="21" />
-      <module name="wisepen-resource-biz" target="21" />
-      <module name="wisepen-resource-service" target="21" />
-    </bytecodeTargetLevel>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">

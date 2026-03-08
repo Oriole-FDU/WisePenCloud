@@ -40,24 +40,18 @@
             <artifactId>apm-toolkit-logback-1.x</artifactId>
             <version>8.16.0</version>
         </dependency>
-<<<<<<< HEAD
 
         <!--Feign包, 包含Spring Cloud LoadBalancer-->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-openfeign</artifactId>
         </dependency>
-=======
->>>>>>> 77e859e (merge: 合并 origin/main，解决 RegisterRequest 和 AuthService 冲突)
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-loadbalancer</artifactId>
         </dependency>
 
         <dependency>
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
             <groupId>cn.dev33</groupId>
             <artifactId>sa-token-core</artifactId>
             <version>1.37.0</version>
@@ -76,9 +70,7 @@
         </dependency>
 
         <dependency>
->>>>>>> 77e859e (merge: 合并 origin/main，解决 RegisterRequest 和 AuthService 冲突)
-=======
->>>>>>> 4cc7057 (merge: 合并 upstream/main，引入 wisepen-resource-service，升级 Auth 为 Redis Session)
+
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-annotation</artifactId>
             <version>${mybatis-plus.version}</version>
@@ -92,23 +84,10 @@
             <groupId>com.alibaba.cloud</groupId>
             <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
         </dependency>
-<<<<<<< HEAD
-<<<<<<< HEAD
-        <dependency>
-            <groupId>org.springframework.data</groupId>
-            <artifactId>spring-data-commons</artifactId>
-=======
-=======
         <dependency>
             <groupId>org.springframework.data</groupId>
             <artifactId>spring-data-commons</artifactId>
         </dependency>
->>>>>>> 4cc7057 (merge: 合并 upstream/main，引入 wisepen-resource-service，升级 Auth 为 Redis Session)
-
-        <dependency>
-            <groupId>org.springframework.cloud</groupId>
-            <artifactId>spring-cloud-starter-openfeign</artifactId>
->>>>>>> 77e859e (merge: 合并 origin/main，解决 RegisterRequest 和 AuthService 冲突)
         </dependency>
 
         <dependency>
