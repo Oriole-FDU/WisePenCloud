@@ -1,4 +1,4 @@
-package com.oriole.wisepen.file.api.domain.dto;
+package com.oriole.wisepen.file.api.domain.base;
 
 import lombok.Data;
 import lombok.NoArgsConstructor;

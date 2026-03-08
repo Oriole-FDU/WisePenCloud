@@ -121,12 +121,12 @@ public class FileUploadConsumer implements CommandLineRunner {
             }
 
             FileInfo update = new FileInfo();
-            update.setId(task.getFileId());
+            update.setFileId(task.getFileId());
             update.setUpdateTime(java.time.LocalDateTime.now());
 
             // 构造资源注册所需的 fileInfo 内存快照 (避免查库)
             FileInfo snapshot = new FileInfo();
-            snapshot.setId(task.getFileId());
+            snapshot.setFileId(task.getFileId());
             snapshot.setFilename(task.getOriginalFilename());
             snapshot.setSize(task.getSize());
             snapshot.setCreateBy(task.getCreateBy());

@@ -156,7 +156,7 @@ public class FileConvertConsumer implements CommandLineRunner {
 
     private void updateFailureStatus(Long fileId) {
         FileInfo update = new FileInfo();
-        update.setId(fileId);
+        update.setFileId(fileId);
         update.setStatus(FileConstants.UPLOAD_STATUS_FAILED);
         update.setUpdateTime(java.time.LocalDateTime.now());
         fileMapper.updateById(update);

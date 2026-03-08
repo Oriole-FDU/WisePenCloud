@@ -1,4 +1,4 @@
-package com.oriole.wisepen.file.api.domain.dto;
+package com.oriole.wisepen.file.api.domain.result;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

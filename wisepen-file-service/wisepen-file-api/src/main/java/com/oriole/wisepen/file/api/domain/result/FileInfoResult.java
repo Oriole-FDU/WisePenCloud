@@ -1,4 +1,4 @@
-package com.oriole.wisepen.file.api.domain.dto;
+package com.oriole.wisepen.file.api.domain.result;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -10,7 +10,7 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
- * 文件信息展示 VO（对齐需求文档 Output 字段命名）
+ * 文件信息展示 Result（对齐需求文档 Output 字段命名）
  *
  * @author Ian.xiong
  */
@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class FileInfoResource implements Serializable {
+public class FileInfoResult implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 

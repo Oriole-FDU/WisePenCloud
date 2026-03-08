@@ -1,9 +1,8 @@
-package com.oriole.wisepen.file.api.domain.dto;
+package com.oriole.wisepen.file.api.domain.request;
 
 import lombok.Data;
 import com.oriole.wisepen.file.api.constant.FileValidationMsg;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 
 import java.io.Serial;
 import java.io.Serializable;

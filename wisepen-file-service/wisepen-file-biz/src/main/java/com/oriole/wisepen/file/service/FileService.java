@@ -1,8 +1,8 @@
 package com.oriole.wisepen.file.service;
 
-import com.oriole.wisepen.file.api.domain.dto.FileInfoResource;
-import com.oriole.wisepen.file.api.domain.dto.FileUploadResult;
-import com.oriole.wisepen.file.api.domain.dto.FileUploadRequest;
+import com.oriole.wisepen.file.api.domain.result.FileInfoResult;
+import com.oriole.wisepen.file.api.domain.result.FileUploadResult;
+import com.oriole.wisepen.file.api.domain.request.FileUploadRequest;
 import org.springframework.web.multipart.MultipartFile;
 import com.oriole.wisepen.common.core.domain.PageResult;
 /**
@@ -20,7 +20,7 @@ public interface FileService {
     /**
      * 获取当前用户的文件列表（按上传时间倒序）
      */
-    PageResult<FileInfoResource> getMyFileList(int page, int size, Long userId);
+    PageResult<FileInfoResult> getMyFileList(int page, int size, Long userId);
 
     /**
      * 删除文件（校验所有权）

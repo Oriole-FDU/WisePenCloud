@@ -1,7 +1,7 @@
 package com.oriole.wisepen.file.api.feign;
 
 import com.oriole.wisepen.common.core.domain.R;
-import com.oriole.wisepen.file.api.domain.dto.FileInfoResource;
+import com.oriole.wisepen.file.api.domain.result.FileInfoResult;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 
@@ -19,5 +19,5 @@ public interface RemoteFileService {
      * @return 文件信息
      */
     @GetMapping("/remote/file/info/{fileId}")
-    R<FileInfoResource> getFileInfo(Long fileId);
+    R<FileInfoResult> getFileInfo(Long fileId);
 }

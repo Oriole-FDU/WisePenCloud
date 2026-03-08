@@ -7,10 +7,12 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.oriole.wisepen.common.core.domain.PageResult;
 import com.oriole.wisepen.common.core.exception.ServiceException;
+import com.oriole.wisepen.file.api.domain.request.FileUploadRequest;
+import com.oriole.wisepen.file.api.domain.result.FileInfoResult;
 import com.oriole.wisepen.file.exception.FileErrorCode;
 import com.oriole.wisepen.file.api.constant.FileConstants;
 import com.oriole.wisepen.file.api.domain.dto.*;
-import com.oriole.wisepen.file.api.domain.dto.FileUploadResult;
+import com.oriole.wisepen.file.api.domain.result.FileUploadResult;
 import com.oriole.wisepen.file.domain.entity.FileInfo;
 import com.oriole.wisepen.file.mapper.FileMapper;
 import com.oriole.wisepen.file.service.FileService;
@@ -107,7 +109,7 @@ public class FileServiceImpl implements FileService {
             // 秒传直接 AVAILABLE，触发统一资源注册
             fileAvailabilityService.registerResource(newRecord);
             FileUploadResult result = new FileUploadResult();
-            result.setDocumentId(newRecord.getId());
+            result.setDocumentId(newRecord.getFileId());
             result.setFilename(newRecord.getFilename());
             return result;
         }
@@ -147,7 +149,7 @@ public class FileServiceImpl implements FileService {
         fileMapper.insert(fileInfo);
 
         // 5. 事务提交后推送 Redis 队列
-        final Long fileId = fileInfo.getId();
+        final Long fileId = fileInfo.getFileId();
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
@@ -183,7 +185,7 @@ public class FileServiceImpl implements FileService {
 
         // 简化返回：仅返回 documentId 和 filename
         FileUploadResult result = new FileUploadResult();
-        result.setDocumentId(fileInfo.getId());
+        result.setDocumentId(fileInfo.getFileId());
         result.setFilename(fileInfo.getFilename());
         return result;
     }
@@ -191,7 +193,7 @@ public class FileServiceImpl implements FileService {
     // ==================== 文件列表 ====================
 
     @Override
-    public PageResult<FileInfoResource> getMyFileList(int page, int size, Long userId) {
+    public PageResult<FileInfoResult> getMyFileList(int page, int size, Long userId) {
 
         Page<FileInfo> pageParam = new Page<>(page, size);
         LambdaQueryWrapper<FileInfo> wrapper = Wrappers.<FileInfo>lambdaQuery()
@@ -200,11 +202,11 @@ public class FileServiceImpl implements FileService {
 
         Page<FileInfo> result = fileMapper.selectPage(pageParam, wrapper);
 
-        List<FileInfoResource> records = result.getRecords().stream()
+        List<FileInfoResult> records = result.getRecords().stream()
                 .map(this::toFileInfoVO)
                 .collect(Collectors.toList());
         
-        PageResult<FileInfoResource> pageResult = new PageResult<>(result.getTotal(), page, size);
+        PageResult<FileInfoResult> pageResult = new PageResult<>(result.getTotal(), page, size);
         pageResult.addAll(records);
         return pageResult;
     }
@@ -255,8 +257,8 @@ public class FileServiceImpl implements FileService {
         return cacheFilePath;
     }
 
-    private FileInfoResource toFileInfoVO(FileInfo fileInfo) {
-        FileInfoResource vo = new FileInfoResource();
+    private FileInfoResult toFileInfoVO(FileInfo fileInfo) {
+        FileInfoResult vo = new FileInfoResult();
         cn.hutool.core.bean.BeanUtil.copyProperties(fileInfo, vo, cn.hutool.core.bean.copier.CopyOptions.create()
                 .setFieldMapping(java.util.Map.of(
                         "id", "documentId",
@@ -300,7 +302,7 @@ public class FileServiceImpl implements FileService {
         
         // 2. 本地修改名字
         FileInfo update = new FileInfo();
-        update.setId(fileId);
+        update.setFileId(fileId);
         update.setFilename(name);
         update.setUpdateTime(LocalDateTime.now());
         fileMapper.updateById(update);

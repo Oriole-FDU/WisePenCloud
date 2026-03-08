@@ -50,16 +50,16 @@ public class FileAvailabilityServiceImpl implements FileAvailabilityService {
 
             R<String> result = remoteResourceService.createResource(dto);
             String resourceId = result.getData();
-            log.info("资源已注册: fileId={}, resourceId={}", fileInfo.getId(), resourceId);
+            log.info("资源已注册: fileId={}, resourceId={}", fileInfo.getFileId(), resourceId);
 
             // 将 resourceId 写回 sys_file，建立 file ↔ resource 的唯一映射
             FileInfo update = new FileInfo();
-            update.setId(fileInfo.getId());
+            update.setFileId(fileInfo.getFileId());
             update.setResourceId(resourceId);
             fileMapper.updateById(update);
 
         } catch (Exception e) {
-            log.warn("资源注册失败: fileId={}, reason={}", fileInfo.getId(), e.getMessage());
+            log.warn("资源注册失败: fileId={}, reason={}", fileInfo.getFileId(), e.getMessage());
         }
     }
 }

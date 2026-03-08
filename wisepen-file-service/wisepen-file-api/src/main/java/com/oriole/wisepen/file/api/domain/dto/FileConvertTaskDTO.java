@@ -1,5 +1,6 @@
 package com.oriole.wisepen.file.api.domain.dto;
 
+import com.oriole.wisepen.file.api.domain.base.FileTaskBase;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import lombok.Data;
