@@ -228,7 +228,7 @@ public class FileServiceImpl implements FileService {
                 remoteResourceService.removeResource(existingFile.getResourceId());
             if (result.getCode() != 200) {
                 log.warn("Failed to delete resource in Resource Service: {}", result.getMsg());
-                throw new ServiceException("Failed to delete resource: " + result.getMsg());
+                throw new ServiceException(result.getMsg());
             }
         } else {
             // 无 resourceId 兜底校验
@@ -293,7 +293,7 @@ public class FileServiceImpl implements FileService {
             com.oriole.wisepen.common.core.domain.R<Void> result = remoteResourceService.updateAttributes(updateDTO);
             if (result.getCode() != 200) {
                 log.warn("Failed to rename resource in Resource Service: {}", result.getMsg());
-                throw new ServiceException("Failed to rename resource: " + result.getMsg());
+                throw new ServiceException(result.getMsg());
             }
         } else {
             // 无 resourceId 兜底校验
