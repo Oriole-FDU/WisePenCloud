@@ -3,7 +3,6 @@ package com.oriole.wisepen.file.config;
 import feign.RequestInterceptor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import com.oriole.wisepen.common.core.context.SecurityContextHolder;
 import org.springframework.util.StringUtils;
 
 /**
@@ -20,13 +19,17 @@ public class FeignAuthInterceptorConfig {
             // 补充网关防伪造 Header
             template.header("X-From-Source", "APISIX-wX0iR6tY");
             
-            // 补充当前用户 ID，如果未获取到则默认传 1 保证测试能通
-            String userId = SecurityContextHolder.getUserId();
-            if (StringUtils.hasText(userId)) {
-                template.header("X-User-Id", userId);
-            } else {
-                template.header("X-User-Id", "1");
+            // 尝试从当前请求中提取 X-User-Id
+            String userId = "1";
+            org.springframework.web.context.request.RequestAttributes requestAttributes = org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+            if (requestAttributes instanceof org.springframework.web.context.request.ServletRequestAttributes) {
+                jakarta.servlet.http.HttpServletRequest request = ((org.springframework.web.context.request.ServletRequestAttributes) requestAttributes).getRequest();
+                String headerUserId = request.getHeader("X-User-Id");
+                if (StringUtils.hasText(headerUserId)) {
+                    userId = headerUserId;
+                }
             }
+            template.header("X-User-Id", userId);
         };
     }
 }

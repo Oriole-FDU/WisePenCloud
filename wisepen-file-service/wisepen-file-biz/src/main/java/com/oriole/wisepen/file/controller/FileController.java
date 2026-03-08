@@ -6,6 +6,7 @@ import com.oriole.wisepen.file.api.domain.dto.FileInfoVO;
 import com.oriole.wisepen.file.api.domain.dto.FileUploadResult;
 import com.oriole.wisepen.file.api.domain.dto.FileUploadRequest;
 
+import com.oriole.wisepen.common.core.context.SecurityContextHolder;
 import com.oriole.wisepen.file.service.FileService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +31,8 @@ public class FileController {
     @PostMapping("/upload")
     public R<FileUploadResult> upload(@RequestPart("file") MultipartFile file,
                                       @Valid @RequestPart("data") FileUploadRequest uploadRequest) {
-        FileUploadResult response = fileService.upload(file, uploadRequest);
+        Long userId = Long.parseLong(SecurityContextHolder.getUserId());
+        FileUploadResult response = fileService.upload(file, uploadRequest, userId);
         return R.ok(response);
     }
 
@@ -41,13 +43,16 @@ public class FileController {
     public R<PageResult<FileInfoVO>> getMyFileList(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return R.ok(fileService.getMyFileList(page, size));
+        Long userId = Long.parseLong(SecurityContextHolder.getUserId());
+        return R.ok(fileService.getMyFileList(page, size, userId));
+    }
     /**
      * 重命名文件（同步更新资源服务）
      */
     @PostMapping("/rename/{id}")
     public R<Void> renameFile(@PathVariable Long id, @RequestParam("name") String name) {
-        fileService.renameFile(id, name);
+        Long userId = Long.parseLong(SecurityContextHolder.getUserId());
+        fileService.renameFile(id, name, userId);
         return R.ok();
     }
 
@@ -56,7 +61,8 @@ public class FileController {
      */
     @DeleteMapping("/delete/{id}")
     public R<Void> deleteFile(@PathVariable Long id) {
-        fileService.deleteFile(id);
+        Long userId = Long.parseLong(SecurityContextHolder.getUserId());
+        fileService.deleteFile(id, userId);
         return R.ok();
     }
 }

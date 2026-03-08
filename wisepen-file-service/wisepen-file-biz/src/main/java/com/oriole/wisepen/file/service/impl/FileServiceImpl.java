@@ -1,6 +1,6 @@
 package com.oriole.wisepen.file.service.impl;
 
-import com.oriole.wisepen.common.core.context.SecurityContextHolder;
+
 import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -54,7 +54,7 @@ public class FileServiceImpl implements FileService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public FileUploadResult upload(MultipartFile file, FileUploadRequest uploadRequest) {
+    public FileUploadResult upload(MultipartFile file, FileUploadRequest uploadRequest, Long userId) {
         String originalFilename = uploadRequest.getFilename();
         String extension = cn.hutool.core.io.FileUtil.extName(originalFilename);
         log.info("Uploading file: {}, MD5: {}, declared size: {} bytes, actual size: {} bytes", 
@@ -88,8 +88,6 @@ public class FileServiceImpl implements FileService {
                 .eq(FileInfo::getMd5, serverMd5)
                 .eq(FileInfo::getStatus, FileConstants.UPLOAD_STATUS_AVAILABLE)
                 .last("LIMIT 1"));
-
-        Long userId = Long.parseLong(SecurityContextHolder.getUserId());
 
         if (existingFile != null) {
             // 秒传：拷贝 url + pdfUrl，创建全新记录
@@ -193,8 +191,7 @@ public class FileServiceImpl implements FileService {
     // ==================== 文件列表 ====================
 
     @Override
-    public PageResult<FileInfoVO> getMyFileList(int page, int size) {
-        Long userId = Long.parseLong(SecurityContextHolder.getUserId());
+    public PageResult<FileInfoVO> getMyFileList(int page, int size, Long userId) {
 
         Page<FileInfo> pageParam = new Page<>(page, size);
         LambdaQueryWrapper<FileInfo> wrapper = Wrappers.<FileInfo>lambdaQuery()
@@ -216,7 +213,7 @@ public class FileServiceImpl implements FileService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void deleteFile(Long fileId) {
+    public void deleteFile(Long fileId, Long userId) {
         FileInfo existingFile = fileMapper.selectById(fileId);
         if (existingFile == null) {
             throw new ServiceException(FileErrorCode.FILE_NOT_FOUND);
@@ -232,7 +229,6 @@ public class FileServiceImpl implements FileService {
             }
         } else {
             // 无 resourceId 兜底校验
-            Long userId = Long.parseLong(SecurityContextHolder.getUserId());
             if (!existingFile.getCreateBy().equals(userId)) {
                 throw new ServiceException(FileErrorCode.FILE_NOT_FOUND);
             }
@@ -279,7 +275,7 @@ public class FileServiceImpl implements FileService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void renameFile(Long fileId, String name) {
+    public void renameFile(Long fileId, String name, Long userId) {
         FileInfo existingFile = fileMapper.selectById(fileId);
         if (existingFile == null) {
             throw new ServiceException(FileErrorCode.FILE_NOT_FOUND);
@@ -297,7 +293,6 @@ public class FileServiceImpl implements FileService {
             }
         } else {
             // 无 resourceId 兜底校验
-            Long userId = Long.parseLong(SecurityContextHolder.getUserId());
             if (!existingFile.getCreateBy().equals(userId)) {
                 throw new ServiceException(FileErrorCode.FILE_NOT_FOUND);
             }

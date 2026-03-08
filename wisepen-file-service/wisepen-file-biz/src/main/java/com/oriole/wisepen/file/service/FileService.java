@@ -15,20 +15,20 @@ public interface FileService {
     /**
      * 文件上传（含秒传逻辑）
      */
-    FileUploadResult upload(MultipartFile file, FileUploadRequest uploadRequest);
+    FileUploadResult upload(MultipartFile file, FileUploadRequest uploadRequest, Long userId);
 
     /**
      * 获取当前用户的文件列表（按上传时间倒序）
      */
-    PageResult<FileInfoVO> getMyFileList(int page, int size);
+    PageResult<FileInfoVO> getMyFileList(int page, int size, Long userId);
 
     /**
      * 删除文件（校验所有权）
      */
-    void deleteFile(Long fileId);
+    void deleteFile(Long fileId, Long userId);
 
     /**
      * 重命名文件
      */
-    void renameFile(Long fileId, String newName);
+    void renameFile(Long fileId, String newName, Long userId);
 }
