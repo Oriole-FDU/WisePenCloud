@@ -26,6 +26,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.multipart.MultipartFile;
 import com.oriole.wisepen.file.config.FileProperties;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -34,7 +35,7 @@ import java.util.stream.Collectors;
 /**
  * 文件存储服务实现类
  *
- * @author Ian.Xiong
+ * @author Ian.xiong
  */
 @Slf4j
 @Service
@@ -52,19 +53,32 @@ public class FileServiceImpl implements FileService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public FileUploadResult upload(MultipartFile file, UploadRequest uploadRequest) {
+    public FileUploadResult upload(MultipartFile file, FileUploadRequest uploadRequest) {
         String originalFilename = uploadRequest.getFilename();
         String extension = cn.hutool.core.io.FileUtil.extName(originalFilename);
-        log.info("Uploading file: {}, MD5: {}, size: {} bytes", originalFilename, uploadRequest.getMd5(), file.getSize());
+        log.info("Uploading file: {}, MD5: {}, declared size: {} bytes, actual size: {} bytes", 
+                originalFilename, uploadRequest.getMd5(), uploadRequest.getFileSize(), file.getSize());
 
         // 1. 文件校验
         FileValidator.validateFileSize(file);
         FileValidator.validateFileType(file, extension);
+        
+        if (!Long.valueOf(file.getSize()).equals(uploadRequest.getFileSize())) {
+            log.warn("File size mismatch! Declared: {}, Actual: {}", uploadRequest.getFileSize(), file.getSize());
+            throw new ServiceException(FileErrorCode.FILE_SIZE_EXCEEDED); // 借用 FileSize 错误码
+        }
+
+        // 为避免流被重复读取或消耗，先将其写入本地缓存，再对本地 File 计算 MD5
+        String uuId = UUID.randomUUID().toString();
+        String localCachePath = uploadCache(file, extension, uuId);
+        java.io.File cachedFile = new java.io.File(localCachePath);
 
         // 2. 服务端 MD5 校验（防伪造哈希）
-        String serverMd5 = FileValidator.calculateMd5(file);
+        String serverMd5 = FileValidator.calculateMd5(cachedFile);
         if (!serverMd5.equalsIgnoreCase(uploadRequest.getMd5())) {
             log.warn("MD5 mismatch! Client: {}, Server: {}", uploadRequest.getMd5(), serverMd5);
+            // 删除垃圾缓存文件
+            cn.hutool.core.io.FileUtil.del(cachedFile);
             throw new ServiceException(FileErrorCode.FILE_MD5_MISMATCH);
         }
 
@@ -79,6 +93,8 @@ public class FileServiceImpl implements FileService {
         if (existingFile != null) {
             // 秒传：拷贝 url + pdfUrl，创建全新记录
             log.info("Flash upload triggered for MD5: {}", serverMd5);
+            cn.hutool.core.io.FileUtil.del(cachedFile); // 既然已经有存档，当前的物理缓存直接删去
+
             FileInfo newRecord = new FileInfo();
             newRecord.setFilename(originalFilename);
             newRecord.setMd5(serverMd5);
@@ -98,26 +114,14 @@ public class FileServiceImpl implements FileService {
         }
 
         // 4. 正常落盘
-        String uuId = UUID.randomUUID().toString();
         // 生成 ObjectKey: yyyy/MM/dd/{uuid}.{ext}
         String datePath = java.time.format.DateTimeFormatter.ofPattern("yyyy/MM/dd").format(LocalDateTime.now());
         String objectKey = datePath + "/" + uuId + "." + extension;
 
-        String localCachePath = uploadCache(file, extension, uuId);
-
         // 物理存储路径 (Consumer 使用)
-        String storagePath = fileProperties.getStoragePath();
-        if (!storagePath.endsWith("/")) {
-            storagePath += "/";
-        }
-        String finalFilePath = storagePath + objectKey;
 
         // 公网访问 URL (存入数据库)
-        String domain = fileProperties.getDomain();
-        if (!domain.endsWith("/")) {
-            domain += "/";
-        }
-        String accessUrl = domain + objectKey;
+        String accessUrl = formatBasePath(fileProperties.getDomain()) + objectKey;
 
         boolean isOffice = FileConstants.OFFICE_EXTENSIONS.contains(extension.toLowerCase());
         boolean isPdf = "pdf".equalsIgnoreCase(extension);
@@ -128,7 +132,8 @@ public class FileServiceImpl implements FileService {
         fileInfo.setMd5(serverMd5);
         fileInfo.setType(extension);
         fileInfo.setSize(file.getSize());
-        fileInfo.setUrl(accessUrl); // 存入访问链接
+        // 存入访问链接
+        fileInfo.setUrl(accessUrl);
         fileInfo.setCreateBy(userId);
         fileInfo.setStatus(FileConstants.UPLOAD_STATUS_PROCESSING);
 
@@ -147,6 +152,8 @@ public class FileServiceImpl implements FileService {
                 uploadTask.setAccessUrl(accessUrl); // 传递 Web URL
                 uploadTask.setMd5(serverMd5);
                 uploadTask.setIsPdfDirect(isPdf);
+                uploadTask.setSize(fileInfo.getSize());
+                uploadTask.setCreateBy(userId);
                 stringRedisTemplate.opsForList().leftPush(FileConstants.UPLOAD_QUEUE_KEY + ":" + fileProperties.getInstanceId(), JSON.toJSONString(uploadTask));
                 log.info("Pushed upload task to Redis for fileId: {}", fileId);
 
@@ -159,6 +166,8 @@ public class FileServiceImpl implements FileService {
                     convertTask.setTempFilePath(localCachePath);
                     convertTask.setOriginalSize(file.getSize());
                     convertTask.setMd5(serverMd5);
+                    convertTask.setSize(fileInfo.getSize());
+                    convertTask.setCreateBy(userId);
                     stringRedisTemplate.opsForList().leftPush(FileConstants.CONVERT_QUEUE_KEY + ":" + fileProperties.getInstanceId(), JSON.toJSONString(convertTask));
                     log.info("Pushed conversion task to Redis for fileId: {}", fileId);
                 }
@@ -199,30 +208,14 @@ public class FileServiceImpl implements FileService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deleteFile(Long fileId) {
-        Long userId = Long.parseLong(SecurityContextHolder.getUserId());
-
-        FileInfo fileInfo = fileMapper.selectById(fileId);
-        if (fileInfo == null) {
-            throw new ServiceException(FileErrorCode.FILE_NOT_FOUND);
-        }
-
-        // 越权防御：createdBy 必须匹配当前用户
-        if (!userId.equals(fileInfo.getCreateBy())) {
-            throw new ServiceException(FileErrorCode.FILE_OPERATION_FORBIDDEN);
-        }
-
         fileMapper.deleteById(fileId);
-        log.info("File deleted: fileId={}, userId={}", fileId, userId);
+        log.info("File deleted via internal API: fileId={}", fileId);
     }
 
     // ==================== 私有方法 ====================
 
     private String uploadCache(MultipartFile file, String extension, String uuId) {
-        String cacheDir = fileProperties.getCachePath();
-        if (!cacheDir.endsWith("/")) {
-            cacheDir += "/";
-        }
-        String cacheFilePath = cacheDir + uuId + "." + extension;
+        String cacheFilePath = formatBasePath(fileProperties.getCachePath()) + uuId + "." + extension;
         java.io.File dest = new java.io.File(cacheFilePath);
         cn.hutool.core.io.FileUtil.touch(dest);
         try {
@@ -246,24 +239,21 @@ public class FileServiceImpl implements FileService {
         return vo;
     }
 
+    private String formatBasePath(String basePath) {
+        if (!basePath.endsWith("/")) {
+            return basePath + "/";
+        }
+        return basePath;
+    }
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void renameFile(Long fileId, String name) {
-        Long userId = Long.parseLong(SecurityContextHolder.getUserId());
-
-        FileInfo fileInfo = fileMapper.selectById(fileId);
-        if (fileInfo == null) {
-            throw new ServiceException(FileErrorCode.FILE_NOT_FOUND);
-        }
-
-        // 越权防御：createdBy 必须匹配当前用户
-        if (!userId.equals(fileInfo.getCreateBy())) {
-            throw new ServiceException(FileErrorCode.FILE_OPERATION_FORBIDDEN);
-        }
-
-        fileInfo.setFilename(name);
-        fileInfo.setUpdateTime(LocalDateTime.now());
-        fileMapper.updateById(fileInfo);
-        log.info("File renamed: fileId={}, userId={}, newName={}", fileId, userId, name);
+        FileInfo update = new FileInfo();
+        update.setId(fileId);
+        update.setFilename(name);
+        update.setUpdateTime(LocalDateTime.now());
+        fileMapper.updateById(update);
+        log.info("File renamed via internal API: fileId={}, newName={}", fileId, name);
     }
 }

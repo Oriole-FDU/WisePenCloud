@@ -8,7 +8,7 @@ import lombok.Getter;
  * 文件模块错误码枚举
  * 范围：2000-2999
  *
- * @author Ian.Xiong
+ * @author Ian.xiong
  */
 @Getter
 @AllArgsConstructor

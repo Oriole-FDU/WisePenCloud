@@ -1,20 +1,28 @@
 package com.oriole.wisepen.file.api.domain.dto;
 
 import lombok.Data;
+import com.oriole.wisepen.file.api.constant.FileValidationMsg;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 import java.io.Serial;
 import java.io.Serializable;
 
+
+/**
+ * @author Ian.xiong
+ */
 @Data
-public class UploadRequest implements Serializable {
+public class FileUploadRequest implements Serializable {
+    @Serial
     private static final long serialVersionUID = 1L;
 
-    @NotBlank(message = "Filename cannot be empty")
+    @NotBlank(message = FileValidationMsg.FILENAME_EMPTY)
     private String filename;
 
-    @NotBlank(message = "MD5 cannot be empty")
+    @NotBlank(message = FileValidationMsg.MD5_EMPTY)
     private String md5;
 
-    // Add other fields as needed, e.g., file type, size, etc.
+    @NotNull(message = FileValidationMsg.FILESIZE_NULL)
+    private Long fileSize;
 }

@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 /**
  * 文件信息实体类
  *
- * @author Ian.Xiong
+ * @author Ian.xiong
  */
 @Data
 @Builder

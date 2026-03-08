@@ -4,15 +4,14 @@ import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import lombok.Data;
 import lombok.experimental.SuperBuilder;
-
-import java.io.Serializable;
+import java.io.Serial;
 
 import lombok.EqualsAndHashCode;
 
 /**
  * 文件转换任务 DTO
  *
- * @author Ian.Xiong
+ * @author Ian.xiong
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -20,6 +19,7 @@ import lombok.EqualsAndHashCode;
 @NoArgsConstructor
 @AllArgsConstructor
 public class FileConvertTaskDTO extends FileTaskBase {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     // 文件扩展名

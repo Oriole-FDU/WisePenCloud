@@ -5,7 +5,7 @@ import java.util.Set;
 /**
  * 文件常量类
  *
- * @author Ian.Xiong
+ * @author Ian.xiong
  */
 public class FileConstants {
     public static final String BUCKET_NAME = "wisepen-files";
@@ -13,7 +13,7 @@ public class FileConstants {
     /** 单文件最大体积：100MB */
     public static final long MAX_FILE_SIZE = 100L * 1024 * 1024;
 
-    // Upload status
+    /** 上传状态 */
     public static final Integer UPLOAD_STATUS_PROCESSING = 0;
     public static final Integer UPLOAD_STATUS_AVAILABLE = 1;
     public static final Integer UPLOAD_STATUS_FAILED = 2;

@@ -9,7 +9,7 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
 /**
  * 文件服务启动类
  *
- * @author Xiong.Heng
+ * @author Ian.xiong
  */
 @EnableDiscoveryClient
 @SpringBootApplication

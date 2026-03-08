@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * 文件转换任务消费者 - 处理文档转 PDF
  *
- * @author Ian.Xiong
+ * @author Ian.xiong
  */
 @Slf4j
 @Component
@@ -107,25 +107,14 @@ public class FileConvertConsumer implements CommandLineRunner {
             String objectKey = datePath + "/" + uuId + ".pdf";
 
             // 物理存储路径 (模拟 OSS)
-            String storagePath = fileProperties.getStoragePath();
-            if (!storagePath.endsWith("/")) {
-                storagePath += "/";
-            }
-            String finalPath = storagePath + objectKey;
+            // finalPath 在 upload 阶段内部无需拼接，由 Consumer 异步落盘使用
+            String finalPath = formatBasePath(fileProperties.getStoragePath()) + objectKey;
 
             // 公网访问 URL
-            String domain = fileProperties.getDomain();
-            if (!domain.endsWith("/")) {
-                domain += "/";
-            }
-            String pdfWebUrl = domain + objectKey;
+            String pdfWebUrl = formatBasePath(fileProperties.getDomain()) + objectKey;
 
             // 缓存转换后的 PDF 到本地缓存目录 (用于后续上传步骤)
-            String cacheDir = fileProperties.getCachePath();
-            if (!cacheDir.endsWith("/")) {
-                cacheDir += "/";
-            }
-            String cachePdfPath = cacheDir + uuId + ".pdf";
+            String cachePdfPath = formatBasePath(fileProperties.getCachePath()) + uuId + ".pdf";
             File cachePdfFile = new File(cachePdfPath);
             cn.hutool.core.io.FileUtil.mkdir(cachePdfFile.getParentFile());
             cn.hutool.core.io.FileUtil.move(tempPdf, cachePdfFile, true);
@@ -138,7 +127,8 @@ public class FileConvertConsumer implements CommandLineRunner {
             cn.hutool.core.bean.BeanUtil.copyProperties(task, uploadTask);
             uploadTask.setTempFilePath(cachePdfPath);
             uploadTask.setTargetPath(finalPath);
-            uploadTask.setAccessUrl(pdfWebUrl); // 传递 Web URL
+            // 传递 Web URL
+            uploadTask.setAccessUrl(pdfWebUrl);
             uploadTask.setIsConvertedPdf(true);
             
             String uploadQueueKey = FileConstants.UPLOAD_QUEUE_KEY + ":" + fileProperties.getInstanceId();
@@ -161,5 +151,12 @@ public class FileConvertConsumer implements CommandLineRunner {
         update.setStatus(FileConstants.UPLOAD_STATUS_FAILED);
         update.setUpdateTime(java.time.LocalDateTime.now());
         fileMapper.updateById(update);
+    }
+
+    private String formatBasePath(String basePath) {
+        if (!basePath.endsWith("/")) {
+            return basePath + "/";
+        }
+        return basePath;
     }
 }

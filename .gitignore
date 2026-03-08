@@ -9,12 +9,9 @@ dev.properties
 logs
 
 ### IntelliJ IDEA ###
-.idea/
+!.idea/runConfigurations/
 .gitignore
 .idea/modules.xml
-.idea/jarRepositories.xml
-.idea/compiler.xml
-.idea/libraries/
 *.iws
 *.iml
 *.ipr

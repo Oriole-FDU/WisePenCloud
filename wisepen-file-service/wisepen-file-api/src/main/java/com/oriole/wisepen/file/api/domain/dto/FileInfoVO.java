@@ -5,22 +5,24 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
  * 文件信息展示 VO（对齐需求文档 Output 字段命名）
  *
- * @author Ian.Xiong
+ * @author Ian.xiong
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class FileInfoVO implements Serializable {
+    @Serial
     private static final long serialVersionUID = 1L;
 
-    // 文档ID
+    // 文档Id
     private Long documentId;
 
     // 文件名

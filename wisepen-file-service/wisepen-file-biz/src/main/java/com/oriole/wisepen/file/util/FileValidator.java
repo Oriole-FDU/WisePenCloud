@@ -16,7 +16,7 @@ import java.util.Map;
 /**
  * 文件校验工具类
  *
- * @author Ian.Xiong
+ * @author Ian.xiong
  */
 @Slf4j
 public class FileValidator {
@@ -90,22 +90,6 @@ public class FileValidator {
         }
     }
 
-    public static String calculateMd5(MultipartFile file) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            byte[] buffer = new byte[BUFFER_SIZE];
-            int read;
-            try (InputStream is = file.getInputStream()) {
-                while ((read = is.read(buffer)) != -1) {
-                    md.update(buffer, 0, read);
-                }
-            }
-            return bytesToHex(md.digest());
-        } catch (Exception e) {
-            log.error("Error calculating MD5", e);
-            throw new ServiceException(FileErrorCode.FILE_READ_ERROR);
-        }
-    }
 
     public static String calculateMd5(File file) {
         try {

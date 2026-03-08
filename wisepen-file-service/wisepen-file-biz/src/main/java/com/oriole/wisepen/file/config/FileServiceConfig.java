@@ -6,6 +6,10 @@ import org.springframework.context.annotation.Configuration;
 
 import java.util.UUID;
 
+
+/**
+ * @author Ian.xiong
+ */
 @Data
 @Configuration
 public class FileServiceConfig {

@@ -5,14 +5,13 @@ import lombok.NoArgsConstructor;
 import lombok.Data;
 import lombok.experimental.SuperBuilder;
 
-import java.io.Serializable;
-
+import java.io.Serial;
 import lombok.EqualsAndHashCode;
 
 /**
  * 文件上传任务 DTO
  * 
- * @author Ian.Xiong
+ * @author Ian.xiong
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -20,6 +19,7 @@ import lombok.EqualsAndHashCode;
 @NoArgsConstructor
 @AllArgsConstructor
 public class FileUploadTaskDTO extends FileTaskBase {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     // 目标存储路径 (模拟 OSS 的最终路径)

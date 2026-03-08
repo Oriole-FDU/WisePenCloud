@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <annotationProcessing>
+      <profile default="true" name="Default" enabled="true" />
+      <profile name="Maven default annotation processors profile" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <module name="wisepen-system-api" />
+        <module name="wisepen-common-log" />
+        <module name="wisepen-user-api" />
+        <module name="wisepen-file-biz" />
+        <module name="wisepen-system-biz" />
+        <module name="wisepen-common" />
+        <module name="wisepen-user-biz" />
+        <module name="wisepen-file-api" />
+      </profile>
+    </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="wisepen-resource-api" target="21" />
+      <module name="wisepen-resource-biz" target="21" />
+      <module name="wisepen-resource-service" target="21" />
+    </bytecodeTargetLevel>
+  </component>
+  <component name="JavacSettings">
+    <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="wisepen-cloud" options="-parameters" />
+      <module name="wisepen-common" options="-parameters" />
+      <module name="wisepen-common-log" options="-parameters" />
+      <module name="wisepen-file-api" options="-parameters" />
+      <module name="wisepen-file-biz" options="-parameters" />
+      <module name="wisepen-file-service" options="-parameters" />
+      <module name="wisepen-resource-api" options="-parameters" />
+      <module name="wisepen-resource-biz" options="-parameters" />
+      <module name="wisepen-resource-service" options="-parameters" />
+      <module name="wisepen-system-api" options="-parameters" />
+      <module name="wisepen-system-biz" options="-parameters" />
+      <module name="wisepen-system-service" options="-parameters" />
+      <module name="wisepen-user-api" options="-parameters" />
+      <module name="wisepen-user-biz" options="-parameters" />
+      <module name="wisepen-user-service" options="-parameters" />
+    </option>
+  </component>
+</project>

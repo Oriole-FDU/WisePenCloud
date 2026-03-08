@@ -4,9 +4,7 @@ import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.PageResult;
 import com.oriole.wisepen.file.api.domain.dto.FileInfoVO;
 import com.oriole.wisepen.file.api.domain.dto.FileUploadResult;
-import com.oriole.wisepen.file.api.domain.dto.UploadRequest;
-import com.oriole.wisepen.common.core.exception.ServiceException;
-import com.oriole.wisepen.file.exception.FileErrorCode;
+import com.oriole.wisepen.file.api.domain.dto.FileUploadRequest;
 
 import com.oriole.wisepen.file.service.FileService;
 import jakarta.validation.Valid;
@@ -14,12 +12,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-
 /**
  * 文件管理接口（对外开放）
  *
- * @author Ian.Xiong
+ * @author Ian.xiong
  */
 @RestController
 @RequestMapping("/file")
@@ -33,7 +29,7 @@ public class FileController {
      */
     @PostMapping("/upload")
     public R<FileUploadResult> upload(@RequestPart("file") MultipartFile file,
-                                    @Valid @RequestPart("data") UploadRequest uploadRequest) {
+                                      @Valid @RequestPart("data") FileUploadRequest uploadRequest) {
         FileUploadResult response = fileService.upload(file, uploadRequest);
         return R.ok(response);
     }

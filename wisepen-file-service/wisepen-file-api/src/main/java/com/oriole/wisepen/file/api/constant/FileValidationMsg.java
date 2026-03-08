@@ -3,7 +3,7 @@ package com.oriole.wisepen.file.api.constant;
 /**
  * 文件校验提示常量
  *
- * @author Ian.Xiong
+ * @author Ian.xiong
  */
 public class FileValidationMsg {
     public static final String FILENAME_EMPTY = "文件名不能为空";

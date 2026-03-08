@@ -8,6 +8,7 @@ import com.oriole.wisepen.file.domain.entity.FileInfo;
 import com.oriole.wisepen.file.mapper.FileMapper;
 import com.oriole.wisepen.file.service.FileAvailabilityService;
 import com.oriole.wisepen.file.util.AliyunOssTemplate;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -20,7 +21,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * 文件上传消费者 - 负责将本地缓存文件同步到模拟 OSS 路径
  *
- * @author Ian.Xiong
+ * @author Ian.xiong
  */
 @Slf4j
 @Component
@@ -70,7 +71,7 @@ public class FileUploadConsumer implements CommandLineRunner {
         });
     }
 
-    @jakarta.annotation.PreDestroy
+    @PreDestroy
     public void destroy() {
         log.info("Shutting down FileUploadConsumer...");
         isRunning = false;
@@ -112,15 +113,17 @@ public class FileUploadConsumer implements CommandLineRunner {
                 log.info("File uploaded to simulated OSS: {}", task.getTargetPath());
             }
 
-            FileInfo fileInfo = fileMapper.selectById(task.getFileId());
-            if (fileInfo == null) {
-                log.error("FileInfo not found for fileId: {}", task.getFileId());
-                return;
-            }
-
             FileInfo update = new FileInfo();
             update.setId(task.getFileId());
             update.setUpdateTime(java.time.LocalDateTime.now());
+
+            // 构造资源注册所需的 fileInfo 内存快照 (避免查库)
+            FileInfo snapshot = new FileInfo();
+            snapshot.setId(task.getFileId());
+            snapshot.setFilename(task.getOriginalFilename());
+            snapshot.setSize(task.getSize());
+            snapshot.setCreateBy(task.getCreateBy());
+            snapshot.setType(cn.hutool.core.io.FileUtil.extName(task.getOriginalFilename()));
 
             if (Boolean.TRUE.equals(task.getIsConvertedPdf())) {
                 // PDF 副本转换完成：仅补充 pdfUrl，不更改状态（原件上传时已设为 AVAILABLE）
@@ -134,21 +137,16 @@ public class FileUploadConsumer implements CommandLineRunner {
                 String finalPdfUrl = (task.getAccessUrl() != null && !task.getAccessUrl().isEmpty())
                         ? task.getAccessUrl() : task.getTargetPath();
                 update.setPdfUrl(finalPdfUrl);
-                fileAvailabilityService.markAvailableAndRegister(update, fileInfo);
+                fileAvailabilityService.markAvailableAndRegister(update, snapshot);
 
             } else {
                 // 非 PDF 原始文件（含 Office 原件）：统一触发 markAvailableAndRegister
                 // Office 文件虽仍需转换 PDF，但原件已可注册进资源系统，状态由 isConvertedPdf 回调更新
-                fileAvailabilityService.markAvailableAndRegister(update, fileInfo);
+                fileAvailabilityService.markAvailableAndRegister(update, snapshot);
             }
 
         } catch (Exception e) {
             log.error("Upload failed for fileId: {}", task.getFileId(), e);
         }
-    }
-
-    private boolean isOfficeDocument(String extension) {
-        if (extension == null) return false;
-        return FileConstants.OFFICE_EXTENSIONS.contains(extension.toLowerCase());
     }
 }

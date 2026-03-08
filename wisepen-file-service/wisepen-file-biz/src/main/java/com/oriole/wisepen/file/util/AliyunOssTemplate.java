@@ -5,6 +5,7 @@ import com.aliyun.oss.OSSClientBuilder;
 import com.oriole.wisepen.file.config.FileProperties;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.file.exception.FileErrorCode;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -14,7 +15,7 @@ import java.io.File;
 /**
  * Aliyun OSS 操作工具类
  *
- * @author Ian.Xiong
+ * @author Ian.xiong
  */
 @Slf4j
 @Component

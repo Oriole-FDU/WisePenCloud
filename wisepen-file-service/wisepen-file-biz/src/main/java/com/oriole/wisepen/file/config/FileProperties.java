@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 /**
  * 文件服务配置属性
  *
- * @author Ian.Xiong
+ * @author Ian.xiong
  */
 @Data
 @Component
