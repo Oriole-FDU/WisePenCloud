@@ -11,6 +11,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Map;
+import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.bean.copier.CopyOptions;
+
 /**
  * @author Ian.xiong
  */
@@ -32,8 +36,8 @@ public class RemoteFileController {
 
     private FileInfoResult toFileInfoVO(FileInfo fileInfo) {
         FileInfoResult vo = new FileInfoResult();
-        cn.hutool.core.bean.BeanUtil.copyProperties(fileInfo, vo, cn.hutool.core.bean.copier.CopyOptions.create()
-                .setFieldMapping(java.util.Map.of(
+        BeanUtil.copyProperties(fileInfo, vo, CopyOptions.create()
+                .setFieldMapping(Map.of(
                         "id", "documentId",
                         "filename", "fileName",
                         "size", "fileSize"

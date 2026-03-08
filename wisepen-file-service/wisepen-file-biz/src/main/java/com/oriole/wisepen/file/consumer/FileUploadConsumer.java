@@ -16,7 +16,12 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
+import java.time.LocalDateTime;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+
+import cn.hutool.core.io.FileUtil;
 
 /**
  * 文件上传消费者 - 负责将本地缓存文件同步到模拟 OSS 路径
@@ -95,10 +100,8 @@ public class FileUploadConsumer implements CommandLineRunner {
 
         try {
             if (fileProperties.getOss().isEnabled()) {
-                // OSS 模式：从 accessUrl 中截取 objectKey（去掉 domain 前缀）
-                String domain = fileProperties.getDomain();
-                if (!domain.endsWith("/")) domain += "/";
-                String objectKey = task.getAccessUrl().replace(domain, "");
+                // OSS 模式：从 accessUrl (即 https://bucket.endpoint/objectKey) 截取 objectKey
+                String objectKey = java.net.URI.create(task.getAccessUrl()).getPath();
                 if (objectKey.startsWith("/")) {
                     objectKey = objectKey.substring(1);
                 }
@@ -115,14 +118,14 @@ public class FileUploadConsumer implements CommandLineRunner {
                     objectKey = objectKey.substring(1);
                 }
                 File targetFile = new File(task.getTargetPath());
-                cn.hutool.core.io.FileUtil.mkdir(targetFile.getParentFile());
-                cn.hutool.core.io.FileUtil.copy(cacheFile, targetFile, true);
+                FileUtil.mkdir(targetFile.getParentFile());
+                FileUtil.copy(cacheFile, targetFile, true);
                 log.info("File uploaded to simulated OSS: {}", task.getTargetPath());
             }
 
             FileInfo update = new FileInfo();
             update.setFileId(task.getFileId());
-            update.setUpdateTime(java.time.LocalDateTime.now());
+            update.setUpdateTime(LocalDateTime.now());
 
             // 构造资源注册所需的 fileInfo 内存快照 (避免查库)
             FileInfo snapshot = new FileInfo();
@@ -130,7 +133,7 @@ public class FileUploadConsumer implements CommandLineRunner {
             snapshot.setFilename(task.getOriginalFilename());
             snapshot.setSize(task.getSize());
             snapshot.setCreateBy(task.getCreateBy());
-            snapshot.setType(cn.hutool.core.io.FileUtil.extName(task.getOriginalFilename()));
+            snapshot.setType(FileUtil.extName(task.getOriginalFilename()));
 
             if (Boolean.TRUE.equals(task.getIsConvertedPdf())) {
                 // PDF 副本转换完成：仅补充 pdfUrl，不更改状态（原件上传时已设为 AVAILABLE）

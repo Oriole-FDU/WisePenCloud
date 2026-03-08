@@ -8,9 +8,12 @@ import com.oriole.wisepen.file.exception.FileErrorCode;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
+import java.net.URL;
+import java.util.Date;
 
 /**
  * Aliyun OSS 操作工具类
@@ -54,11 +57,27 @@ public class AliyunOssTemplate {
         }
     }
 
+    public String getPresignedUrl(String objectKey, int expirationMinutes) {
+        FileProperties.OssConfig ossConfig = fileProperties.getOss();
+        if (!ossConfig.isEnabled()) {
+            throw new ServiceException("OSS is disabled");
+        }
+        try {
+            ensureClient();
+            Date expiration = new Date(System.currentTimeMillis() + expirationMinutes * 60 * 1000L);
+            URL url = ossClient.generatePresignedUrl(ossConfig.getBucketName(), objectKey, expiration);
+            return url.toString();
+        } catch (Exception e) {
+            log.error("Failed to generate presigned URL for Aliyun OSS", e);
+            throw new ServiceException("获取下载链接失败: " + e.getMessage());
+        }
+    }
+
     @PreDestroy
     public void shutdown() {
         if (ossClient != null) {
             log.info("Shutting down Aliyun OSS Client...");
-                ossClient.shutdown();
+            ossClient.shutdown();
         }
     }
 }

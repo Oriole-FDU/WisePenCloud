@@ -2,16 +2,20 @@ package com.oriole.wisepen.file.controller;
 
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.PageResult;
+import com.oriole.wisepen.file.api.domain.request.FileDownloadRequest;
 import com.oriole.wisepen.file.api.domain.result.FileInfoResult;
 import com.oriole.wisepen.file.api.domain.result.FileUploadResult;
 import com.oriole.wisepen.file.api.domain.request.FileUploadRequest;
 
 import com.oriole.wisepen.common.core.context.SecurityContextHolder;
+import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.file.service.FileService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.Map;
 
 /**
  * 文件管理接口（对外开放）
@@ -64,5 +68,16 @@ public class FileController {
         Long userId = Long.parseLong(SecurityContextHolder.getUserId());
         fileService.deleteFile(id, userId);
         return R.ok();
+    }
+
+    /**
+     * 下载文件
+     */
+    @PostMapping("/downloads")
+    public R<String> downloads(@RequestBody FileDownloadRequest req) {
+        Long userId = Long.parseLong(SecurityContextHolder.getUserId());
+        Map<String, GroupRoleType> groupRoles = SecurityContextHolder.getGroupRoleMap();
+        String downloadUrl = fileService.downloadFile(req, userId, groupRoles);
+        return R.ok(downloadUrl);
     }
 }

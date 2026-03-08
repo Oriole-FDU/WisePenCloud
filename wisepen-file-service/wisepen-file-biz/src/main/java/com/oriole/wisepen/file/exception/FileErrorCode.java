@@ -25,7 +25,9 @@ public enum FileErrorCode implements IErrorCode {
     FILE_DELETE_ERROR(2009, "文件删除失败"),
     FILE_OPERATION_FORBIDDEN(2010, "当前状态不允许此操作"),
     FILE_SIZE_EXCEEDED(2011, "文件大小超过100MB限制"),
-    FILE_RENAME_ERROR(2012, "文件重命名失败");
+    FILE_RENAME_ERROR(2012, "文件重命名失败"),
+    FILE_PERMISSION_DENIED(2013,"无权访问此文件"),
+    FILE_DOWNLOAD_ERROR(2014,"文件下载失败");
 
     private final Integer code;
     private final String msg;

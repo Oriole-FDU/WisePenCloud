@@ -53,6 +53,6 @@ wisepen:
     oss:
       enabled: true
       endpoint: oss-cn-shanghai.aliyuncs.com
-      access-key-id: 
-      access-key-secret: 
+      access-key-id:
+      access-key-secret:
       bucket-name: wisepen-cloud-aliyunoss
