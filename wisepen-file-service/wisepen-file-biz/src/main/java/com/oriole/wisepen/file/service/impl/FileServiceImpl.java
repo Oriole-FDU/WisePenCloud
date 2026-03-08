@@ -1,12 +1,17 @@
 package com.oriole.wisepen.file.service.impl;
 
 
+import cn.hutool.core.bean.BeanUtil;
 import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.oriole.wisepen.common.core.domain.PageResult;
+import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.exception.ServiceException;
+import com.oriole.wisepen.resource.domain.dto.ResourceCheckPermissionDTO;
+import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
+import com.oriole.wisepen.file.api.domain.request.FileDownloadRequest;
 import com.oriole.wisepen.file.api.domain.request.FileUploadRequest;
 import com.oriole.wisepen.file.api.domain.result.FileInfoResult;
 import com.oriole.wisepen.file.exception.FileErrorCode;
@@ -18,8 +23,16 @@ import com.oriole.wisepen.file.mapper.FileMapper;
 import com.oriole.wisepen.file.service.FileService;
 import com.oriole.wisepen.file.service.FileAvailabilityService;
 import com.oriole.wisepen.file.util.FileValidator;
+import com.oriole.wisepen.resource.feign.RemoteResourceService;
+import com.oriole.wisepen.resource.domain.dto.ResourceUpdateDTO;
+import com.oriole.wisepen.file.util.AliyunOssTemplate;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import java.io.File;
+import java.io.IOException;
+import java.net.URL;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +46,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.Map;
 
 /**
  * 文件存储服务实现类
@@ -48,7 +62,8 @@ public class FileServiceImpl implements FileService {
     private final StringRedisTemplate stringRedisTemplate;
     private final FileProperties fileProperties;
     private final FileAvailabilityService fileAvailabilityService;
-    private final com.oriole.wisepen.resource.feign.RemoteResourceService remoteResourceService;
+    private final RemoteResourceService remoteResourceService;
+    private final AliyunOssTemplate aliyunOssTemplate;
 
     // ==================== 上传 ====================
 
@@ -94,7 +109,8 @@ public class FileServiceImpl implements FileService {
         if (existingFile != null) {
             // 秒传：拷贝 url + pdfUrl，创建全新记录
             log.info("Flash upload triggered for MD5: {}", serverMd5);
-            cn.hutool.core.io.FileUtil.del(cachedFile); // 既然已经有存档，当前的物理缓存直接删去
+            // 既然已经有存档，当前的物理缓存直接删去
+            cn.hutool.core.io.FileUtil.del(cachedFile);
 
             FileInfo newRecord = new FileInfo();
             newRecord.setFilename(originalFilename);
@@ -121,16 +137,7 @@ public class FileServiceImpl implements FileService {
 
         // 物理存储路径 (Consumer 使用)
 
-        String accessUrl;
-        if (fileProperties.getOss().isEnabled()) {
-            // OSS 公网访问 URL: https://bucket.endpoint/objectKey
-            String bucket = fileProperties.getOss().getBucketName();
-            String endpoint = fileProperties.getOss().getEndpoint();
-            accessUrl = "https://" + bucket + "." + endpoint + "/" + objectKey;
-        } else {
-            // 本地访问 URL
-            accessUrl = formatBasePath(fileProperties.getDomain()) + objectKey;
-        }
+        String accessUrl = generateAccessUrl(objectKey);
 
         boolean isOffice = FileConstants.OFFICE_EXTENSIONS.contains(extension.toLowerCase());
         boolean isPdf = "pdf".equalsIgnoreCase(extension);
@@ -154,29 +161,14 @@ public class FileServiceImpl implements FileService {
             @Override
             public void afterCommit() {
                 // 推送上传任务
-                FileUploadTaskDTO uploadTask = new FileUploadTaskDTO();
-                uploadTask.setFileId(fileId);
-                uploadTask.setOriginalFilename(originalFilename);
-                uploadTask.setTempFilePath(localCachePath);
-                uploadTask.setAccessUrl(accessUrl); // 传递 Web URL
-                uploadTask.setMd5(serverMd5);
-                uploadTask.setIsPdfDirect(isPdf);
-                uploadTask.setSize(fileInfo.getSize());
-                uploadTask.setCreateBy(userId);
+                // 传递 Web URL
+                FileUploadTaskDTO uploadTask = createUploadTask(fileId, originalFilename, localCachePath, accessUrl, serverMd5, isPdf, fileInfo.getSize(), userId);
                 stringRedisTemplate.opsForList().leftPush(FileConstants.UPLOAD_QUEUE_KEY + ":" + fileProperties.getInstanceId(), JSON.toJSONString(uploadTask));
                 log.info("Pushed upload task to Redis for fileId: {}", fileId);
 
                 // Office 文档：额外推送转换任务
                 if (isOffice) {
-                    FileConvertTaskDTO convertTask = new FileConvertTaskDTO();
-                    convertTask.setFileId(fileId);
-                    convertTask.setOriginalFilename(originalFilename);
-                    convertTask.setExtension(extension);
-                    convertTask.setTempFilePath(localCachePath);
-                    convertTask.setOriginalSize(file.getSize());
-                    convertTask.setMd5(serverMd5);
-                    convertTask.setSize(fileInfo.getSize());
-                    convertTask.setCreateBy(userId);
+                    FileConvertTaskDTO convertTask = createConvertTask(fileId, originalFilename, extension, localCachePath, file.getSize(), serverMd5, fileInfo.getSize(), userId);
                     stringRedisTemplate.opsForList().leftPush(FileConstants.CONVERT_QUEUE_KEY + ":" + fileProperties.getInstanceId(), JSON.toJSONString(convertTask));
                     log.info("Pushed conversion task to Redis for fileId: {}", fileId);
                 }
@@ -210,6 +202,7 @@ public class FileServiceImpl implements FileService {
         pageResult.addAll(records);
         return pageResult;
     }
+
 
     // ==================== 删除文件 ====================
 
@@ -245,7 +238,7 @@ public class FileServiceImpl implements FileService {
 
     private String uploadCache(MultipartFile file, String extension, String uuId) {
         String cacheFilePath = formatBasePath(fileProperties.getCachePath()) + uuId + "." + extension;
-        java.io.File dest = new java.io.File(cacheFilePath);
+        File dest = new File(cacheFilePath);
         cn.hutool.core.io.FileUtil.touch(dest);
         try {
             file.transferTo(dest);
@@ -260,7 +253,7 @@ public class FileServiceImpl implements FileService {
     private FileInfoResult toFileInfoVO(FileInfo fileInfo) {
         FileInfoResult vo = new FileInfoResult();
         cn.hutool.core.bean.BeanUtil.copyProperties(fileInfo, vo, cn.hutool.core.bean.copier.CopyOptions.create()
-                .setFieldMapping(java.util.Map.of(
+                .setFieldMapping(Map.of(
                         "id", "documentId",
                         "filename", "fileName",
                         "size", "fileSize"
@@ -285,10 +278,11 @@ public class FileServiceImpl implements FileService {
         
         // 1. 同步修改 resource-service 中的记录名，由 Resource 侧校验权限
         if (cn.hutool.core.util.StrUtil.isNotBlank(existingFile.getResourceId())) {
-            com.oriole.wisepen.resource.domain.dto.ResourceUpdateDTO updateDTO = new com.oriole.wisepen.resource.domain.dto.ResourceUpdateDTO();
+            ResourceUpdateDTO updateDTO = new ResourceUpdateDTO();
             updateDTO.setResourceId(existingFile.getResourceId());
-            updateDTO.setResourceName(name); // 仅更新名字
-            com.oriole.wisepen.common.core.domain.R<Void> result = remoteResourceService.updateAttributes(updateDTO);
+            // 仅更新名字
+            updateDTO.setResourceName(name);
+            R<Void> result = remoteResourceService.updateAttributes(updateDTO);
             if (result.getCode() != 200) {
                 log.warn("Failed to rename resource in Resource Service: {}", result.getMsg());
                 throw new ServiceException(result.getMsg());
@@ -307,5 +301,86 @@ public class FileServiceImpl implements FileService {
         update.setUpdateTime(LocalDateTime.now());
         fileMapper.updateById(update);
         log.info("File renamed: fileId={}, newName={}", fileId, name);
+    }
+    @Override
+    public String downloadFile(FileDownloadRequest req, Long userId,Map<String,GroupRoleType> groupRoles) {
+        // 1. 鉴权
+        ResourceCheckPermissionDTO checkDto = new ResourceCheckPermissionDTO();
+        BeanUtil.copyProperties(req, checkDto);
+        checkDto.setUserId(String.valueOf(userId));
+        checkDto.setGroupRoles(groupRoles);
+
+        R<Boolean> permissionR = remoteResourceService.checkResPermission(checkDto);
+        if (permissionR.getCode() != 200 || !Boolean.TRUE.equals(permissionR.getData())) {
+            throw new ServiceException(FileErrorCode.FILE_PERMISSION_DENIED);
+        }
+
+        // 2. 具体下载逻辑
+        //查出下载url
+        LambdaQueryWrapper<FileInfo> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(FileInfo::getResourceId, req.getResourceId());
+
+        FileInfo fileInfo = fileMapper.selectOne(queryWrapper);
+        if (fileInfo == null) {
+            throw new ServiceException(FileErrorCode.FILE_NOT_FOUND);
+        }
+
+        String downloadUrl = fileInfo.getUrl();
+        
+        // 3. 如果开启了 OSS，生成带签名的临时下载链接
+        if (fileProperties.getOss().isEnabled() && downloadUrl != null && downloadUrl.startsWith("http")) {
+            try {
+                URL url = java.net.URI.create(downloadUrl).toURL();
+                String objectKey = url.getPath();
+                // 剃掉前面的 /
+                if (objectKey.startsWith("/")) {
+                    objectKey = objectKey.substring(1);
+                }
+                // 默认 15 分钟临时下载链接有效
+                downloadUrl = aliyunOssTemplate.getPresignedUrl(objectKey, 15);
+            } catch (Exception e) {
+                log.error("生成 OSS 临时下载链接失败: {}", downloadUrl, e);
+                throw new ServiceException(FileErrorCode.FILE_DOWNLOAD_ERROR);
+            }
+        }
+
+        log.info("鉴权通过，文件 {} ({}) 分发下载链接成功", fileInfo.getFilename(), fileInfo.getFileId());
+        return downloadUrl;
+    }
+
+    private String generateAccessUrl(String objectKey) {
+        if (fileProperties.getOss().isEnabled()) {
+            String bucket = fileProperties.getOss().getBucketName();
+            String endpoint = fileProperties.getOss().getEndpoint();
+            return "https://" + bucket + "." + endpoint + "/" + objectKey;
+        } else {
+            return formatBasePath(fileProperties.getDomain()) + objectKey;
+        }
+    }
+
+    private FileUploadTaskDTO createUploadTask(Long fileId, String originalFilename, String localCachePath, String accessUrl, String serverMd5, boolean isPdf, Long size, Long userId) {
+        FileUploadTaskDTO uploadTask = new FileUploadTaskDTO();
+        uploadTask.setFileId(fileId);
+        uploadTask.setOriginalFilename(originalFilename);
+        uploadTask.setTempFilePath(localCachePath);
+        uploadTask.setAccessUrl(accessUrl);
+        uploadTask.setMd5(serverMd5);
+        uploadTask.setIsPdfDirect(isPdf);
+        uploadTask.setSize(size);
+        uploadTask.setCreateBy(userId);
+        return uploadTask;
+    }
+
+    private FileConvertTaskDTO createConvertTask(Long fileId, String originalFilename, String extension, String localCachePath, Long originalSize, String serverMd5, Long size, Long userId) {
+        FileConvertTaskDTO convertTask = new FileConvertTaskDTO();
+        convertTask.setFileId(fileId);
+        convertTask.setOriginalFilename(originalFilename);
+        convertTask.setExtension(extension);
+        convertTask.setTempFilePath(localCachePath);
+        convertTask.setOriginalSize(originalSize);
+        convertTask.setMd5(serverMd5);
+        convertTask.setSize(size);
+        convertTask.setCreateBy(userId);
+        return convertTask;
     }
 }

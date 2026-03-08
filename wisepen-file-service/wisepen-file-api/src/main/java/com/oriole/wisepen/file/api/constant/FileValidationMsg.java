@@ -9,4 +9,6 @@ public class FileValidationMsg {
     public static final String FILENAME_EMPTY = "文件名不能为空";
     public static final String MD5_EMPTY = "MD5不能为空";
     public static final String FILESIZE_NULL = "文件大小不能为空";
+    public static final String RESOURCE_ID_EMPTY = "资源ID不能为空";
+    public static final String RESOURCE_TYPE_EMPTY = "资源类型不能为空";
 }

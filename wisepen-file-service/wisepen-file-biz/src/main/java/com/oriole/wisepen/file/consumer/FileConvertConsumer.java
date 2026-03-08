@@ -15,7 +15,13 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+
+import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.io.FileUtil;
 
 /**
  * 文件转换任务消费者 - 处理文档转 PDF
@@ -100,8 +106,8 @@ public class FileConvertConsumer implements CommandLineRunner {
             officeConversionService.convertToPdf(rawFile, tempPdf);
 
             // 生成 ObjectKey: yyyy/MM/dd/{uuid}.pdf (与 FileService 保持一致)
-            String uuId = java.util.UUID.randomUUID().toString();
-            String datePath = java.time.format.DateTimeFormatter.ofPattern("yyyy/MM/dd").format(java.time.LocalDateTime.now());
+            String uuId = UUID.randomUUID().toString();
+            String datePath = DateTimeFormatter.ofPattern("yyyy/MM/dd").format(LocalDateTime.now());
 
 
             String objectKey = datePath + "/" + uuId + ".pdf";
@@ -125,15 +131,15 @@ public class FileConvertConsumer implements CommandLineRunner {
             // 缓存转换后的 PDF 到本地缓存目录 (用于后续上传步骤)
             String cachePdfPath = formatBasePath(fileProperties.getCachePath()) + uuId + ".pdf";
             File cachePdfFile = new File(cachePdfPath);
-            cn.hutool.core.io.FileUtil.mkdir(cachePdfFile.getParentFile());
-            cn.hutool.core.io.FileUtil.move(tempPdf, cachePdfFile, true);
+            FileUtil.mkdir(cachePdfFile.getParentFile());
+            FileUtil.move(tempPdf, cachePdfFile, true);
             
             log.info("Conversion successful, PDF cached at {}. Pushing upload task...", cachePdfPath);
 
             // 推送 PDF 上传任务到 Redis 队列 (必须推送到同实例的 Upload Queue)
             // 注意：因为 cachePdfPath 是本地路径，所以必须由本机消费
             FileUploadTaskDTO uploadTask = new FileUploadTaskDTO();
-            cn.hutool.core.bean.BeanUtil.copyProperties(task, uploadTask);
+            BeanUtil.copyProperties(task, uploadTask);
             uploadTask.setTempFilePath(cachePdfPath);
             uploadTask.setTargetPath(finalPath);
             // 传递 Web URL
@@ -149,7 +155,7 @@ public class FileConvertConsumer implements CommandLineRunner {
             updateFailureStatus(task.getFileId());
         } finally {
             if (tempPdf != null) {
-                cn.hutool.core.io.FileUtil.del(tempPdf);
+                FileUtil.del(tempPdf);
             }
         }
     }
