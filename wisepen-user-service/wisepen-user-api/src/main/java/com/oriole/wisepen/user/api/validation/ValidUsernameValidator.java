@@ -13,14 +13,12 @@ import java.util.regex.Pattern;
  */
 public class ValidUsernameValidator implements ConstraintValidator<ValidUsername, String> {
 
-<<<<<<< HEAD
     private static final Pattern USERNAME_PATTERN = Pattern.compile(UserRegexPatterns.USERNAME_PATTERN);
     private static final Pattern ELEVEN_DIGIT_PATTERN = Pattern.compile(UserRegexPatterns.ELEVEN_DIGIT_PATTERN);
     private static final Pattern XH_PATTERN = Pattern.compile(UserRegexPatterns.XH_PATTERN);
 
     @Override
     public boolean isValid(String value, ConstraintValidatorContext context) {
-<<<<<<< HEAD
         if (value == null || value.trim().isEmpty()) {
             return true;
         }

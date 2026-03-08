@@ -18,7 +18,6 @@ public interface UserRegexPatterns {
     String PASSWORD_PATTERN = "^(?=.*[a-zA-Z])(?=.*\\d).{8,}$";
 
     /**
-<<<<<<< HEAD
      * 学工号正则：11位数字或5位数字XH4位数字
      */
     String CAMPUS_NO_PATTERN = "^(\\d{11}|\\d{5}XH\\d{4})$";
@@ -39,7 +38,6 @@ public interface UserRegexPatterns {
     String ELEVEN_DIGIT_PATTERN = "^\\d{11}$";
 
     /**
-<<<<<<< HEAD
      * 特殊非法用户名格式（5位数字+XH+4位数字）
      */
     String XH_PATTERN = "^\\d{5}XH\\d{4}$";
