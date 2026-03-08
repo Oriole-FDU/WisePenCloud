@@ -109,15 +109,12 @@ public class FileConvertConsumer implements CommandLineRunner {
 
             // 推送 PDF 上传任务到 Redis 队列 (必须推送到同实例的 Upload Queue)
             // 注意：因为 cachePdfPath 是本地路径，所以必须由本机消费
-            FileUploadTaskDTO uploadTask = FileUploadTaskDTO.builder()
-                    .fileId(task.getFileId())
-                    .originalFilename(task.getOriginalFilename())
-                    .tempFilePath(cachePdfPath)
-                    .targetPath(finalPath)
-                    .accessUrl(pdfWebUrl) // 传递 Web URL
-                    .md5(task.getMd5())
-                    .isConvertedPdf(true)
-                    .build();
+            FileUploadTaskDTO uploadTask = new FileUploadTaskDTO();
+            cn.hutool.core.bean.BeanUtil.copyProperties(task, uploadTask);
+            uploadTask.setTempFilePath(cachePdfPath);
+            uploadTask.setTargetPath(finalPath);
+            uploadTask.setAccessUrl(pdfWebUrl); // 传递 Web URL
+            uploadTask.setIsConvertedPdf(true);
             
             String uploadQueueKey = FileConstants.UPLOAD_QUEUE_KEY + ":" + fileProperties.getInstanceId();
             stringRedisTemplate.opsForList().leftPush(uploadQueueKey, JSON.toJSONString(uploadTask));

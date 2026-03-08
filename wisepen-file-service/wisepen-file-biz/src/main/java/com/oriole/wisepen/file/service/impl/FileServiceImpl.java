@@ -80,25 +80,22 @@ public class FileServiceImpl implements FileService {
         if (existingFile != null) {
             // 秒传：拷贝 url + pdfUrl，创建全新记录
             log.info("Flash upload triggered for MD5: {}", serverMd5);
-            FileInfo newRecord = FileInfo.builder()
-                    .filename(originalFilename)
-                    .md5(serverMd5)
-                    .type(extension)
-                    .size(file.getSize())
-                    .url(existingFile.getUrl())
-                    .pdfUrl(existingFile.getPdfUrl())
-                    .createBy(userId)
-                    .status(FileConstants.UPLOAD_STATUS_AVAILABLE)
-                    .createTime(LocalDateTime.now())
-                    .updateTime(LocalDateTime.now())
-                    .build();
+            FileInfo newRecord = new FileInfo();
+            newRecord.setFilename(originalFilename);
+            newRecord.setMd5(serverMd5);
+            newRecord.setType(extension);
+            newRecord.setSize(file.getSize());
+            newRecord.setUrl(existingFile.getUrl());
+            newRecord.setPdfUrl(existingFile.getPdfUrl());
+            newRecord.setCreateBy(userId);
+            newRecord.setStatus(FileConstants.UPLOAD_STATUS_AVAILABLE);
             fileMapper.insert(newRecord);
             // 秒传直接 AVAILABLE，触发统一资源注册
             fileAvailabilityService.registerResource(newRecord);
-            return FileUploadResult.builder()
-                    .documentId(newRecord.getId())
-                    .filename(newRecord.getFilename())
-                    .build();
+            FileUploadResult result = new FileUploadResult();
+            result.setDocumentId(newRecord.getId());
+            result.setFilename(newRecord.getFilename());
+            return result;
         }
 
         // 4. 正常落盘
@@ -127,17 +124,14 @@ public class FileServiceImpl implements FileService {
         boolean isPdf = "pdf".equalsIgnoreCase(extension);
 
         // 所有新文件初始状态都是 PROCESSING（需要异步上传至 OSS）
-        FileInfo fileInfo = FileInfo.builder()
-                .filename(originalFilename)
-                .md5(serverMd5)
-                .type(extension)
-                .size(file.getSize())
-                .url(accessUrl) // 存入访问链接
-                .createBy(userId)
-                .status(FileConstants.UPLOAD_STATUS_PROCESSING)
-                .createTime(LocalDateTime.now())
-                .updateTime(LocalDateTime.now())
-                .build();
+        FileInfo fileInfo = new FileInfo();
+        fileInfo.setFilename(originalFilename);
+        fileInfo.setMd5(serverMd5);
+        fileInfo.setType(extension);
+        fileInfo.setSize(file.getSize());
+        fileInfo.setUrl(accessUrl); // 存入访问链接
+        fileInfo.setCreateBy(userId);
+        fileInfo.setStatus(FileConstants.UPLOAD_STATUS_PROCESSING);
 
         fileMapper.insert(fileInfo);
 
@@ -147,27 +141,25 @@ public class FileServiceImpl implements FileService {
             @Override
             public void afterCommit() {
                 // 推送上传任务
-                FileUploadTaskDTO uploadTask = FileUploadTaskDTO.builder()
-                        .fileId(fileId)
-                        .originalFilename(originalFilename)
-                        .tempFilePath(localCachePath)
-                        .accessUrl(accessUrl) // 传递 Web URL
-                        .md5(serverMd5)
-                        .isPdfDirect(isPdf)
-                        .build();
+                FileUploadTaskDTO uploadTask = new FileUploadTaskDTO();
+                uploadTask.setFileId(fileId);
+                uploadTask.setOriginalFilename(originalFilename);
+                uploadTask.setTempFilePath(localCachePath);
+                uploadTask.setAccessUrl(accessUrl); // 传递 Web URL
+                uploadTask.setMd5(serverMd5);
+                uploadTask.setIsPdfDirect(isPdf);
                 stringRedisTemplate.opsForList().leftPush(FileConstants.UPLOAD_QUEUE_KEY + ":" + fileProperties.getInstanceId(), JSON.toJSONString(uploadTask));
                 log.info("Pushed upload task to Redis for fileId: {}", fileId);
 
                 // Office 文档：额外推送转换任务
                 if (isOffice) {
-                    FileConvertTaskDTO convertTask = FileConvertTaskDTO.builder()
-                            .fileId(fileId)
-                            .originalFilename(originalFilename)
-                            .extension(extension)
-                            .tempFilePath(localCachePath)
-                            .originalSize(file.getSize())
-                            .md5(serverMd5)
-                            .build();
+                    FileConvertTaskDTO convertTask = new FileConvertTaskDTO();
+                    convertTask.setFileId(fileId);
+                    convertTask.setOriginalFilename(originalFilename);
+                    convertTask.setExtension(extension);
+                    convertTask.setTempFilePath(localCachePath);
+                    convertTask.setOriginalSize(file.getSize());
+                    convertTask.setMd5(serverMd5);
                     stringRedisTemplate.opsForList().leftPush(FileConstants.CONVERT_QUEUE_KEY + ":" + fileProperties.getInstanceId(), JSON.toJSONString(convertTask));
                     log.info("Pushed conversion task to Redis for fileId: {}", fileId);
                 }
@@ -175,10 +167,10 @@ public class FileServiceImpl implements FileService {
         });
 
         // 简化返回：仅返回 documentId 和 filename
-        return FileUploadResult.builder()
-                .documentId(fileInfo.getId())
-                .filename(fileInfo.getFilename())
-                .build();
+        FileUploadResult result = new FileUploadResult();
+        result.setDocumentId(fileInfo.getId());
+        result.setFilename(fileInfo.getFilename());
+        return result;
     }
 
     // ==================== 文件列表 ====================
@@ -241,13 +233,14 @@ public class FileServiceImpl implements FileService {
     }
 
     private FileInfoVO toFileInfoVO(FileInfo fileInfo) {
-        return FileInfoVO.builder()
-                .documentId(fileInfo.getId())
-                .fileName(fileInfo.getFilename())
-                .fileSize(fileInfo.getSize())
-                .createTime(fileInfo.getCreateTime())
-                .status(fileInfo.getStatus())
-                .build();
+        FileInfoVO vo = new FileInfoVO();
+        cn.hutool.core.bean.BeanUtil.copyProperties(fileInfo, vo, cn.hutool.core.bean.copier.CopyOptions.create()
+                .setFieldMapping(java.util.Map.of(
+                        "id", "documentId",
+                        "filename", "fileName",
+                        "size", "fileSize"
+                )));
+        return vo;
     }
 
     @Override

@@ -27,13 +27,13 @@ public class RemoteFileController {
     }
 
     private FileInfoVO toFileInfoVO(FileInfo fileInfo) {
-        return FileInfoVO.builder()
-                .documentId(fileInfo.getId())
-                .fileName(fileInfo.getFilename())
-                .fileSize(fileInfo.getSize())
-                .createTime(fileInfo.getCreateTime())
-                .status(fileInfo.getStatus())
-                .createBy(fileInfo.getCreateBy())
-                .build();
+        FileInfoVO vo = new FileInfoVO();
+        cn.hutool.core.bean.BeanUtil.copyProperties(fileInfo, vo, cn.hutool.core.bean.copier.CopyOptions.create()
+                .setFieldMapping(java.util.Map.of(
+                        "id", "documentId",
+                        "filename", "fileName",
+                        "size", "fileSize"
+                )));
+        return vo;
     }
 }
