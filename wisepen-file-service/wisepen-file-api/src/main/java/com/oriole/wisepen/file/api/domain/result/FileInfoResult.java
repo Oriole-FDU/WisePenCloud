@@ -22,7 +22,7 @@ public class FileInfoResult implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    // 文档Id
+    // 文档 ID
     private Long documentId;
 
     // 文件名

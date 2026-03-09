@@ -17,8 +17,6 @@ import org.springframework.stereotype.Component;
 
 import java.io.File;
 import java.time.LocalDateTime;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import cn.hutool.core.io.FileUtil;
@@ -109,14 +107,6 @@ public class FileUploadConsumer implements CommandLineRunner {
                 log.info("File uploaded to Aliyun OSS: {}", objectKey);
             } else {
                 // 本地模拟 OSS 模式：依赖 targetPath
-                String storagePath = fileProperties.getStoragePath();
-                if (!storagePath.endsWith("/")) {
-                    storagePath += "/";
-                }
-                String objectKey = task.getTargetPath().replace(storagePath, "");
-                if (objectKey.startsWith("/")) {
-                    objectKey = objectKey.substring(1);
-                }
                 File targetFile = new File(task.getTargetPath());
                 FileUtil.mkdir(targetFile.getParentFile());
                 FileUtil.copy(cacheFile, targetFile, true);

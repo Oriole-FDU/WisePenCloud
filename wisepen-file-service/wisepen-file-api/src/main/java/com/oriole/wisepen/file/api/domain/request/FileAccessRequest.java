@@ -7,8 +7,11 @@ import lombok.Data;
 import java.io.Serial;
 import java.io.Serializable;
 
+/**
+ * @author Ian.xiong
+ */
 @Data
-public class FileDownloadRequest implements Serializable {
+public class FileAccessRequest implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
     @NotBlank(message = FileValidationMsg.RESOURCE_ID_EMPTY)

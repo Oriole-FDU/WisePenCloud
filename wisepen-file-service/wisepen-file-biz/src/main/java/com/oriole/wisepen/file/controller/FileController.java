@@ -2,7 +2,7 @@ package com.oriole.wisepen.file.controller;
 
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.PageResult;
-import com.oriole.wisepen.file.api.domain.request.FileDownloadRequest;
+import com.oriole.wisepen.file.api.domain.request.FileAccessRequest;
 import com.oriole.wisepen.file.api.domain.result.FileInfoResult;
 import com.oriole.wisepen.file.api.domain.result.FileUploadResult;
 import com.oriole.wisepen.file.api.domain.request.FileUploadRequest;
@@ -74,10 +74,21 @@ public class FileController {
      * 下载文件
      */
     @PostMapping("/downloads")
-    public R<String> downloads(@RequestBody FileDownloadRequest req) {
+    public R<String> downloads(@RequestBody FileAccessRequest req) {
         Long userId = Long.parseLong(SecurityContextHolder.getUserId());
         Map<String, GroupRoleType> groupRoles = SecurityContextHolder.getGroupRoleMap();
         String downloadUrl = fileService.downloadFile(req, userId, groupRoles);
         return R.ok(downloadUrl);
+    }
+
+    /**
+     * 预览文件
+     */
+    @PostMapping("/preview")
+    public R<String>  preview(@RequestBody FileAccessRequest req) {
+        Long userId = Long.parseLong(SecurityContextHolder.getUserId());
+        Map<String, GroupRoleType> groupRoles = SecurityContextHolder.getGroupRoleMap();
+        String previewUrl = fileService.previewFile(req,userId,groupRoles);
+        return R.ok(previewUrl);
     }
 }

@@ -11,7 +11,7 @@ import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.resource.domain.dto.ResourceCheckPermissionDTO;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
-import com.oriole.wisepen.file.api.domain.request.FileDownloadRequest;
+import com.oriole.wisepen.file.api.domain.request.FileAccessRequest;
 import com.oriole.wisepen.file.api.domain.request.FileUploadRequest;
 import com.oriole.wisepen.file.api.domain.result.FileInfoResult;
 import com.oriole.wisepen.file.exception.FileErrorCode;
@@ -32,6 +32,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.net.URL;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -41,7 +42,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.multipart.MultipartFile;
 import com.oriole.wisepen.file.config.FileProperties;
 
-import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -303,17 +303,9 @@ public class FileServiceImpl implements FileService {
         log.info("File renamed: fileId={}, newName={}", fileId, name);
     }
     @Override
-    public String downloadFile(FileDownloadRequest req, Long userId,Map<String,GroupRoleType> groupRoles) {
+    public String downloadFile(FileAccessRequest req, Long userId, Map<String,GroupRoleType> groupRoles) {
         // 1. 鉴权
-        ResourceCheckPermissionDTO checkDto = new ResourceCheckPermissionDTO();
-        BeanUtil.copyProperties(req, checkDto);
-        checkDto.setUserId(String.valueOf(userId));
-        checkDto.setGroupRoles(groupRoles);
-
-        R<Boolean> permissionR = remoteResourceService.checkResPermission(checkDto);
-        if (permissionR.getCode() != 200 || !Boolean.TRUE.equals(permissionR.getData())) {
-            throw new ServiceException(FileErrorCode.FILE_PERMISSION_DENIED);
-        }
+        checkPermission(req, userId, groupRoles);
 
         // 2. 具体下载逻辑
         //查出下载url
@@ -324,28 +316,45 @@ public class FileServiceImpl implements FileService {
         if (fileInfo == null) {
             throw new ServiceException(FileErrorCode.FILE_NOT_FOUND);
         }
-
-        String downloadUrl = fileInfo.getUrl();
-        
         // 3. 如果开启了 OSS，生成带签名的临时下载链接
-        if (fileProperties.getOss().isEnabled() && downloadUrl != null && downloadUrl.startsWith("http")) {
-            try {
-                URL url = java.net.URI.create(downloadUrl).toURL();
-                String objectKey = url.getPath();
-                // 剃掉前面的 /
-                if (objectKey.startsWith("/")) {
-                    objectKey = objectKey.substring(1);
-                }
-                // 默认 15 分钟临时下载链接有效
-                downloadUrl = aliyunOssTemplate.getPresignedUrl(objectKey, 15);
-            } catch (Exception e) {
-                log.error("生成 OSS 临时下载链接失败: {}", downloadUrl, e);
-                throw new ServiceException(FileErrorCode.FILE_DOWNLOAD_ERROR);
-            }
-        }
-
+        String downloadUrl = generateDownloadUrl(fileInfo.getUrl());
         log.info("鉴权通过，文件 {} ({}) 分发下载链接成功", fileInfo.getFilename(), fileInfo.getFileId());
         return downloadUrl;
+    }
+
+    @Override
+    public String previewFile(FileAccessRequest req, Long userId, Map<String,GroupRoleType> groupRoles) {
+        // 1. 鉴权
+        checkPermission(req, userId, groupRoles);
+        // 2.查出预览pdf url
+        LambdaQueryWrapper<FileInfo> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(FileInfo::getResourceId, req.getResourceId());
+
+        FileInfo fileInfo = fileMapper.selectOne(queryWrapper);
+        if (fileInfo == null) {
+            throw new ServiceException(FileErrorCode.FILE_NOT_FOUND);
+        }
+        String objectUrl = fileInfo.getPdfUrl();
+        String previewUrl;
+        if(objectUrl!=null){
+            previewUrl = generateDownloadUrl(objectUrl);
+        }else{
+            previewUrl = generateDownloadUrl(fileInfo.getUrl());
+        }
+        log.info("鉴权通过，文件 {} ({}) 分发预览链接成功", fileInfo.getFilename(), fileInfo.getFileId());
+        return previewUrl;
+    }
+
+    private void checkPermission(FileAccessRequest req, Long userId, Map<String,GroupRoleType> groupRoles){
+        ResourceCheckPermissionDTO checkDto = new ResourceCheckPermissionDTO();
+        BeanUtil.copyProperties(req, checkDto);
+        checkDto.setUserId(String.valueOf(userId));
+        checkDto.setGroupRoles(groupRoles);
+
+        R<Boolean> permissionR = remoteResourceService.checkResPermission(checkDto);
+        if (permissionR.getCode() != 200 || !Boolean.TRUE.equals(permissionR.getData())) {
+            throw new ServiceException(FileErrorCode.FILE_PERMISSION_DENIED);
+        }
     }
 
     private String generateAccessUrl(String objectKey) {
@@ -355,6 +364,28 @@ public class FileServiceImpl implements FileService {
             return "https://" + bucket + "." + endpoint + "/" + objectKey;
         } else {
             return formatBasePath(fileProperties.getDomain()) + objectKey;
+        }
+    }
+
+    private String generateDownloadUrl(String objectUrl) {
+        if (fileProperties.getOss().isEnabled() && objectUrl != null && objectUrl.startsWith("http")) {
+            try {
+                URL url = URI.create(objectUrl).toURL();
+                String downloadUrl = url.getPath();
+                // 剃掉前面的 /
+                if (downloadUrl.startsWith("/")) {
+                    downloadUrl = downloadUrl.substring(1);
+                }
+                // 默认 15 分钟临时下载链接有效
+                downloadUrl = aliyunOssTemplate.getPresignedUrl(downloadUrl, 15);
+                return downloadUrl;
+            } catch (Exception e) {
+                log.error("生成 OSS 临时下载链接失败: {}", objectUrl, e);
+                throw new ServiceException(FileErrorCode.FILE_DOWNLOAD_ERROR);
+            }
+        }else{
+            //兜底返回
+            return formatBasePath(fileProperties.getDomain()) + objectUrl;
         }
     }
 

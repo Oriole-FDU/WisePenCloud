@@ -1,6 +1,6 @@
 package com.oriole.wisepen.file.service;
 
-import com.oriole.wisepen.file.api.domain.request.FileDownloadRequest;
+import com.oriole.wisepen.file.api.domain.request.FileAccessRequest;
 import com.oriole.wisepen.file.api.domain.result.FileInfoResult;
 import com.oriole.wisepen.file.api.domain.result.FileUploadResult;
 import com.oriole.wisepen.file.api.domain.request.FileUploadRequest;
@@ -41,5 +41,12 @@ public interface FileService {
      * 下载文件
      * @return 文件的下载链接
      */
-    String downloadFile(FileDownloadRequest req, Long userId, Map<String,GroupRoleType> groupRoles);
+    String downloadFile(FileAccessRequest req, Long userId, Map<String,GroupRoleType> groupRoles);
+
+    /**
+     *
+     * 预览文件
+     * @return 文件的 PDF 下载链接
+     */
+    String previewFile(FileAccessRequest req, Long userId, Map<String, GroupRoleType> groupRoles);
 }

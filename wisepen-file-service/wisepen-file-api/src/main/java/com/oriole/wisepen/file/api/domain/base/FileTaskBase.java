@@ -20,7 +20,7 @@ public abstract class FileTaskBase implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    // 文件ID
+    // 文件 ID
     private Long fileId;
 
     // 原始文件名
@@ -35,6 +35,6 @@ public abstract class FileTaskBase implements Serializable {
     // 文件大小
     private Long size;
 
-    // 创建者ID
+    // 创建者 ID
     private Long createBy;
 }

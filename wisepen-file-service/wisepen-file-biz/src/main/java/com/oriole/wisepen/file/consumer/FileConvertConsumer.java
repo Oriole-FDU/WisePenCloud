@@ -8,6 +8,7 @@ import com.oriole.wisepen.file.config.FileProperties;
 import com.oriole.wisepen.file.domain.entity.FileInfo;
 import com.oriole.wisepen.file.mapper.FileMapper;
 import com.oriole.wisepen.file.service.OfficeConversionService;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -75,7 +76,7 @@ public class FileConvertConsumer implements CommandLineRunner {
         });
     }
 
-    @jakarta.annotation.PreDestroy
+    @PreDestroy
     public void destroy() {
         log.info("Shutting down FileConvertConsumer...");
         isRunning = false;
