@@ -107,6 +107,7 @@ public class UserServiceImpl implements UserService {
         // 新建未验证的学生用户
         UserEntity user = UserEntity.builder()
                 .username(req.getUsername())
+                .nickname(req.getUsername())
                 .identityType(IdentityType.STUDENT)
                 .status(Status.UNIDENTIFIED)
                 .build();
