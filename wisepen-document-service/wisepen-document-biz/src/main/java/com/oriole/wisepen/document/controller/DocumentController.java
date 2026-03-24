@@ -4,6 +4,7 @@ import com.oriole.wisepen.common.core.context.SecurityContextHolder;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.document.api.domain.dto.req.DocumentUploadInitRequest;
 import com.oriole.wisepen.document.api.domain.dto.res.DocumentUploadInitResponse;
+import com.oriole.wisepen.document.service.IDocumentDownloadService;
 import com.oriole.wisepen.document.service.IDocumentPreviewService;
 import com.oriole.wisepen.document.service.IDocumentService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,6 +25,7 @@ public class DocumentController {
 
     private final IDocumentService documentService;
     private final IDocumentPreviewService documentPreviewService;
+    private final IDocumentDownloadService documentDownloadService;
 
     /**
      * 上传初始化：前端提交 md5/filename/extension/expectedSize，
@@ -63,6 +65,18 @@ public class DocumentController {
                         HttpServletResponse response) {
         String userId = String.valueOf(SecurityContextHolder.getUserId());
         documentPreviewService.handlePreviewRequest(request, response, documentId, userId);
+    }
+
+    /**
+     * 下载原始文档（302 重定向至 OSS 预签名 URL，有效期 900 秒）。
+     * <p>仅 {@code READY} 状态的文档可下载，返回用户上传的原始文件（不含水印）。
+     */
+    @GetMapping("/{documentId}/download")
+    public void download(@PathVariable String documentId,
+                         HttpServletRequest request,
+                         HttpServletResponse response) {
+        String userId = String.valueOf(SecurityContextHolder.getUserId());
+        documentDownloadService.handleDownloadRequest(request, response, documentId, userId);
     }
 
     /**
