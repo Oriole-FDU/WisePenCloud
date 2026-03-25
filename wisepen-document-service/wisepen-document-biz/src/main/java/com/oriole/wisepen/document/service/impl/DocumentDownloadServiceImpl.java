@@ -1,5 +1,6 @@
 package com.oriole.wisepen.document.service.impl;
 
+import com.oriole.wisepen.common.core.context.SecurityContextHolder;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.document.api.enums.DocumentStatusEnum;
@@ -8,6 +9,9 @@ import com.oriole.wisepen.document.exception.DocumentErrorCode;
 import com.oriole.wisepen.document.service.IDocumentDownloadService;
 import com.oriole.wisepen.document.service.IDocumentProcessService;
 import com.oriole.wisepen.file.storage.api.feign.RemoteStorageService;
+import com.oriole.wisepen.resource.domain.dto.ResourceCheckPermissionReqDTO;
+import com.oriole.wisepen.resource.enums.ResPermissionLevelEnum;
+import com.oriole.wisepen.resource.feign.RemoteResourceService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +37,7 @@ public class DocumentDownloadServiceImpl implements IDocumentDownloadService {
 
     private final IDocumentProcessService documentProcessService;
     private final RemoteStorageService remoteStorageService;
+    private final RemoteResourceService remoteResourceService;
 
     @Override
     public void handleDownloadRequest(HttpServletRequest request,
@@ -48,6 +53,17 @@ public class DocumentDownloadServiceImpl implements IDocumentDownloadService {
             throw new ServiceException(DocumentErrorCode.DOCUMENT_NOT_READY);
         }
 
+        // 权限校验：仅文档所有者（OWNER）可下载原始文件
+        ResourceCheckPermissionReqDTO permReq = new ResourceCheckPermissionReqDTO();
+        permReq.setResourceId(documentId);
+        permReq.setResourceType(doc.getFileType().name());
+        permReq.setUserId(userId);
+        permReq.setGroupRoles(SecurityContextHolder.getGroupRoleMap());
+        ResPermissionLevelEnum permLevel = remoteResourceService.checkResPermission(permReq).getData().getResPermissionLevel();
+        if (permLevel.getLevel() < ResPermissionLevelEnum.OWNER.getLevel()) {
+            throw new ServiceException(DocumentErrorCode.DOCUMENT_PERMISSION_DENIED);
+        }
+
         // 2. 向 storage 服务申请原始文件的预签名下载 URL
         R<String> result = remoteStorageService.getDownloadUrl(doc.getSourceObjectKey(), DEFAULT_DOWNLOAD_DURATION);
         if (result.getCode() != 200 || result.getData() == null) {
@@ -60,4 +76,6 @@ public class DocumentDownloadServiceImpl implements IDocumentDownloadService {
         response.setStatus(HttpStatus.FOUND.value());
         response.setHeader("Location", result.getData());
     }
+
+     
 }

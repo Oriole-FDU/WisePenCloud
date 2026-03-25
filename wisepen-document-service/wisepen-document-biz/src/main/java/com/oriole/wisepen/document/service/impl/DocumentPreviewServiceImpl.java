@@ -1,5 +1,6 @@
 package com.oriole.wisepen.document.service.impl;
 
+import com.oriole.wisepen.common.core.context.SecurityContextHolder;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.document.api.enums.DocumentStatusEnum;
 import com.oriole.wisepen.document.config.DocumentProperties;
@@ -10,6 +11,9 @@ import com.oriole.wisepen.document.service.IDocumentPreviewService;
 import com.oriole.wisepen.document.service.IDocumentProcessService;
 import com.oriole.wisepen.document.util.WatermarkAppendixBuilder;
 import com.oriole.wisepen.file.storage.api.feign.RemoteStorageService;
+import com.oriole.wisepen.resource.domain.dto.ResourceCheckPermissionReqDTO;
+import com.oriole.wisepen.resource.enums.ResPermissionLevelEnum;
+import com.oriole.wisepen.resource.feign.RemoteResourceService;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -63,6 +67,7 @@ public class DocumentPreviewServiceImpl implements IDocumentPreviewService {
 
     private final IDocumentProcessService documentProcessService;
     private final RemoteStorageService remoteStorageService;
+    private final RemoteResourceService remoteResourceService;
     private final DocumentProperties documentProperties;
 
     @Override
@@ -74,6 +79,17 @@ public class DocumentPreviewServiceImpl implements IDocumentPreviewService {
         if (doc == null || doc.getStatus() != DocumentStatusEnum.READY) {
             response.setStatus(HttpStatus.NOT_FOUND.value());
             return;
+        }
+
+        // 权限校验：调 resource 服务实时计算用户是否有权访问此文档
+        ResourceCheckPermissionReqDTO permReq = new ResourceCheckPermissionReqDTO();
+        permReq.setResourceId(documentId);
+        permReq.setResourceType(doc.getFileType().name());
+        permReq.setUserId(userId);
+        permReq.setGroupRoles(SecurityContextHolder.getGroupRoleMap());
+        ResPermissionLevelEnum permLevel = remoteResourceService.checkResPermission(permReq).getData().getResPermissionLevel();
+        if (permLevel.getLevel() < ResPermissionLevelEnum.GROUP_MEMBER.getLevel()) {
+            throw new ServiceException(DocumentErrorCode.DOCUMENT_PERMISSION_DENIED);
         }
 
         DocumentPdfMetaEntity meta = documentProcessService.getPdfMeta(documentId);
