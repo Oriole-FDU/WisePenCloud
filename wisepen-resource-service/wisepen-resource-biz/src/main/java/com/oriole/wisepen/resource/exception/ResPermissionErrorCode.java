@@ -34,7 +34,8 @@ public enum ResPermissionErrorCode implements IErrorCode {
     PATH_MUST_BE_FIRST_TAG(50104, "资源的路径目录必须位于标签列表的首位"),
 
     // --- 小组资源配置相关异常 ---
-    FOLDER_MODE_ONLY_ONE_TAG(50201, "文件夹模式下每个资源在同一小组内至多只能挂载一个标签");
+    FOLDER_MODE_ONLY_ONE_TAG(50201, "文件夹模式下每个资源在同一小组内至多只能挂载一个标签"),
+    TAG_MOUNT_DENIED(50202, "对不起，您没有该标签的挂载权限");
 
     private final Integer code;
     private final String msg;

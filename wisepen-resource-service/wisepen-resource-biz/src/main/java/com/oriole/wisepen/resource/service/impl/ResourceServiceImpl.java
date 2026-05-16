@@ -22,6 +22,7 @@ import com.oriole.wisepen.resource.enums.ResourceAccessRole;
 import com.oriole.wisepen.resource.enums.ResourceAction;
 import com.oriole.wisepen.resource.enums.ResourceSortBy;
 import com.oriole.wisepen.resource.enums.AclGrantMode;
+import com.oriole.wisepen.resource.enums.ResourceMountMode;
 import com.oriole.wisepen.resource.event.TagChangedEvent;
 import com.oriole.wisepen.resource.event.TagDeletedEvent;
 import com.oriole.wisepen.resource.event.TagTrashedEvent;
@@ -231,6 +232,44 @@ public class ResourceServiceImpl implements IResourceService {
             return;
         }
         eventPublisher.publishAclRecalculateEvent(entity.getResourceId(), "RESOURCE_TAGS_CHANGED");
+    }
+
+    @Override
+    public void assertResourceMountPermission(String userId, String groupId, GroupRoleType groupRole, List<String> tagIds) {
+        if (!StringUtils.hasText(groupId) || groupId.startsWith(ResourceConstants.PERSONAL_GROUP_PREFIX)) {
+            return;
+        }
+        if (groupRole == GroupRoleType.ADMIN || groupRole == GroupRoleType.OWNER) {
+            return;
+        }
+        if (tagIds == null || tagIds.isEmpty()) {
+            return;
+        }
+
+        List<TagEntity> validTags = tagRepository.findAllById(tagIds);
+        if (validTags.size() != tagIds.size()) {
+            throw new ServiceException(ResPermissionErrorCode.TAG_NOT_FOUND);
+        }
+        boolean allBelongToGroup = validTags.stream().allMatch(tag -> groupId.equals(tag.getGroupId()));
+        if (!allBelongToGroup) {
+            throw new ServiceException(ResPermissionErrorCode.TAG_NOT_FOUND);
+        }
+
+        Integer defaultActions = groupResConfigRepository.findByGroupId(groupId)
+                .map(GroupResConfigEntity::getDefaultMemberActionsMask)
+                .orElse(ResourceAction.DEFAULT_MEMBER_ACTIONS);
+
+        for (TagEntity tag : validTags) {
+            ResolvedTagPermission resolved = resolveTagPermission(tag, defaultActions);
+            boolean canMount = (resolved.resourceMountMode == ResourceMountMode.ALL ||
+                    (resolved.resourceMountMode == ResourceMountMode.WHITELIST && resolved.resourceMountSpecifiedUsers.contains(userId)) ||
+                    (resolved.resourceMountMode == ResourceMountMode.BLACKLIST && !resolved.resourceMountSpecifiedUsers.contains(userId)));
+            if (!canMount) {
+                log.warn("resource mount denied userId={} groupId={} tagId={} mode={}",
+                        userId, groupId, tag.getTagId(), resolved.resourceMountMode);
+                throw new ServiceException(ResPermissionErrorCode.TAG_MOUNT_DENIED);
+            }
+        }
     }
 
     @Override
@@ -676,11 +715,11 @@ public class ResourceServiceImpl implements IResourceService {
                         break;
                     case WHITELIST:
                         computed.setBaseMask(0);
-                        resolved.specifiedUsers.forEach(uid -> computed.getUserMasks().put(uid, effectiveMask));
+                        resolved.aclGrantSpecifiedUsers.forEach(uid -> computed.getUserMasks().put(uid, effectiveMask));
                         break;
                     case BLACKLIST:
                         computed.setBaseMask(effectiveMask);
-                        resolved.specifiedUsers.forEach(uid -> computed.getUserMasks().put(uid, 0));
+                        resolved.aclGrantSpecifiedUsers.forEach(uid -> computed.getUserMasks().put(uid, 0));
                         break;
                 }
                 computedGroupAcls.put(groupBind.getGroupId(), computed);
@@ -754,8 +793,8 @@ public class ResourceServiceImpl implements IResourceService {
 
                 // 使用 AclGrantMode 判断用户是否能获取当前组的权限掩码
                 boolean isEligibleForMask = (resolved.aclGrantMode == AclGrantMode.ALL ||
-                        (resolved.aclGrantMode == AclGrantMode.WHITELIST && resolved.specifiedUsers.contains(dto.getUserId().toString())) ||
-                        (resolved.aclGrantMode == AclGrantMode.BLACKLIST && !resolved.specifiedUsers.contains(dto.getUserId().toString())));
+                    (resolved.aclGrantMode == AclGrantMode.WHITELIST && resolved.aclGrantSpecifiedUsers.contains(dto.getUserId().toString())) ||
+                    (resolved.aclGrantMode == AclGrantMode.BLACKLIST && !resolved.aclGrantSpecifiedUsers.contains(dto.getUserId().toString())));
 
                 if (isEligibleForMask) {
                     // 只要有一个组能下发权限，基础身份就是 Member
@@ -798,12 +837,17 @@ public class ResourceServiceImpl implements IResourceService {
     @Data
     private static class ResolvedTagPermission {
         AclGrantMode aclGrantMode;
-        List<String> specifiedUsers = Collections.emptyList();
+        List<String> aclGrantSpecifiedUsers = Collections.emptyList();
         Integer grantedActionsMask;
+        ResourceMountMode resourceMountMode;
+        List<String> resourceMountSpecifiedUsers = Collections.emptyList();
 
         boolean isAclGrantModeResolved() { return aclGrantMode != null; }
         boolean isActionsResolved() { return grantedActionsMask != null; }
-        boolean isFullyResolved() { return isAclGrantModeResolved() && isActionsResolved(); }
+        boolean isResourceMountModeResolved() { return resourceMountMode != null; }
+        boolean isFullyResolved() {
+            return isAclGrantModeResolved() && isActionsResolved() && isResourceMountModeResolved();
+        }
     }
 
     /**
@@ -849,6 +893,10 @@ public class ResourceServiceImpl implements IResourceService {
         if (!result.isAclGrantModeResolved()) {
             result.aclGrantMode = AclGrantMode.ALL;
         }
+        // 如果未解析到资源挂载模式，则使用默认挂载模式（ALL）
+        if (!result.isResourceMountModeResolved()) {
+            result.resourceMountMode = ResourceMountMode.ALL;
+        }
 
         return result;
     }
@@ -859,11 +907,16 @@ public class ResourceServiceImpl implements IResourceService {
     private void capturePermission(ResolvedTagPermission result, TagEntity node) {
         if (!result.isAclGrantModeResolved() && node.getAclGrantMode() != null) {
             result.aclGrantMode = node.getAclGrantMode();
-            result.specifiedUsers = node.getSpecifiedUsers() != null ? node.getSpecifiedUsers()
+            result.aclGrantSpecifiedUsers = node.getAclGrantSpecifiedUsers() != null ? node.getAclGrantSpecifiedUsers()
                     : Collections.emptyList();
         }
         if (!result.isActionsResolved() && (node.getGrantedActionsMask() != null)) {
             result.grantedActionsMask = node.getGrantedActionsMask();
+        }
+        if (!result.isResourceMountModeResolved() && node.getResourceMountMode() != null) {
+            result.resourceMountMode = node.getResourceMountMode();
+                result.resourceMountSpecifiedUsers = node.getResourceMountSpecifiedUsers() != null ? node.getResourceMountSpecifiedUsers()
+                    : Collections.emptyList();
         }
     }
 }

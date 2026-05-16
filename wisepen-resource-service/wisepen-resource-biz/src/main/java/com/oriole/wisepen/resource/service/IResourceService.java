@@ -24,6 +24,8 @@ public interface IResourceService {
 
     void updateResourceTags(ResourceUpdateTagsRequest req);
 
+    void assertResourceMountPermission(String userId, String groupId, GroupRoleType groupRole, List<String> tagIds);
+
     void updateResourceActionPermission(ResourceUpdateActionPermissionRequest req);
 
     PageResult<ResourceItemResponse> listResources(String currentUserId,
