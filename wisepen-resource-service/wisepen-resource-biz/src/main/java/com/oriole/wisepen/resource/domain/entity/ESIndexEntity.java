@@ -74,7 +74,7 @@ public class ESIndexEntity {
     @Field(type = FieldType.Nested)
     private List<GroupAcl> groupAcls;
 
-    @Field(type = FieldType.Keyword)
+    @Field(type = FieldType.Text, analyzer = SearchConstants.ANALYZER_IK_MAX_WORD, searchAnalyzer = SearchConstants.ANALYZER_IK_SMART)
     private List<String> tags;
 
     /** 同时支持 ISO 标准格式、空格分隔格式和毫秒时间戳，便于异构上游推数据 */

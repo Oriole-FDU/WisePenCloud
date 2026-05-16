@@ -162,7 +162,8 @@ public class SearchQueryServiceImpl implements ISearchQueryService {
                 .build();
         Highlight highlight = new Highlight(hlParams, List.of(
                 new HighlightField(SearchConstants.FIELD_RESOURCE_NAME),
-                new HighlightField(SearchConstants.FIELD_CONTENT)));
+                new HighlightField(SearchConstants.FIELD_CONTENT),
+                new HighlightField(SearchConstants.FIELD_TAGS)));
 
         return new NativeQueryBuilder()
                 .withQuery(query)
@@ -184,10 +185,16 @@ public class SearchQueryServiceImpl implements ISearchQueryService {
                 ? StrUtil.join(SearchConstants.HIGHLIGHT_FRAGMENT_SEPARATOR, contentHighlights)
                 : null;
 
+        List<String> tagHighlights = hit.getHighlightField(SearchConstants.FIELD_TAGS);
+        String tagResult = CollUtil.isNotEmpty(tagHighlights)
+                ? StrUtil.join(SearchConstants.TAG_SEPARATOR, tagHighlights)
+                : null;
+
         return SearchHitItemResponse.builder()
                 .resourceId(entity.getResourceId())
                 .resourceType(ResourceType.fromExtension(entity.getResourceType()))
                 .resourceName(resourceName)
+                .tags(tagResult)
                 .highlightContent(highlightContent)
                 .updateTime(entity.getUpdateTime())
                 .build();

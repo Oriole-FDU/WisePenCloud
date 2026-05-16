@@ -36,4 +36,6 @@ public class SearchHitItemResponse implements Serializable {
     private String highlightContent;
 
     private LocalDateTime updateTime;
+
+    private String tags;
 }

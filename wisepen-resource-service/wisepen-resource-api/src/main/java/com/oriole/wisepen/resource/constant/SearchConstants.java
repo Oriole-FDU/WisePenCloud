@@ -63,7 +63,7 @@ public interface SearchConstants {
      */
     String ES_DATE_FORMAT_PATTERN = "uuuu-MM-dd'T'HH:mm:ss||uuuu-MM-dd HH:mm:ss||epoch_millis";
 
-    List<String> BOOSTED_SEARCH_FIELDS= List.of("resourceName^3", "content");
+    List<String> BOOSTED_SEARCH_FIELDS= List.of("resourceName^3", "tags^2", "content");
 
 
     /** 资源类型 */
@@ -112,5 +112,8 @@ public interface SearchConstants {
 
     /** 多段高亮内容拼接时的分隔符 */
     String HIGHLIGHT_FRAGMENT_SEPARATOR = "...";
+
+    /** 多个标签拼接时的分隔符 */
+    String TAG_SEPARATOR = ",";
 
 }
