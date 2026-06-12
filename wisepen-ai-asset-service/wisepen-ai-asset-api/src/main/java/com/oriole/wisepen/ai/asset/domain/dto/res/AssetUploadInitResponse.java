@@ -14,7 +14,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SkillAssetUploadInitResponse implements Serializable {
+public class AssetUploadInitResponse implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 

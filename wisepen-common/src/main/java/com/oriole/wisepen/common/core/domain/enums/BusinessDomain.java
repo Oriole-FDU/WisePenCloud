@@ -10,6 +10,7 @@ public enum BusinessDomain {
     DOCUMENT,
     NOTE,
     SKILL,
+    AGENT,
     STORAGE,
     FUDAN_EXTENSION;
 

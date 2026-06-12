@@ -2,7 +2,7 @@ package com.oriole.wisepen.ai.asset.consumer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.oriole.wisepen.ai.asset.service.ISkillVersionService;
+import com.oriole.wisepen.ai.asset.service.IVersionService;
 import com.oriole.wisepen.file.storage.api.domain.mq.FileUploadedMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,7 +16,7 @@ import static com.oriole.wisepen.file.storage.api.constant.MqTopicConstants.TOPI
 @RequiredArgsConstructor
 public class FileUploadedConsumer {
 
-    private final ISkillVersionService skillVersionService;
+    private final IVersionService skillVersionService;
     private final ObjectMapper objectMapper;
 
     @KafkaListener(topics = TOPIC_FILE_UPLOADED, groupId = "wisepen-skill-upload-callback-group")

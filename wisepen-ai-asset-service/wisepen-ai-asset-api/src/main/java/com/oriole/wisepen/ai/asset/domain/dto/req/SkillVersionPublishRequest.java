@@ -1,6 +1,6 @@
 package com.oriole.wisepen.ai.asset.domain.dto.req;
 
-import com.oriole.wisepen.ai.asset.constant.SkillValidationMsg;
+import com.oriole.wisepen.ai.asset.constant.AIAssetValidationMsg;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -13,6 +13,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class SkillVersionPublishRequest {
-    @NotBlank(message = SkillValidationMsg.SKILL_ID_NOT_BLANK)
+    @NotBlank(message = AIAssetValidationMsg.SKILL_ID_NOT_BLANK)
     private String resourceId;
 }

@@ -1,6 +1,6 @@
 package com.oriole.wisepen.ai.asset.domain.entity;
 
-import com.oriole.wisepen.ai.asset.domain.base.SkillVersionBundleBase;
+import com.oriole.wisepen.ai.asset.domain.base.VersionBundleBase;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.springframework.data.annotation.CreatedDate;
@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "wisepen_skill_versions")
-public class SkillVersionBundleEntity extends SkillVersionBundleBase {
+public class SkillVersionBundleEntity extends VersionBundleBase {
     @Id
     private String id;
 

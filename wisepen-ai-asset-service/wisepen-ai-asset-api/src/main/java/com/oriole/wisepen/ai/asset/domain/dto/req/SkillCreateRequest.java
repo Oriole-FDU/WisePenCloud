@@ -1,6 +1,6 @@
 package com.oriole.wisepen.ai.asset.domain.dto.req;
 
-import com.oriole.wisepen.ai.asset.constant.SkillValidationMsg;
+import com.oriole.wisepen.ai.asset.constant.AIAssetValidationMsg;
 import com.oriole.wisepen.ai.asset.enums.SkillSourceType;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class SkillCreateRequest {
-    @NotBlank(message = SkillValidationMsg.SKILL_TITLE_NOT_BLANK)
+    @NotBlank(message = AIAssetValidationMsg.SKILL_TITLE_NOT_BLANK)
     private String title;
 
     private String name;

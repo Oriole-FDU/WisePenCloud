@@ -1,7 +1,7 @@
 package com.oriole.wisepen.ai.asset.domain.base;
 
-import com.oriole.wisepen.ai.asset.enums.SkillAssetUploadStatus;
-import com.oriole.wisepen.ai.asset.enums.SkillAssetResourceType;
+import com.oriole.wisepen.ai.asset.enums.AssetUploadStatus;
+import com.oriole.wisepen.ai.asset.enums.AssetResourceType;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
@@ -9,12 +9,12 @@ import lombok.experimental.SuperBuilder;
 @Data
 @SuperBuilder
 @NoArgsConstructor
-public class SkillAssetInfoBase {
+public class AssetInfoBase {
     private String id;
     private String name;
     private String path;
     private String objectKey;
-    private SkillAssetResourceType skillAssetResourceType;
-    private SkillAssetUploadStatus uploadStatus;
+    private AssetResourceType skillAssetResourceType;
+    private AssetUploadStatus uploadStatus;
     private Long size;
 }

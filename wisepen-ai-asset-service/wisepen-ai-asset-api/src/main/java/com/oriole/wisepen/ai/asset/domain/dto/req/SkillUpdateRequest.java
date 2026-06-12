@@ -1,7 +1,7 @@
 package com.oriole.wisepen.ai.asset.domain.dto.req;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.oriole.wisepen.ai.asset.constant.SkillValidationMsg;
+import com.oriole.wisepen.ai.asset.constant.AIAssetValidationMsg;
 import jakarta.validation.constraints.AssertTrue;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -20,7 +20,7 @@ public class SkillUpdateRequest {
 
     private String description;
 
-    @AssertTrue(message = SkillValidationMsg.SKILL_ID_NOT_BLANK)
+    @AssertTrue(message = AIAssetValidationMsg.SKILL_ID_NOT_BLANK)
     @JsonIgnore
     public boolean isResourceIdPresent() {
         return StringUtils.hasText(resourceId);

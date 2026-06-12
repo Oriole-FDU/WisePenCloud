@@ -3,7 +3,7 @@ package com.oriole.wisepen.ai.asset.constant;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
-public interface SkillValidationMsg {
+public interface AIAssetValidationMsg {
     String SKILL_ID_NOT_BLANK = "Skill ID 不能为空";
     String SKILL_TITLE_NOT_BLANK = "Skill 标题不能为空";
     String SKILL_VERSION_NOT_BLANK = "Skill 版本不能为空";

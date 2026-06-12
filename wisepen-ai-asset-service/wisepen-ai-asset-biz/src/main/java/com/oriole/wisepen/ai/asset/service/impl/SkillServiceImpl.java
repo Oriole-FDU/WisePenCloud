@@ -10,7 +10,7 @@ import com.oriole.wisepen.ai.asset.enums.SkillSourceType;
 import com.oriole.wisepen.ai.asset.exception.SkillError;
 import com.oriole.wisepen.ai.asset.repository.SkillRepository;
 import com.oriole.wisepen.ai.asset.service.ISkillService;
-import com.oriole.wisepen.ai.asset.service.ISkillVersionService;
+import com.oriole.wisepen.ai.asset.service.IVersionService;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.resource.domain.dto.ResourceCreateReqDTO;
 import com.oriole.wisepen.resource.enums.ResourceType;
@@ -27,7 +27,7 @@ import java.util.List;
 public class SkillServiceImpl implements ISkillService {
 
     private final SkillRepository skillRepository;
-    private final ISkillVersionService skillVersionService;
+    private final IVersionService skillVersionService;
     private final RemoteResourceService remoteResourceService;
 
     @Override

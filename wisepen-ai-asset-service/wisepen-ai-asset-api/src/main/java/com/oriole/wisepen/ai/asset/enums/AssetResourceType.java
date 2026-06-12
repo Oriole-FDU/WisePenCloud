@@ -7,7 +7,7 @@ import lombok.Getter;
 
 @Getter
 @AllArgsConstructor
-public enum SkillAssetResourceType {
+public enum AssetResourceType {
     MD(1, "MD", "md"),
     PYTHON_SCRIPT(2, "PYTHON_SCRIPT", "py"),
     TEXT(3, "TEXT", "txt"),

@@ -2,22 +2,22 @@ package com.oriole.wisepen.ai.asset.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.IdUtil;
-import com.oriole.wisepen.ai.asset.domain.base.SkillAssetInfoBase;
-import com.oriole.wisepen.ai.asset.domain.dto.req.SkillAssetDeleteRequest;
-import com.oriole.wisepen.ai.asset.domain.dto.req.SkillAssetUploadInitRequest;
+import com.oriole.wisepen.ai.asset.domain.base.AssetInfoBase;
+import com.oriole.wisepen.ai.asset.domain.dto.req.AssetDeleteRequest;
+import com.oriole.wisepen.ai.asset.domain.dto.req.AssetUploadInitRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.req.SkillVersionPublishRequest;
-import com.oriole.wisepen.ai.asset.domain.dto.res.SkillAssetUploadInitResponse;
+import com.oriole.wisepen.ai.asset.domain.dto.res.AssetUploadInitResponse;
 import com.oriole.wisepen.ai.asset.domain.dto.res.SkillVersionBundleInfoResponse;
 import com.oriole.wisepen.ai.asset.domain.entity.SkillEntity;
 import com.oriole.wisepen.ai.asset.domain.entity.SkillVersionBundleEntity;
-import com.oriole.wisepen.ai.asset.enums.SkillAssetUploadStatus;
-import com.oriole.wisepen.ai.asset.enums.SkillAssetResourceType;
-import com.oriole.wisepen.ai.asset.enums.SkillVersionStatus;
+import com.oriole.wisepen.ai.asset.enums.AssetUploadStatus;
+import com.oriole.wisepen.ai.asset.enums.AssetResourceType;
+import com.oriole.wisepen.ai.asset.enums.VersionStatus;
 import com.oriole.wisepen.ai.asset.exception.SkillError;
-import com.oriole.wisepen.ai.asset.mq.KafkaSkillEventPublisher;
+import com.oriole.wisepen.ai.asset.mq.AIAssetEventPublisher;
 import com.oriole.wisepen.ai.asset.repository.SkillRepository;
 import com.oriole.wisepen.ai.asset.repository.SkillVersionBundleRepository;
-import com.oriole.wisepen.ai.asset.service.ISkillVersionService;
+import com.oriole.wisepen.ai.asset.service.IVersionService;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitRespDTO;
@@ -35,7 +35,7 @@ import java.util.*;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class SkillVersionServiceImpl implements ISkillVersionService {
+public class SkillVersionService implements IVersionService {
 
     private static final String ROOT_PATH = "/";
     private static final String MAIN_SKILL_MD = "SKILL.md";
@@ -43,14 +43,14 @@ public class SkillVersionServiceImpl implements ISkillVersionService {
     private final SkillRepository skillRepository;
     private final SkillVersionBundleRepository skillVersionBundleRepository;
     private final RemoteStorageService remoteStorageService;
-    private final KafkaSkillEventPublisher eventPublisher;
+    private final AIAssetEventPublisher eventPublisher;
 
     @Override
     public void createDraftSkillVersion(String resourceId, Integer draftVersion) {
         SkillVersionBundleEntity draft = SkillVersionBundleEntity.builder()
                 .resourceId(resourceId)
                 .version(draftVersion)
-                .status(SkillVersionStatus.DRAFT)
+                .status(VersionStatus.DRAFT)
                 .skillAssets(new ArrayList<>())
                 .build();
         // 如果不是首份草案(1)需要复制此前的资源列表
@@ -78,26 +78,26 @@ public class SkillVersionServiceImpl implements ISkillVersionService {
 
     @Override
     @Transactional
-    public SkillAssetUploadInitResponse initUploadSkillAssets(SkillAssetUploadInitRequest req) {
+    public AssetUploadInitResponse initUploadSkillAssets(AssetUploadInitRequest req) {
         // 检查当前是否是草案版本
         SkillVersionBundleEntity draft = skillVersionBundleRepository.findByResourceIdAndVersion(req.getResourceId(), req.getDraftVersion())
                 .orElseThrow(() -> new ServiceException(SkillError.SKILL_VERSION_NOT_FOUND));
-        if (draft.getStatus() != SkillVersionStatus.DRAFT) throw new ServiceException(SkillError.CANNOT_OPERATE_NON_DRAFT_SKILL_VERSION);
+        if (draft.getStatus() != VersionStatus.DRAFT) throw new ServiceException(SkillError.CANNOT_OPERATE_NON_DRAFT_SKILL_VERSION);
 
         Set<String> replacedObjectKeys = new HashSet<>();
 
-        SkillAssetUploadInitResponse response = SkillAssetUploadInitResponse.builder()
+        AssetUploadInitResponse response = AssetUploadInitResponse.builder()
                 .resourceId(req.getResourceId())
                 .version(draft.getVersion())
                 .build();
 
-        for (SkillAssetUploadInitRequest.SkillAssetUploadRequest assetReq : req.getAssets()) {
+        for (AssetUploadInitRequest.AssetUploadRequest assetReq : req.getAssets()) {
             // 校验 Path 和 Name 合法性
             validateDirectoryPath(assetReq.getPath());
             validateFileName(assetReq.getName());
             // 查找或新增目标 Asset
             // 找到旧 Asset 为覆盖，未找到则为新增 Asset
-            SkillAssetInfoBase asset = findOrCreateDraftAsset(draft, assetReq.getPath(), assetReq.getName(), assetReq.getSkillAssetResourceType());
+            AssetInfoBase asset = findOrCreateDraftAsset(draft, assetReq.getPath(), assetReq.getName(), assetReq.getSkillAssetResourceType());
             String oldObjectKey = asset.getObjectKey();
 
             UploadInitRespDTO uploadInitRespDTO;
@@ -118,9 +118,9 @@ public class SkillVersionServiceImpl implements ISkillVersionService {
 
             asset.setObjectKey(uploadInitRespDTO.getObjectKey());
             asset.setSize(assetReq.getExpectedSize());
-            asset.setUploadStatus(Boolean.TRUE.equals(uploadInitRespDTO.getFlashUploaded()) ? SkillAssetUploadStatus.AVAILABLE : SkillAssetUploadStatus.UPLOADING);
+            asset.setUploadStatus(Boolean.TRUE.equals(uploadInitRespDTO.getFlashUploaded()) ? AssetUploadStatus.AVAILABLE : AssetUploadStatus.UPLOADING);
 
-            SkillAssetUploadInitResponse.AssetUploadTicket assetUploadTicket = SkillAssetUploadInitResponse.AssetUploadTicket
+            AssetUploadInitResponse.AssetUploadTicket assetUploadTicket = AssetUploadInitResponse.AssetUploadTicket
                     .builder().assetId(asset.getId())
                     .path(asset.getPath())
                     .name(asset.getName()).build();
@@ -151,9 +151,9 @@ public class SkillVersionServiceImpl implements ISkillVersionService {
         }
     }
 
-    private SkillAssetInfoBase findOrCreateDraftAsset(SkillVersionBundleEntity draft, String path, String name, SkillAssetResourceType skillAssetResourceType) {
+    private AssetInfoBase findOrCreateDraftAsset(SkillVersionBundleEntity draft, String path, String name, AssetResourceType skillAssetResourceType) {
         if (draft.getSkillAssets() == null) draft.setSkillAssets(new ArrayList<>());
-        SkillAssetInfoBase asset;
+        AssetInfoBase asset;
         // 主 Asset
         if (ROOT_PATH.equals(path) && MAIN_SKILL_MD.equals(name)) {
             asset = draft.getMainSkillMD();
@@ -164,9 +164,9 @@ public class SkillVersionServiceImpl implements ISkillVersionService {
                     .findFirst().orElse(null);
         }
         if (asset == null) {
-            asset = SkillAssetInfoBase.builder().id(IdUtil.fastSimpleUUID())
+            asset = AssetInfoBase.builder().id(IdUtil.fastSimpleUUID())
                     .path(path).name(name).skillAssetResourceType(skillAssetResourceType)
-                    .uploadStatus(SkillAssetUploadStatus.UPLOADING)
+                    .uploadStatus(AssetUploadStatus.UPLOADING)
                     .build();
             // 主 Asset setMainSkillMD，非主 Asset 加入draft.getSkillAssets()
             if (ROOT_PATH.equals(path) && MAIN_SKILL_MD.equals(name)) draft.setMainSkillMD(asset);
@@ -176,11 +176,11 @@ public class SkillVersionServiceImpl implements ISkillVersionService {
     }
 
     @Override
-    public void deleteSkillAssets(SkillAssetDeleteRequest req) {
+    public void deleteSkillAssets(AssetDeleteRequest req) {
         // 检查是否是草案版本
         SkillVersionBundleEntity draft = skillVersionBundleRepository.findByResourceIdAndVersion(req.getResourceId(), req.getDraftVersion())
                 .orElseThrow(() -> new ServiceException(SkillError.SKILL_VERSION_NOT_FOUND));
-        if (draft.getStatus() != SkillVersionStatus.DRAFT) throw new ServiceException(SkillError.CANNOT_OPERATE_NON_DRAFT_SKILL_VERSION);
+        if (draft.getStatus() != VersionStatus.DRAFT) throw new ServiceException(SkillError.CANNOT_OPERATE_NON_DRAFT_SKILL_VERSION);
 
         Set<String> removedObjectKeys = new HashSet<>();
 
@@ -189,7 +189,7 @@ public class SkillVersionServiceImpl implements ISkillVersionService {
                 removedObjectKeys.add(draft.getMainSkillMD().getObjectKey());
                 draft.setMainSkillMD(null);
             } else {
-                SkillAssetInfoBase removed = draft.getSkillAssets().stream()
+                AssetInfoBase removed = draft.getSkillAssets().stream()
                         .filter(asset -> assetId.equals(asset.getId()))
                         .findFirst()
                         .orElse(null);
@@ -232,7 +232,7 @@ public class SkillVersionServiceImpl implements ISkillVersionService {
         // 检查当否是草案版本
         SkillVersionBundleEntity draft = skillVersionBundleRepository.findByResourceIdAndVersion(req.getResourceId(), draftVersion)
                 .orElseThrow(() -> new ServiceException(SkillError.SKILL_VERSION_NOT_FOUND));
-        if (draft.getStatus() != SkillVersionStatus.DRAFT) throw new ServiceException(SkillError.CANNOT_OPERATE_NON_DRAFT_SKILL_VERSION);
+        if (draft.getStatus() != VersionStatus.DRAFT) throw new ServiceException(SkillError.CANNOT_OPERATE_NON_DRAFT_SKILL_VERSION);
         // 核心资源缺失
         if (isSkillDraftUnavailable(draft.getMainSkillMD())) {
             throw new ServiceException(SkillError.SKILL_CORE_ASSET_NOT_FOUND);
@@ -241,7 +241,7 @@ public class SkillVersionServiceImpl implements ISkillVersionService {
         if (draft.getSkillAssets() != null && draft.getSkillAssets().stream().anyMatch(this::isSkillDraftUnavailable)) {
             throw new ServiceException(SkillError.SKILL_ASSET_NOT_READY);
         }
-        draft.setStatus(SkillVersionStatus.PUBLISHED);
+        draft.setStatus(VersionStatus.PUBLISHED);
         skillRepository.updateVersionByResourceId(req.getResourceId(), draftVersion);
         skillVersionBundleRepository.save(draft);
 
@@ -249,10 +249,10 @@ public class SkillVersionServiceImpl implements ISkillVersionService {
         createDraftSkillVersion(req.getResourceId(), draftVersion + 1);
     }
 
-    private boolean isSkillDraftUnavailable(SkillAssetInfoBase asset) {
+    private boolean isSkillDraftUnavailable(AssetInfoBase asset) {
         return asset == null
                 || !StringUtils.hasText(asset.getObjectKey())
-                || asset.getUploadStatus() != SkillAssetUploadStatus.AVAILABLE;
+                || asset.getUploadStatus() != AssetUploadStatus.AVAILABLE;
     }
 
     @Override
@@ -268,7 +268,7 @@ public class SkillVersionServiceImpl implements ISkillVersionService {
             log.warn("skill asset upload compensated for missing version. objectKey={}", msg.getObjectKey());
             return;
         }
-        SkillAssetInfoBase asset = null;
+        AssetInfoBase asset = null;
         if (versionBundle.getMainSkillMD() != null && msg.getObjectKey().equals(versionBundle.getMainSkillMD().getObjectKey())) {
             asset = versionBundle.getMainSkillMD();
         } else { // version.getSkillAssets() 不可能为空，否则不可能找到 Skill 的版本
@@ -278,12 +278,12 @@ public class SkillVersionServiceImpl implements ISkillVersionService {
                     .orElse(null);
         }
         assert asset != null; // 断言 asset 不为空，因为否则不可能找到 Skill 的版本
-        if (asset.getUploadStatus() == SkillAssetUploadStatus.AVAILABLE) {
+        if (asset.getUploadStatus() == AssetUploadStatus.AVAILABLE) {
             return;
         }
 
         asset.setSize(msg.getSize());
-        asset.setUploadStatus(SkillAssetUploadStatus.AVAILABLE);
+        asset.setUploadStatus(AssetUploadStatus.AVAILABLE);
         skillVersionBundleRepository.save(versionBundle);
 
         log.info("skill asset upload handled. resourceId={} version={} assetId={} objectKey={}",

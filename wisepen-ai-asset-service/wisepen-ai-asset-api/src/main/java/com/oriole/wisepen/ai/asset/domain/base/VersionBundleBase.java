@@ -1,6 +1,6 @@
 package com.oriole.wisepen.ai.asset.domain.base;
 
-import com.oriole.wisepen.ai.asset.enums.SkillVersionStatus;
+import com.oriole.wisepen.ai.asset.enums.VersionStatus;
 import lombok.Builder.Default;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -12,10 +12,10 @@ import java.util.List;
 @Data
 @SuperBuilder
 @NoArgsConstructor
-public class SkillVersionBundleBase {
+public class VersionBundleBase {
     private Integer version;
-    private SkillAssetInfoBase mainSkillMD;
-    private SkillVersionStatus status;
+    private AssetInfoBase mainSkillMD;
+    private VersionStatus status;
     @Default
-    private List<SkillAssetInfoBase> skillAssets = new ArrayList<>();
+    private List<AssetInfoBase> skillAssets = new ArrayList<>();
 }

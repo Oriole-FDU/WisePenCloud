@@ -7,7 +7,7 @@ import com.oriole.wisepen.ai.asset.domain.dto.res.SkillInfoResponse;
 import com.oriole.wisepen.ai.asset.domain.dto.res.SkillMetaInfoResponse;
 import com.oriole.wisepen.ai.asset.exception.SkillError;
 import com.oriole.wisepen.ai.asset.service.ISkillService;
-import com.oriole.wisepen.ai.asset.service.ISkillVersionService;
+import com.oriole.wisepen.ai.asset.service.IVersionService;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class InternalSkillController {
 
     private final ISkillService skillService;
-    private final ISkillVersionService skillVersionService;
+    private final IVersionService skillVersionService;
 
     @GetMapping("/getSkillByResourceId")
     public R<SkillInfoResponse> getPublishedSkillByResourceId(@RequestParam String resourceId, @RequestParam(required = false) Integer skillVersion) {

@@ -7,7 +7,10 @@ import java.util.Locale;
 public enum AIAssetSubject implements IBusinessSubject {
     SKILL,
     SKILL_VERSION,
-    SKILL_ASSET;
+    SKILL_ASSET,
+    AGENT,
+    AGENT_VERSION,
+    AGENT_ASSET;
 
     @Override
     public String key() {

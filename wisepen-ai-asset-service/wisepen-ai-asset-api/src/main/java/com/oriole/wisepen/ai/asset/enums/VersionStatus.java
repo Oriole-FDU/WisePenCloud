@@ -7,9 +7,9 @@ import lombok.Getter;
 
 @Getter
 @AllArgsConstructor
-public enum SkillAssetUploadStatus {
-    UPLOADING(1, "UPLOADING"),
-    AVAILABLE(2, "AVAILABLE");
+public enum VersionStatus {
+    DRAFT(1,"DRAFT"),
+    PUBLISHED(2,"PUBLISHED");
 
     private final int code;
 

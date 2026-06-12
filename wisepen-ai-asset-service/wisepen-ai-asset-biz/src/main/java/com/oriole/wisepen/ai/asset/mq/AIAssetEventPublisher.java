@@ -18,7 +18,7 @@ import static com.oriole.wisepen.file.storage.api.constant.MqTopicConstants.TOPI
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class KafkaSkillEventPublisher {
+public class AIAssetEventPublisher {
 
     @Resource
     ReliablePublisher reliablePublisher;

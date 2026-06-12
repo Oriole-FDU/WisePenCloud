@@ -1,17 +1,17 @@
 package com.oriole.wisepen.ai.asset.controller;
 
 import com.oriole.wisepen.ai.asset.domain.base.SkillInfoBase;
-import com.oriole.wisepen.ai.asset.domain.dto.req.SkillAssetDeleteRequest;
-import com.oriole.wisepen.ai.asset.domain.dto.req.SkillAssetUploadInitRequest;
+import com.oriole.wisepen.ai.asset.domain.dto.req.AssetDeleteRequest;
+import com.oriole.wisepen.ai.asset.domain.dto.req.AssetUploadInitRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.req.SkillCreateRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.req.SkillUpdateRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.req.SkillVersionPublishRequest;
-import com.oriole.wisepen.ai.asset.domain.dto.res.SkillAssetUploadInitResponse;
+import com.oriole.wisepen.ai.asset.domain.dto.res.AssetUploadInitResponse;
 import com.oriole.wisepen.ai.asset.domain.dto.res.SkillResourceInfoResponse;
 import com.oriole.wisepen.ai.asset.domain.dto.res.SkillVersionBundleInfoResponse;
 import com.oriole.wisepen.ai.asset.exception.SkillError;
 import com.oriole.wisepen.ai.asset.service.ISkillService;
-import com.oriole.wisepen.ai.asset.service.ISkillVersionService;
+import com.oriole.wisepen.ai.asset.service.IVersionService;
 import com.oriole.wisepen.common.core.context.SecurityContextHolder;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.enums.BusinessType;
@@ -42,7 +42,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class SkillController {
 
     private final ISkillService skillService;
-    private final ISkillVersionService skillVersionService;
+    private final IVersionService skillVersionService;
     private final RemoteResourceService remoteResourceService;
 
     @Operation(
@@ -154,9 +154,9 @@ public class SkillController {
     )
     @Log(title = "上传 Skill 资源", businessType = BusinessType.INSERT)
     @PostMapping("/initUploadSkillAssets")
-    public R<SkillAssetUploadInitResponse> initUploadSkillAssets(@Validated @RequestBody SkillAssetUploadInitRequest request) {
+    public R<AssetUploadInitResponse> initUploadSkillAssets(@Validated @RequestBody AssetUploadInitRequest request) {
         assertSkillOwner(request.getResourceId());
-        SkillAssetUploadInitResponse skillAssetUploadInitResponse = skillVersionService.initUploadSkillAssets(request);
+        AssetUploadInitResponse skillAssetUploadInitResponse = skillVersionService.initUploadSkillAssets(request);
         return R.ok(skillAssetUploadInitResponse);
     }
 
@@ -173,7 +173,7 @@ public class SkillController {
     )
     @Log(title = "Delete Skill asset", businessType = BusinessType.DELETE)
     @PostMapping("/deleteSkillAssets")
-    public R<Void> deleteSkillAssets(@Validated @RequestBody SkillAssetDeleteRequest request) {
+    public R<Void> deleteSkillAssets(@Validated @RequestBody AssetDeleteRequest request) {
         assertSkillOwner(request.getResourceId());
         skillVersionService.deleteSkillAssets(request);
         return R.ok();

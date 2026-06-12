@@ -1,6 +1,6 @@
 package com.oriole.wisepen.ai.asset.domain.dto.req;
 
-import com.oriole.wisepen.ai.asset.constant.SkillValidationMsg;
+import com.oriole.wisepen.ai.asset.constant.AIAssetValidationMsg;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -16,13 +16,13 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SkillAssetDeleteRequest {
-    @NotBlank(message = SkillValidationMsg.SKILL_ID_NOT_BLANK)
+public class AssetDeleteRequest {
+    @NotBlank(message = AIAssetValidationMsg.SKILL_ID_NOT_BLANK)
     private String resourceId;
 
     private Integer draftVersion;
 
     @Valid
-    @NotEmpty(message = SkillValidationMsg.SKILL_ASSET_LIST_NOT_EMPTY)
+    @NotEmpty(message = AIAssetValidationMsg.SKILL_ASSET_LIST_NOT_EMPTY)
     private List<String> assetIds = new ArrayList<>();
 }
