@@ -1,15 +1,18 @@
 package com.oriole.wisepen.user.controller;
 
 import com.oriole.wisepen.common.core.context.SecurityContextHolder;
+import com.oriole.wisepen.common.core.domain.PageR;
+import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.log.annotation.Log;
-import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.security.annotation.CheckLogin;
-import com.oriole.wisepen.user.api.domain.dto.req.UserInfoUpdateRequest;
-import com.oriole.wisepen.user.api.domain.dto.res.UserDetailInfoResponse;
 import com.oriole.wisepen.user.api.domain.dto.VerificationResultDTO;
+import com.oriole.wisepen.user.api.domain.dto.req.UserInfoUpdateRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.UserProfileUpdateRequest;
+import com.oriole.wisepen.user.api.domain.dto.res.UserDetailInfoResponse;
+import com.oriole.wisepen.user.api.domain.dto.res.UserSearchResponse;
 import com.oriole.wisepen.user.api.enums.UserVerificationMode;
+import com.oriole.wisepen.user.service.ISearchUserService;
 import com.oriole.wisepen.user.service.IUserService;
 import com.oriole.wisepen.user.strategy.VerificationStrategyFactory;
 import io.swagger.v3.oas.annotations.Operation;
@@ -18,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Tag(name = "用户资料", description = "用户资料查询、更新与身份验证")
@@ -27,7 +31,36 @@ import java.util.Map;
 public class UserController {
 
     private final IUserService userService;
+    private final ISearchUserService searchUserService;
     private final VerificationStrategyFactory verificationStrategyFactory;
+
+    @Operation(
+            summary = "搜索用户",
+            description = """
+                    - 用途：为登录用户提供按关键词查找其他用户的展示信息能力。
+                    - 请求：keyword 是可选搜索关键词；传入时 nickname、realName 使用模糊匹配，username、campusNo 使用精确匹配；groupIds 为空时使用当前用户已加入的小组范围，非空时限定在这些小组成员内；page 和 size 控制分页。
+                    - 约束：当前用户必须已登录；传入 groupIds 时，当前用户必须属于其中每一个小组。
+                    - 处理：查询状态正常的用户账号展示字段，不返回手机号、邮箱、账号状态或密码等敏感信息；keyword 为空时返回小组范围内全部成员；按小组搜索时先校验请求者的小组成员身份，再按小组成员范围过滤。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；当前用户不属于任一请求小组 -> PermissionError.PERMISSION_DENIED。
+                    - 响应：返回匹配用户的分页展示信息列表。
+                    """
+    )
+    @CheckLogin
+    @GetMapping("/search")
+    @Log(title = "搜索用户", businessType = BusinessType.SELECT, isSaveResponseData = false)
+    public R<PageR<UserSearchResponse>> searchUsers(
+            @RequestParam(value = "keyword", required = false) String keyword,
+            @RequestParam(value = "groupIds", required = false) List<Long> groupIds,
+            @RequestParam(value = "page", defaultValue = "1") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
+        List<Long> searchGroupIds = groupIds;
+        if (groupIds != null && !groupIds.isEmpty()) {
+            groupIds.forEach(SecurityContextHolder::assertInGroup);
+        } else {
+            searchGroupIds = List.copyOf(SecurityContextHolder.getGroupRoleMap().keySet());
+        }
+        return R.ok(searchUserService.searchUsers(keyword, searchGroupIds, page, size));
+    }
 
     @Operation(
             summary = "获取当前用户信息",
