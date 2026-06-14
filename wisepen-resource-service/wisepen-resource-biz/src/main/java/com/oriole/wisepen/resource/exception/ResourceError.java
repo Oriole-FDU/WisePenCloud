@@ -48,10 +48,10 @@ public enum ResourceError implements IResult {
 
     // 小组资源管理模式异常
     CANNOT_CHANGE_FILE_ORG_LOGIC_FROM_TAG_TO_FOLDER(5611, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.FILE_ORG_LOGIC, ErrorReason.UNSUPPORTED), "小组资源管理模式不允许从TAG改为FOLDER"),
-    // 收藏相关异常 
+
+    // 收藏相关异常
     FAVORITE_COLLECTION_NOT_FOUND(5711, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.FAVORITE, ErrorReason.NOT_FOUND), "收藏集合不存在"),
-    FAVORITE_COLLECTION_ACCESS_DENIED(5721, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.FAVORITE, ErrorReason.PERMISSION_DENIED), "无权操作此收藏集合"),
-    DEFAULT_COLLECTION_CANNOT_DELETE(5731, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.FAVORITE, ErrorReason.NOT_ALLOWED), "默认收藏集合不可删除");
+    DEFAULT_COLLECTION_CANNOT_DELETE(5721, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.FAVORITE, ErrorReason.NOT_ALLOWED), "默认收藏集合不可删除");
 
     private final Integer code;
     private final ResultKey key;

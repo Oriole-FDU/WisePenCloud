@@ -14,7 +14,8 @@ public enum ResourceAction {
     VIEW(1 << 1),               // 2: 在线阅读
     EDIT(1 << 2),               // 4: 协同编辑
     DOWNLOAD_WATERMARK(1 << 3), // 8: 导出/下载带水印
-    DOWNLOAD_ORIGINAL(1 << 4);  // 16: 下载源文件
+    DOWNLOAD_ORIGINAL(1 << 4), // 16: 下载源文件
+    COMMENT_EDIT(1 << 5);      // 32: 编辑批注
 
     public static final int ALL_ACTIONS = (1 << values().length) - 1;
     public static final int DEFAULT_MEMBER_ACTIONS = DISCOVER.code | VIEW.code | DOWNLOAD_WATERMARK.code;
@@ -39,6 +40,10 @@ public enum ResourceAction {
             case VIEW:
                 // 阅读 必须包含 可见
                 mask |= DISCOVER.code;
+                break;
+            case COMMENT_EDIT:
+                // 编辑批注 必须包含 阅读和可见
+                mask |= VIEW.code | DISCOVER.code;
                 break;
             case DISCOVER:
                 // 列表可见 是最底层的，不隐含其他权限

@@ -16,8 +16,6 @@ public class ResourceItemResponse extends ResourceItemInfoBase {
     private String resourceId;
     private UserDisplayBase ownerInfo;
 
-    private ResourceInteractionInfoBase resourceInteractionInfo;
-
     private Map<String, String> currentTags;
     private List<ResourceAction> currentActions;
 

@@ -36,7 +36,7 @@ public class ResourceUserInteractionRecordEntity extends ResourceUserInteraction
     private LocalDateTime updateTime;
 
     public ResourceUserInteractionRecordEntity(String resourceId, String userId) {
-        super(false, false, null);
+        super();
         this.resourceId = resourceId;
         this.userId = userId;
     }

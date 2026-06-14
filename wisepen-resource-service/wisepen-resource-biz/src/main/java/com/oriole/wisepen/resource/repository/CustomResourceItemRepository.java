@@ -94,43 +94,29 @@ public class CustomResourceItemRepository {
         return new PageImpl<>(list, pageable, total);
     }
 
-    // ────────────────────────────────────────────────────────────────────────────
-    // interactionInfo 原子更新
-    // ────────────────────────────────────────────────────────────────────────────
-
-    /** 原子累加阅读量 */
-    public void incrementReadCount(String resourceId, int delta) {
-        incrementInteractionField(resourceId, "interactionInfo.readCount", delta);
+    /** 更新阅读量 */
+    public void updateReadCount(String resourceId, int delta) {
+        updateInteractionField(resourceId, "interactionInfo.readCount", delta);
     }
 
-    /** 原子累加点赞数 */
-    public void incrementLikeCount(String resourceId, int delta) {
-        incrementInteractionField(resourceId, "interactionInfo.likeCount", delta);
+    /** 更新点赞数 */
+    public void updateLikeCount(String resourceId, int delta) {
+        updateInteractionField(resourceId, "interactionInfo.likeCount", delta);
     }
 
-    /** 原子累加收藏数 */
-    public void incrementFavoriteCount(String resourceId, int delta) {
-        incrementInteractionField(resourceId, "interactionInfo.favoriteCount", delta);
+    /** 更新收藏数 */
+    public void updateFavoriteCount(String resourceId, int delta) {
+        updateInteractionField(resourceId, "interactionInfo.favoriteCount", delta);
     }
 
-    /**
-     * 批量递减收藏数，只更新已存在文档（非 upsert）。
-     * 调用方须已确认这些资源在其他收藏集合中均无引用。
-     */
-    public void decrementFavoriteCountForResources(List<String> resourceIds) {
+    public void updateFavoriteCount(List<String> resourceIds, int delta) {
         if (resourceIds.isEmpty()) return;
         Query query = Query.query(Criteria.where("_id").in(resourceIds));
-        Update update = new Update().inc("interactionInfo.favoriteCount", -1);
+        Update update = new Update().inc("interactionInfo.favoriteCount", delta);
         mongoTemplate.updateMulti(query, update, ResourceItemEntity.class);
     }
 
-    /**
-     * 原子更新评分统计（upsert 保证文档存在）。
-     *
-     * @param scoreCountDelta 首次评分传 1，覆盖评分传 0
-     * @param scoreTotalDelta 分数增量
-     */
-    public void updateScoreStats(String resourceId, int scoreCountDelta, int scoreTotalDelta) {
+    public void updateScore(String resourceId, int scoreCountDelta, int scoreTotalDelta) {
         Query query = Query.query(Criteria.where("_id").is(resourceId));
         Update update = new Update()
                 .inc("interactionInfo.scoreCount", scoreCountDelta)
@@ -139,7 +125,7 @@ public class CustomResourceItemRepository {
     }
 
     /** 单字段原子 $inc 模板 */
-    private void incrementInteractionField(String resourceId, String field, int delta) {
+    private void updateInteractionField(String resourceId, String field, int delta) {
         Query query = Query.query(Criteria.where("_id").is(resourceId));
         Update update = new Update().inc(field, delta);
         mongoTemplate.updateFirst(query, update, ResourceItemEntity.class);

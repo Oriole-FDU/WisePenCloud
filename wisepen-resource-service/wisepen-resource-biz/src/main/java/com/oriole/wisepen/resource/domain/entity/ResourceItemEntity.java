@@ -33,9 +33,6 @@ public class ResourceItemEntity extends ResourceItemInfoBase {
     /** 资源级绝对用户特权：若用户命中此 Map，直接返回该值，无视其他所有规则 */
     private Map<String, Integer> specifiedUsersGrantedActionsMask;
 
-    /** 阅读量、点赞、评分、收藏等统计数据，直接内嵌，避免跨集合查询 */
-    private ResourceInteractionInfoBase interactionInfo = new ResourceInteractionInfoBase();
-
     @CreatedDate
     private LocalDateTime createTime;
     @LastModifiedDate

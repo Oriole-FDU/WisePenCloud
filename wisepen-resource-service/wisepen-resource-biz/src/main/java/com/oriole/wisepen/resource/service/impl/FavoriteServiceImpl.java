@@ -4,8 +4,9 @@ import cn.hutool.core.bean.BeanUtil;
 import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.resource.domain.dto.req.FavoriteCollectionCreateRequest;
-import com.oriole.wisepen.resource.domain.dto.req.FavoriteCollectionItemRequest;
-import com.oriole.wisepen.resource.domain.dto.req.FavoriteCollectionUpdateRequest;
+import com.oriole.wisepen.resource.domain.dto.req.FavoriteCollectionDeleteRequest;
+import com.oriole.wisepen.resource.domain.dto.req.FavoriteCollectionInfoUpdateRequest;
+import com.oriole.wisepen.resource.domain.dto.req.ResourceFavoriteRequest;
 import com.oriole.wisepen.resource.domain.dto.res.FavoriteCollectionResponse;
 import com.oriole.wisepen.resource.domain.dto.res.FavoriteItemResponse;
 import com.oriole.wisepen.resource.domain.dto.res.ResourceItemResponse;
@@ -13,21 +14,32 @@ import com.oriole.wisepen.resource.domain.entity.FavoriteCollectionEntity;
 import com.oriole.wisepen.resource.domain.entity.FavoriteResourceRef;
 import com.oriole.wisepen.resource.domain.entity.ResourceItemEntity;
 import com.oriole.wisepen.resource.exception.ResourceError;
-import com.oriole.wisepen.resource.repository.CustomFavoriteCollectionRepository;
 import com.oriole.wisepen.resource.repository.CustomResourceItemRepository;
+import com.oriole.wisepen.resource.repository.CustomFavoriteCollectionRepository;
 import com.oriole.wisepen.resource.repository.FavoriteCollectionRepository;
+import com.oriole.wisepen.resource.repository.FavoriteResourceRefRepository;
 import com.oriole.wisepen.resource.repository.ResourceItemRepository;
 import com.oriole.wisepen.resource.service.IFavoriteService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
-import java.util.Comparator;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -36,50 +48,103 @@ import java.util.stream.Collectors;
 public class FavoriteServiceImpl implements IFavoriteService {
 
     private final FavoriteCollectionRepository favoriteCollectionRepository;
+    private final FavoriteResourceRefRepository favoriteResourceRefRepository;
     private final CustomFavoriteCollectionRepository customFavoriteCollectionRepository;
     private final CustomResourceItemRepository customResourceItemRepository;
     private final ResourceItemRepository resourceItemRepository;
 
     @Override
-    public void switchCollectionItem(FavoriteCollectionItemRequest request, String userId) {
+    @Transactional
+    public void changeResourceFavoriteStatus(ResourceFavoriteRequest request, String userId) {
         String resourceId = request.getResourceId();
+        // 检查资源是否存在
+        ResourceItemEntity targetResource = resourceItemRepository.findById(resourceId)
+                .orElseThrow(() -> new ServiceException(ResourceError.RESOURCE_NOT_FOUND));
+        if (targetResource.getDeletedAt() != null) throw new ServiceException(ResourceError.RESOURCE_NOT_FOUND);
 
-        // 确定目标收藏集合
-        FavoriteCollectionEntity collection;
-        if (StringUtils.hasText(request.getCollectionId())) {
-            collection = validateCollectionOwnership(request.getCollectionId(), userId);
-        } else {
-            collection = customFavoriteCollectionRepository.findOrCreateDefaultCollection(userId);
+        // 取消收藏
+        if (Boolean.FALSE.equals(request.getFavorite())) {
+            // 查找收藏记录
+            favoriteResourceRefRepository.findFirstByUserIdAndResourceId(userId, resourceId).ifPresent(ref -> {
+                // 移除资源收藏记录
+                favoriteResourceRefRepository.delete(ref);
+                // 扣减收藏次数（收藏夹与资源收藏计数）
+                customFavoriteCollectionRepository.updateItemCount(ref.getCollectionIds(), -1);
+                customResourceItemRepository.updateFavoriteCount(resourceId, -1);
+                log.info("resource favorite removed. resourceId={} userId={}", resourceId, userId);
+            });
+            return;
         }
-        String collectionId = collection.getCollectionId();
 
-        boolean alreadyInCollection = collection.getResources() != null
-                && collection.getResources().stream().anyMatch(r -> resourceId.equals(r.getResourceId()));
-
-        if (!alreadyInCollection) {
-            // 添加收藏：排除软删除资源（deletedAt != null 的资源对用户不可见）
-            ResourceItemEntity targetResource = resourceItemRepository.findById(resourceId)
-                    .orElseThrow(() -> new ServiceException(ResourceError.RESOURCE_NOT_FOUND));
-            if (targetResource.getDeletedAt() != null) {
-                throw new ServiceException(ResourceError.RESOURCE_NOT_FOUND);
-            }
-            customFavoriteCollectionRepository.addResource(collectionId, new FavoriteResourceRef(resourceId, LocalDateTime.now()));
-
-            // 首次收藏判断：若其他集合均不含该资源则 favoriteCount +1
-            if (isOnlyFavoriteCollection(userId, resourceId, collectionId)) {
-                customResourceItemRepository.incrementFavoriteCount(resourceId, 1);
-            }
-            log.info("resource favorited. resourceId={} collectionId={} userId={}", resourceId, collectionId, userId);
-        } else {
-            // 移除收藏
-            customFavoriteCollectionRepository.removeResource(collectionId, resourceId);
-
-            // 若其他集合均不含该资源则 favoriteCount -1
-            if (isOnlyFavoriteCollection(userId, resourceId, collectionId)) {
-                customResourceItemRepository.incrementFavoriteCount(resourceId, -1);
-            }
-            log.info("resource unfavorited. resourceId={} collectionId={} userId={}", resourceId, collectionId, userId);
+        Set<String> collectionIds = normalizeCollectionIds(request.getCollectionIds());
+        // 无收藏夹列表，兜底为默认收藏夹
+        if (collectionIds.isEmpty()) {
+            collectionIds = Set.of(getDefaultCollection(userId).getCollectionId());
         }
+
+        // 列出收藏夹
+        List<FavoriteCollectionEntity> collections =
+                favoriteCollectionRepository.findByCollectionIdInAndUserId(collectionIds, userId);
+
+        // 检查收藏夹ID有效性
+        Set<String> foundIds = collections.stream()
+                .map(FavoriteCollectionEntity::getCollectionId)
+                .collect(Collectors.toSet());
+        if (!foundIds.containsAll(collectionIds)) {
+            throw new ServiceException(ResourceError.FAVORITE_COLLECTION_NOT_FOUND);
+        }
+
+        // 查找收藏记录
+        FavoriteResourceRef ref = favoriteResourceRefRepository.findFirstByUserIdAndResourceId(userId, resourceId).orElse(null);
+        if (ref == null) { // 为空时新建
+            favoriteResourceRefRepository.save(FavoriteResourceRef.builder()
+                    .userId(userId).resourceId(resourceId)
+                    .collectionIds(collectionIds.stream().toList()).build()
+            );
+            // 增加收藏次数（收藏夹与资源收藏计数）
+            customFavoriteCollectionRepository.updateItemCount(collectionIds, 1);
+            customResourceItemRepository.updateFavoriteCount(resourceId, 1);
+            log.info("resource favorite created. resourceId={} userId={} collectionCount={}", resourceId, userId, collectionIds.size());
+            return;
+        }
+
+        // 确定新增和删除的收藏夹
+        List<String> oldCollectionIds = ref.getCollectionIds();
+        List<String> newCollectionIds = collectionIds.stream().toList();
+        List<String> addedCollectionIds = newCollectionIds.stream().filter(id -> !oldCollectionIds.contains(id)).toList();
+        List<String> removedCollectionIds = oldCollectionIds.stream().filter(id -> !newCollectionIds.contains(id)).toList();
+
+        if (addedCollectionIds.isEmpty() && removedCollectionIds.isEmpty()) return; // 无变动，直接返回
+
+        // 保存变更
+        ref.setCollectionIds(collectionIds.stream().toList());
+        if (!addedCollectionIds.isEmpty()) ref.setFavoritedAt(LocalDateTime.now());
+        favoriteResourceRefRepository.save(ref);
+
+        // 变更收藏次数（收藏夹计数）
+        customFavoriteCollectionRepository.updateItemCount(addedCollectionIds, 1);
+        customFavoriteCollectionRepository.updateItemCount(removedCollectionIds, -1);
+        log.info("resource favorite updated. resourceId={} userId={} collectionCount={}", resourceId, userId, collectionIds.size());
+    }
+
+    private Set<String> normalizeCollectionIds(List<String> collectionIds) {
+        if (CollectionUtils.isEmpty(collectionIds)) return new LinkedHashSet<>();
+        return collectionIds.stream().filter(StringUtils::hasText).collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private FavoriteCollectionEntity getDefaultCollection(String userId) {
+        return favoriteCollectionRepository.findFirstByUserIdAndIsDefaultTrue(userId).orElseGet(() -> {
+            FavoriteCollectionEntity newCollection = new FavoriteCollectionEntity(userId, null, null, true);
+            FavoriteCollectionEntity saved = favoriteCollectionRepository.save(newCollection);
+            log.info("default favorite collection created. collectionId={} userId={}", saved.getCollectionId(), userId);
+            return saved;
+        });
+    }
+
+    private FavoriteCollectionEntity getCollectionInfo(String collectionId, String userId) {
+        if (!StringUtils.hasText(collectionId)) return getDefaultCollection(userId);
+        return favoriteCollectionRepository.findFirstByCollectionIdAndUserId(collectionId, userId)
+                .orElseThrow(() -> new ServiceException(ResourceError.FAVORITE_COLLECTION_NOT_FOUND));
     }
 
     @Override
@@ -92,8 +157,8 @@ public class FavoriteServiceImpl implements IFavoriteService {
     }
 
     @Override
-    public void updateCollection(FavoriteCollectionUpdateRequest request, String userId) {
-        FavoriteCollectionEntity entity = validateCollectionOwnership(request.getCollectionId(), userId);
+    public void updateCollectionInfo(FavoriteCollectionInfoUpdateRequest request, String userId) {
+        FavoriteCollectionEntity entity = getCollectionInfo(request.getCollectionId(), userId);
         entity.setCollectionName(request.getCollectionName());
         entity.setDescription(request.getDescription());
         favoriteCollectionRepository.save(entity);
@@ -101,177 +166,99 @@ public class FavoriteServiceImpl implements IFavoriteService {
     }
 
     @Override
-    public void deleteCollection(String collectionId, String userId) {
-        FavoriteCollectionEntity collection = validateCollectionOwnership(collectionId, userId);
-        if (Boolean.TRUE.equals(collection.getIsDefault())) {
+    @Transactional
+    public void deleteCollection(FavoriteCollectionDeleteRequest request, String userId) {
+        FavoriteCollectionEntity entity = getCollectionInfo(request.getCollectionId(), userId);
+        if (Boolean.TRUE.equals(entity.getIsDefault())) {
             throw new ServiceException(ResourceError.DEFAULT_COLLECTION_CANNOT_DELETE);
         }
+        // 查询受影响的资源
+        List<FavoriteResourceRef> affectedRefs =
+                favoriteResourceRefRepository.findByUserIdAndCollectionId(userId, request.getCollectionId());
 
-        // 批量计算并递减仅属于本集合的资源的 favoriteCount
-        List<String> resourceIdsInThisCollection = collection.getResources() == null
-            ? List.of()
-            : collection.getResources().stream().map(FavoriteResourceRef::getResourceId).toList();
-
-        int decrementCount = 0;
-        if (!resourceIdsInThisCollection.isEmpty()) {
-            List<FavoriteCollectionEntity> otherCollections = favoriteCollectionRepository
-                .findByUserIdOrderByIsDefaultDescCreateTimeDesc(userId).stream()
-                .filter(c -> !collectionId.equals(c.getCollectionId()))
-                .toList();
-
-            List<String> toDecrement = resourceIdsInThisCollection.stream()
-                .filter(rid -> otherCollections.stream()
-                    .noneMatch(c -> c.getResources() != null
-                        && c.getResources().stream().anyMatch(r -> rid.equals(r.getResourceId()))))
-                .toList();
-
-            customResourceItemRepository.decrementFavoriteCountForResources(toDecrement);
-            decrementCount = toDecrement.size();
+        String defaultCollectionId = null;
+        int movedToDefaultCount = 0; // 默认收藏夹移入计数
+        List<FavoriteResourceRef> deletedRefs = new ArrayList<>();
+        // 处理受影响的资源
+        for (FavoriteResourceRef ref: affectedRefs) {
+            List<String> collectionIds = ref.getCollectionIds().stream().filter(StringUtils::hasText)
+                    .filter(id -> !request.getCollectionId().equals(id)).collect(Collectors.toList());
+            // 收藏夹为空
+            if (collectionIds.isEmpty()) {
+                if (!request.getKeepResourcesToDefault()) deletedRefs.add(ref); // 直接删除，不保留
+                else { // 保留至默认收藏夹
+                    if (defaultCollectionId == null) defaultCollectionId = getDefaultCollection(userId).getCollectionId();
+                    collectionIds.add(defaultCollectionId);
+                    movedToDefaultCount++; // 默认收藏夹移入计数增加
+                }
+            }
+            ref.setCollectionIds(collectionIds);
         }
 
-        favoriteCollectionRepository.deleteById(collectionId);
-        log.info("favorite collection deleted. collectionId={} userId={} decrementCount={}",
-                collectionId, userId, decrementCount);
+        // 处理受影响的资源
+        if (!affectedRefs.isEmpty()) {
+            favoriteResourceRefRepository.saveAll(affectedRefs);
+            // 处理默认收藏夹移入计数
+            if (movedToDefaultCount > 0) {
+                customFavoriteCollectionRepository.updateItemCount(Collections.singletonList(defaultCollectionId), movedToDefaultCount);
+            }
+            if (!deletedRefs.isEmpty()) { // 如果有移除资源
+                favoriteResourceRefRepository.deleteAll(deletedRefs);
+                // 删除时扣减资源的收藏统计
+                customResourceItemRepository.updateFavoriteCount(deletedRefs.stream().map(FavoriteResourceRef::getResourceId).toList(), -1);
+            }
+        }
+
+        // 移除收藏夹
+        favoriteCollectionRepository.deleteById(request.getCollectionId());
+
+        log.info("favorite collection deleted. collectionId={} userId={} affectedRefCount={}",
+                request.getCollectionId(), userId, affectedRefs.size());
     }
 
     @Override
     public List<FavoriteCollectionResponse> listCollections(String userId) {
+        getDefaultCollection(userId); // 新建默认收藏夹
         List<FavoriteCollectionEntity> collections =
                 favoriteCollectionRepository.findByUserIdOrderByIsDefaultDescCreateTimeDesc(userId);
-        return collections.stream().map(c -> {
-            FavoriteCollectionResponse resp = new FavoriteCollectionResponse();
-            BeanUtil.copyProperties(c, resp);
-            resp.setItemCount(c.getResources() == null ? 0 : c.getResources().size());
-            return resp;
-        }).toList();
+        return collections.stream().map(entity -> BeanUtil.copyProperties(entity, FavoriteCollectionResponse.class)).toList();
     }
 
     @Override
-    public PageR<FavoriteItemResponse> listFavoritedResources(int page, int size, String userId) {
-        List<FavoriteCollectionEntity> collections =
-                favoriteCollectionRepository.findByUserIdOrderByIsDefaultDescCreateTimeDesc(userId);
-
-        // 拉平所有 resources，按 resourceId 去重，同一资源 favoritedAt 取最近的
-        Map<String, LocalDateTime> latestFavoritedAtMap = new HashMap<>();
-        for (FavoriteCollectionEntity c : collections) {
-            if (c.getResources() == null) continue;
-            for (FavoriteResourceRef ref : c.getResources()) {
-                latestFavoritedAtMap.merge(ref.getResourceId(), ref.getFavoritedAt(),
-                        (existing, newVal) -> newVal.isAfter(existing) ? newVal : existing);
-            }
-        }
-
-        // 按 favoritedAt 倒序排列后内存分页
-        List<Map.Entry<String, LocalDateTime>> sorted = latestFavoritedAtMap.entrySet().stream()
-                .sorted(Map.Entry.<String, LocalDateTime>comparingByValue(Comparator.nullsLast(Comparator.reverseOrder())))
-                .toList();
-
-        long total = sorted.size();
-        int skip = (page - 1) * size;
-        List<Map.Entry<String, LocalDateTime>> pageEntries = sorted.stream().skip(skip).limit(size).toList();
-
-        if (pageEntries.isEmpty()) {
-            return new PageR<>(total, page, size);
-        }
-
-        List<String> resourceIds = pageEntries.stream().map(Map.Entry::getKey).toList();
-        // 过滤软删除资源（deletedAt != null），软删除资源对用户不可见，accessible=false
-        Map<String, ResourceItemEntity> resourceMap = resourceItemRepository.findAllById(resourceIds).stream()
-                .filter(r -> r.getDeletedAt() == null)
-                .collect(Collectors.toMap(ResourceItemEntity::getResourceId, r -> r));
-
-        List<FavoriteItemResponse> respList = pageEntries.stream().map(entry -> {
-            String rid = entry.getKey();
-            FavoriteItemResponse resp = new FavoriteItemResponse();
-            resp.setFavoritedAt(entry.getValue());
-            boolean accessible = resourceMap.containsKey(rid);
-            resp.setAccessible(accessible);
-            resp.setResourceInfo(buildResourceItemResponse(rid, accessible, resourceMap));
-            return resp;
-        }).toList();
-
-        PageR<FavoriteItemResponse> pageR = new PageR<>(total, page, size);
-        pageR.addAll(respList);
-        return pageR;
-    }
-
-    @Override
-    public PageR<FavoriteItemResponse> listFavoritesByCollection(String collectionId, int page, int size, String userId) {
-        FavoriteCollectionEntity collection = validateCollectionOwnership(collectionId, userId);
-
-        List<FavoriteResourceRef> allRefs = collection.getResources() == null ? List.of() : collection.getResources();
-        // 按 favoritedAt 倒序
-        List<FavoriteResourceRef> sorted = allRefs.stream()
-                .sorted(Comparator.comparing(FavoriteResourceRef::getFavoritedAt,
-                        Comparator.nullsLast(Comparator.reverseOrder())))
-                .toList();
-
-        long total = sorted.size();
-        int skip = (page - 1) * size;
-        List<FavoriteResourceRef> pageRefs = sorted.stream().skip(skip).limit(size).toList();
-
-        if (pageRefs.isEmpty()) {
-            return new PageR<>(total, page, size);
-        }
-
-        List<String> resourceIds = pageRefs.stream().map(FavoriteResourceRef::getResourceId).toList();
-        // 过滤软删除资源（deletedAt != null），软删除资源对用户不可见，accessible=false
-        Map<String, ResourceItemEntity> resourceMap = resourceItemRepository.findAllById(resourceIds).stream()
-                .filter(r -> r.getDeletedAt() == null)
-                .collect(Collectors.toMap(ResourceItemEntity::getResourceId, r -> r));
-
-        List<FavoriteItemResponse> respList = pageRefs.stream().map(ref -> {
-            FavoriteItemResponse resp = new FavoriteItemResponse();
-            resp.setFavoritedAt(ref.getFavoritedAt());
-            boolean accessible = resourceMap.containsKey(ref.getResourceId());
-            resp.setAccessible(accessible);
-            resp.setResourceInfo(buildResourceItemResponse(ref.getResourceId(), accessible, resourceMap));
-            return resp;
-        }).toList();
-
-        PageR<FavoriteItemResponse> pageR = new PageR<>(total, page, size);
-        pageR.addAll(respList);
-        return pageR;
-    }
-
-    @Override
-    public List<String> listResourceCollections(String resourceId, String userId) {
-        return favoriteCollectionRepository.findByUserIdOrderByIsDefaultDescCreateTimeDesc(userId).stream()
-                .filter(c -> c.getResources() != null
-                        && c.getResources().stream().anyMatch(r -> resourceId.equals(r.getResourceId())))
-                .map(FavoriteCollectionEntity::getCollectionId)
-                .toList();
-    }
-
-    // 内部辅助方法
-
-    private FavoriteCollectionEntity validateCollectionOwnership(String collectionId, String userId) {
-        FavoriteCollectionEntity entity = favoriteCollectionRepository.findById(collectionId)
-                .orElseThrow(() -> new ServiceException(ResourceError.FAVORITE_COLLECTION_NOT_FOUND));
-        if (!userId.equals(entity.getUserId())) {
-            throw new ServiceException(ResourceError.FAVORITE_COLLECTION_ACCESS_DENIED);
-        }
-        return entity;
-    }
-
-    /** 判断 excludeCollectionId 之外的其他收藏集合是否均不含此资源（首次/最后一次收藏的统一判断条件） */
-    private boolean isOnlyFavoriteCollection(String userId, String resourceId, String excludeCollectionId) {
-        return favoriteCollectionRepository.findByUserIdOrderByIsDefaultDescCreateTimeDesc(userId).stream()
-                .filter(c -> !excludeCollectionId.equals(c.getCollectionId()))
-                .noneMatch(c -> c.getResources() != null
-                        && c.getResources().stream().anyMatch(r -> resourceId.equals(r.getResourceId())));
-    }
-
-    private ResourceItemResponse buildResourceItemResponse(String resourceId, boolean accessible,
-            Map<String, ResourceItemEntity> resourceMap) {
-        ResourceItemResponse resourceInfo = new ResourceItemResponse();
-        if (accessible) {
-            ResourceItemEntity entity = resourceMap.get(resourceId);
-            BeanUtil.copyProperties(entity, resourceInfo);
-            resourceInfo.setResourceInteractionInfo(entity.getInteractionInfo());
+    public PageR<FavoriteItemResponse> listFavoritedResources(String collectionId, int page, int size, String userId) {
+        Pageable pageable =  PageRequest.of(page - 1, size, Sort.by(Sort.Order.desc("favoritedAt"), Sort.Order.desc("id")));
+        Page<FavoriteResourceRef> refPage;
+        if (collectionId != null){
+            getCollectionInfo(collectionId, userId);
+            refPage = favoriteResourceRefRepository.findByUserIdAndCollectionId(userId, collectionId, pageable);
         } else {
-            resourceInfo.setResourceId(resourceId);
+            refPage = favoriteResourceRefRepository.findByUserId(userId, pageable);
         }
-        return resourceInfo;
+
+        List<String> resourceIds = refPage.getContent().stream()
+                .map(FavoriteResourceRef::getResourceId).filter(StringUtils::hasText).toList();
+
+        Map<String, ResourceItemEntity> resourceMap = new HashMap<>();
+        // 批量查询 resourceItem
+        if (!resourceIds.isEmpty()) {
+            resourceItemRepository.findAllById(resourceIds).forEach(entity -> resourceMap.put(entity.getResourceId(), entity));
+        }
+
+        List<FavoriteItemResponse> responses = refPage.getContent().stream()
+                .map(ref -> {
+                    FavoriteItemResponse favoriteItemResponse = BeanUtil.copyProperties(ref, FavoriteItemResponse.class);
+                    ResourceItemEntity resourceItemEntity = resourceMap.get(ref.getResourceId());
+                    if (resourceItemEntity == null || resourceItemEntity.getDeletedAt() != null) {
+                        favoriteItemResponse.setAccessible(false);
+                        return favoriteItemResponse;
+                    }
+                    favoriteItemResponse.setAccessible(true);
+                    favoriteItemResponse.setResourceInfo(BeanUtil.copyProperties(resourceItemEntity, ResourceItemResponse.class));
+                    return favoriteItemResponse;
+                }).toList();
+
+        PageR<FavoriteItemResponse> pageR = new PageR<>(refPage.getTotalElements(), page, size);
+        pageR.addAll(responses);
+        return pageR;
     }
 }

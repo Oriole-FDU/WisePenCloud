@@ -7,21 +7,17 @@ import com.oriole.wisepen.resource.domain.dto.req.ResourceRateRequest;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceLikeRequest;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceReadRequest;
 import com.oriole.wisepen.resource.domain.dto.res.ResourceUserInteractionRecordResponse;
-import com.oriole.wisepen.resource.domain.entity.FavoriteCollectionEntity;
 import com.oriole.wisepen.resource.domain.entity.ResourceItemEntity;
 import com.oriole.wisepen.resource.domain.entity.ResourceUserInteractionRecordEntity;
 import com.oriole.wisepen.resource.exception.ResourceError;
 import com.oriole.wisepen.resource.repository.CustomResourceItemRepository;
 import com.oriole.wisepen.resource.repository.CustomResourceUserInteractionRecordRepository;
-import com.oriole.wisepen.resource.repository.FavoriteCollectionRepository;
 import com.oriole.wisepen.resource.repository.ResourceItemRepository;
 import com.oriole.wisepen.resource.repository.ResourceUserInteractionRecordRepository;
 import com.oriole.wisepen.resource.service.IResourceInteractionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 @Slf4j
@@ -32,7 +28,6 @@ public class ResourceInteractionServiceImpl implements IResourceInteractionServi
     private final ResourceUserInteractionRecordRepository resourceUserInteractRecordRepository;
     private final CustomResourceItemRepository customResourceItemRepository;
     private final CustomResourceUserInteractionRecordRepository customResourceUserInteractionRecordRepository;
-    private final FavoriteCollectionRepository favoriteCollectionRepository;
 
     private final RedisCacheManager redisCacheManager;
 
@@ -41,18 +36,7 @@ public class ResourceInteractionServiceImpl implements IResourceInteractionServi
         ResourceUserInteractionRecordEntity interactionRecord = resourceUserInteractRecordRepository
                 .findByUserIdAndResourceId(userId, resourceId)
                 .orElseGet(() -> new ResourceUserInteractionRecordEntity(resourceId, userId));
-        ResourceUserInteractionRecordResponse resp = BeanUtil.copyProperties(interactionRecord, ResourceUserInteractionRecordResponse.class);
-
-        // 收藏状态从 wisepen_favorite_collections.resources 计算，不再依赖互动记录
-        List<FavoriteCollectionEntity> collections = favoriteCollectionRepository.findByUserIdOrderByIsDefaultDescCreateTimeDesc(userId);
-        List<String> favoritedCollectionIds = collections.stream()
-                .filter(c -> c.getResources() != null
-                        && c.getResources().stream().anyMatch(r -> resourceId.equals(r.getResourceId())))
-                .map(FavoriteCollectionEntity::getCollectionId)
-                .toList();
-        resp.setFavorited(!favoritedCollectionIds.isEmpty());
-        resp.setFavoritedCollectionIds(favoritedCollectionIds);
-        return resp;
+        return BeanUtil.copyProperties(interactionRecord, ResourceUserInteractionRecordResponse.class);
     }
 
     @Override
@@ -61,13 +45,12 @@ public class ResourceInteractionServiceImpl implements IResourceInteractionServi
         // 软删除资源对用户不可见，拒绝记录互动
         ResourceItemEntity resource = resourceItemRepository.findById(resourceId)
                 .orElseThrow(() -> new ServiceException(ResourceError.RESOURCE_NOT_FOUND));
-        if (resource.getDeletedAt() != null) {
-            throw new ServiceException(ResourceError.RESOURCE_NOT_FOUND);
-        }
+        if (resource.getDeletedAt() != null) throw new ServiceException(ResourceError.RESOURCE_NOT_FOUND);
+        // 检查是否在窗口期中的第一次阅读
         Boolean isFirstReadInWindow = redisCacheManager.isFirstReadInWindow(resourceId, userId);
         if (Boolean.TRUE.equals(isFirstReadInWindow)) {
             customResourceUserInteractionRecordRepository.findAndSetRead(resourceId, userId, true);
-            customResourceItemRepository.incrementReadCount(resourceId, 1);
+            customResourceItemRepository.updateReadCount(resourceId, 1);
             log.info("resource read count incremented. resourceId={} userId={}", resourceId, userId);
         }
     }
@@ -87,7 +70,7 @@ public class ResourceInteractionServiceImpl implements IResourceInteractionServi
                 .orElse(false);
         boolean wantLiked = !currentLiked;
         customResourceUserInteractionRecordRepository.findAndSetLiked(resourceId, userId, wantLiked);
-        customResourceItemRepository.incrementLikeCount(resourceId, wantLiked ? 1 : -1);
+        customResourceItemRepository.updateLikeCount(resourceId, wantLiked ? 1 : -1);
         log.info("resource like toggled. resourceId={} userId={} wantLiked={}", resourceId, userId, wantLiked);
     }
 
@@ -105,9 +88,9 @@ public class ResourceInteractionServiceImpl implements IResourceInteractionServi
                 customResourceUserInteractionRecordRepository.findAndSetScore(resourceId, userId, newScore);
         Integer oldScore = oldRecord == null ? null : oldRecord.getScore();
         if (oldScore == null) { // 首次评分
-            customResourceItemRepository.updateScoreStats(resourceId, 1, newScore);
+            customResourceItemRepository.updateScore(resourceId, 1, newScore);
         } else if (!oldScore.equals(newScore)) { // 改分
-            customResourceItemRepository.updateScoreStats(resourceId, 0, newScore - oldScore);
+            customResourceItemRepository.updateScore(resourceId, 0, newScore - oldScore);
         }
         log.info("resource rating changed. resourceId={} userId={} oldScore={} newScore={}",
                 resourceId, userId, oldScore, newScore);

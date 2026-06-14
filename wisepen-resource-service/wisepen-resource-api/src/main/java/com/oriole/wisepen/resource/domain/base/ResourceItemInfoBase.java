@@ -16,4 +16,7 @@ public class ResourceItemInfoBase {
     private String ownerId;           // 所有者
     private String preview;           // 可选：预览图
     private Long size;                // 可选：文件大小/字数摘要
+
+    /** 阅读量、点赞、评分、收藏等统计数据 */
+    private ResourceInteractionInfoBase resourceInteractionInfo;
 }

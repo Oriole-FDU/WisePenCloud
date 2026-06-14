@@ -10,7 +10,7 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ResourceUserInteractionRecordBase {
-    private Boolean read;   // 用户是否阅读过该资源
-    private Boolean liked;  // 用户是否赞过该资源
+    private Boolean read = false;   // 用户是否阅读过该资源
+    private Boolean liked = false;  // 用户是否赞过该资源
     private Integer score;  // 用户对该资源的评分
 }

@@ -3,9 +3,10 @@ package com.oriole.wisepen.resource.domain.base;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
 
-/** 收藏集合公共字段基类 */
 @Data
+@SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
 public class FavoriteCollectionBase {

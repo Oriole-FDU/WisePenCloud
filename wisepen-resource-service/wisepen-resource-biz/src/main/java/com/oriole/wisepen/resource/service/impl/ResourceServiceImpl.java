@@ -14,6 +14,7 @@ import com.oriole.wisepen.resource.domain.dto.*;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceRenameRequest;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceUpdateActionPermissionRequest;
 import com.oriole.wisepen.resource.domain.dto.res.ResourceItemResponse;
+import com.oriole.wisepen.resource.domain.entity.FavoriteResourceRef;
 import com.oriole.wisepen.resource.domain.entity.GroupResConfigEntity;
 import com.oriole.wisepen.resource.domain.entity.ResourceItemEntity;
 import com.oriole.wisepen.resource.domain.entity.TagEntity;
@@ -22,8 +23,9 @@ import com.oriole.wisepen.resource.event.TagChangedEvent;
 import com.oriole.wisepen.resource.event.TagDeletedEvent;
 import com.oriole.wisepen.resource.event.TagTrashedEvent;
 import com.oriole.wisepen.resource.exception.ResourceError;
-import com.oriole.wisepen.resource.repository.CustomFavoriteCollectionRepository;
 import com.oriole.wisepen.resource.repository.CustomResourceItemRepository;
+import com.oriole.wisepen.resource.repository.CustomFavoriteCollectionRepository;
+import com.oriole.wisepen.resource.repository.FavoriteResourceRefRepository;
 import com.oriole.wisepen.resource.repository.GroupResConfigRepository;
 import com.oriole.wisepen.resource.repository.ResourceItemRepository;
 import com.oriole.wisepen.resource.repository.ResourceUserInteractionRecordRepository;
@@ -68,6 +70,7 @@ public class ResourceServiceImpl implements IResourceService {
     private final CustomResourceItemRepository customResourceItemRepository;
     private final GroupResConfigRepository groupResConfigRepository;
     private final ResourceUserInteractionRecordRepository resourceUserInteractRecordRepository;
+    private final FavoriteResourceRefRepository favoriteResourceRefRepository;
     private final CustomFavoriteCollectionRepository customFavoriteCollectionRepository;
 
     private final IResourceEventPublisher eventPublisher;
@@ -335,8 +338,7 @@ public class ResourceServiceImpl implements IResourceService {
         }
 
         // 组装响应数据
-        ResourceItemResponse resp = new ResourceItemResponse();
-        BeanUtil.copyProperties(entity, resp);
+        ResourceItemResponse resp = BeanUtil.copyProperties(entity, ResourceItemResponse.class);
 
         resp.setCurrentActions(ResourceAction.permissionCodeToActions(currentActionsMask));
 
@@ -394,8 +396,6 @@ public class ResourceServiceImpl implements IResourceService {
             }
         }
 
-        // 互动信息直接读自 ResourceItemEntity.interactionInfo，无需额外查询
-        resp.setResourceInteractionInfo(entity.getInteractionInfo());
         return resp;
     }
 
@@ -454,8 +454,7 @@ public class ResourceServiceImpl implements IResourceService {
         }
 
         List<ResourceItemResponse> responses = entityPage.getContent().stream().map(entity -> {
-            ResourceItemResponse resp = new ResourceItemResponse();
-            BeanUtil.copyProperties(entity, resp);
+            ResourceItemResponse resp = BeanUtil.copyProperties(entity, ResourceItemResponse.class);
 
             List<String> myTagIds = resourceTagIdsMap.get(entity.getResourceId());
 
@@ -467,8 +466,6 @@ public class ResourceServiceImpl implements IResourceService {
                 }
             }
             resp.setCurrentTags(tagMap);
-            // interactionInfo 已内嵌在 ResourceItemEntity，直接读取
-            resp.setResourceInteractionInfo(entity.getInteractionInfo());
 
             return resp;
         }).collect(Collectors.toList());
@@ -549,7 +546,19 @@ public class ResourceServiceImpl implements IResourceService {
                 .collect(Collectors.toList());
             resourceUserInteractRecordRepository.deleteAllByResourceIdIn(deletedResourceIds);
             // 清理收藏集合中的孤立引用
-            customFavoriteCollectionRepository.removeResourcesFromAllCollections(deletedResourceIds);
+            List<FavoriteResourceRef> deletedFavoriteRefs = favoriteResourceRefRepository.findByResourceIdIn(deletedResourceIds);
+            // 扣减各个集合的收藏计数
+            Map<String, Integer> collectionCountDeltas = new HashMap<>();
+            for (FavoriteResourceRef ref : deletedFavoriteRefs) {
+                if (ref.getCollectionIds() == null) continue;
+                ref.getCollectionIds().stream()
+                        .filter(StringUtils::hasText)
+                        .forEach(collectionId -> collectionCountDeltas.merge(collectionId, -1, Integer::sum));
+            }
+            for (Map.Entry<String, Integer> entry: collectionCountDeltas.entrySet()) {
+                customFavoriteCollectionRepository.updateItemCount(Set.of(entry.getKey()), entry.getValue());
+            }
+            favoriteResourceRefRepository.deleteByResourceIdIn(deletedResourceIds);
 
             log.info("resources deleted. mode=hard count={} resourceIds={}",
                     deletedCount, summarizeIds(resourceIds));

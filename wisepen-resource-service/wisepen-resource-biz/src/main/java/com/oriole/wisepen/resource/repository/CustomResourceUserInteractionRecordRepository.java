@@ -8,9 +8,6 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Repository;
 
-/**
- * 用户资源互动记录自定义 Repository，封装需要原子读写语义的操作。
- */
 @Repository
 public class CustomResourceUserInteractionRecordRepository {
 
@@ -22,14 +19,10 @@ public class CustomResourceUserInteractionRecordRepository {
 
     private ResourceUserInteractionRecordEntity findAndSetField(String resourceId, String userId, String field, Object value) {
         Query query = Query.query(Criteria.where("resourceId").is(resourceId).and("userId").is(userId));
-        Update update = new Update()
-                .set(field, value)
-                .setOnInsert("resourceId", resourceId)
-                .setOnInsert("userId", userId);
-        // upsert 兼容历史遗留用户（文档不存在时自动创建）；returnNew=false 使调用方拿到操作前的旧值
+        Update update = new Update().set(field, value);
+
         return mongoTemplate.findAndModify(
-                query, update,
-                FindAndModifyOptions.options().upsert(true).returnNew(false),
+                query, update, FindAndModifyOptions.options().returnNew(false),
                 ResourceUserInteractionRecordEntity.class);
     }
 
