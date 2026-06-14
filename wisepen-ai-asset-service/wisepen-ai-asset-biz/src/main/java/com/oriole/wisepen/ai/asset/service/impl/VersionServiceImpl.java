@@ -3,6 +3,7 @@ package com.oriole.wisepen.ai.asset.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.IdUtil;
 import com.oriole.wisepen.ai.asset.domain.base.AssetInfoBase;
+import com.oriole.wisepen.ai.asset.domain.dto.req.AgentSpecUpdateRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.req.AssetDeleteRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.req.AssetUploadInitRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.res.AssetUploadInitResponse;
@@ -172,6 +173,15 @@ public class VersionServiceImpl<T extends BaseVersionBundleEntity> implements IV
 
         profile.getRepository().save(draft);
         deleteUnreferencedObjectKeys(req.getResourceId(), removedObjectKeys);
+    }
+
+    // 更新草稿版本的运行配置（spec 只能写入草稿，仅 agent 端开放入口）
+    public void updateDraftSpec(AgentSpecUpdateRequest req) {
+        T draft = profile.getRepository().findByResourceIdAndVersion(req.getResourceId(), req.getDraftVersion())
+                .orElseThrow(() -> new ServiceException(profile.getVersionNotFound()));
+        if (draft.getStatus() != VersionStatus.DRAFT) throw new ServiceException(profile.getNonDraft());
+        draft.setSpec(req.getSpec());
+        profile.getRepository().save(draft);
     }
 
     private void deleteUnreferencedObjectKeys(String resourceId, Set<String> objectKeys) {

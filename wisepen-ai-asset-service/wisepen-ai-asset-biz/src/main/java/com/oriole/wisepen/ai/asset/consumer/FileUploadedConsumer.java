@@ -1,7 +1,8 @@
 package com.oriole.wisepen.ai.asset.consumer;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.oriole.wisepen.ai.asset.domain.entity.AgentVersionBundleEntity;
+import com.oriole.wisepen.ai.asset.domain.entity.SkillVersionBundleEntity;
 import com.oriole.wisepen.ai.asset.service.IVersionService;
 import com.oriole.wisepen.file.storage.api.domain.mq.FileUploadedMessage;
 import lombok.RequiredArgsConstructor;
@@ -16,21 +17,31 @@ import static com.oriole.wisepen.file.storage.api.constant.MqTopicConstants.TOPI
 @RequiredArgsConstructor
 public class FileUploadedConsumer {
 
-    private final IVersionService skillVersionService;
+    private final IVersionService<SkillVersionBundleEntity> skillVersionService;
+    private final IVersionService<AgentVersionBundleEntity> agentVersionService;
     private final ObjectMapper objectMapper;
 
     @KafkaListener(topics = TOPIC_FILE_UPLOADED, groupId = "wisepen-skill-upload-callback-group")
     public void onFileUploaded(String payload) throws Exception {
         // 从兼容非Java微服务的发布者订阅，使用objectMapper显式转换
         FileUploadedMessage message = objectMapper.readValue(payload, FileUploadedMessage.class);
-        log.info("skill asset file upload event received. topic={} objectKey={} scene={}",
+        log.info("ai asset file upload event received. topic={} objectKey={} scene={}",
                 TOPIC_FILE_UPLOADED, message.getObjectKey(), message.getScene());
         try {
-            skillVersionService.handleFileUploaded(message);
-            log.debug("skill asset file upload event consumed. topic={} objectKey={}",
+            // 按存储场景分流到 skill / agent 各自的版本服务
+            switch (message.getScene()) {
+                case PRIVATE_SKILL_ASSET -> skillVersionService.handleFileUploaded(message);
+                case PRIVATE_AGENT_ASSET -> agentVersionService.handleFileUploaded(message);
+                default -> {
+                    log.debug("ai asset file upload event skipped. objectKey={} scene={} reason=\"scene mismatch\"",
+                            message.getObjectKey(), message.getScene());
+                    return;
+                }
+            }
+            log.debug("ai asset file upload event consumed. topic={} objectKey={}",
                     TOPIC_FILE_UPLOADED, message.getObjectKey());
         } catch (Exception e) {
-            log.error("skill asset file upload event consumption failed. topic={} objectKey={}",
+            log.error("ai asset file upload event consumption failed. topic={} objectKey={}",
                     TOPIC_FILE_UPLOADED, message.getObjectKey(), e);
             throw e;
         }

@@ -13,7 +13,7 @@ import static com.oriole.wisepen.common.core.util.LogIdUtils.summarizeIds;
 import static com.oriole.wisepen.file.storage.api.constant.MqTopicConstants.TOPIC_FILE_DELETE;
 
 /**
- * 文档服务 Kafka 事件发布器
+ * AI 资产服务 Kafka 事件发布器，skill / agent 共用
  */
 @Slf4j
 @Component
