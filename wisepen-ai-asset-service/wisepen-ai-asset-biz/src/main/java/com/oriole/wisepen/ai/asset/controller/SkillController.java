@@ -1,5 +1,6 @@
 package com.oriole.wisepen.ai.asset.controller;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.oriole.wisepen.ai.asset.domain.base.SkillInfoBase;
 import com.oriole.wisepen.ai.asset.domain.dto.req.AssetDeleteRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.req.AssetUploadInitRequest;
@@ -9,6 +10,7 @@ import com.oriole.wisepen.ai.asset.domain.dto.req.SkillVersionPublishRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.res.AssetUploadInitResponse;
 import com.oriole.wisepen.ai.asset.domain.dto.res.SkillResourceInfoResponse;
 import com.oriole.wisepen.ai.asset.domain.dto.res.SkillVersionBundleInfoResponse;
+import com.oriole.wisepen.ai.asset.domain.entity.SkillVersionBundleEntity;
 import com.oriole.wisepen.ai.asset.exception.SkillError;
 import com.oriole.wisepen.ai.asset.service.ISkillService;
 import com.oriole.wisepen.ai.asset.service.IVersionService;
@@ -42,7 +44,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class SkillController {
 
     private final ISkillService skillService;
-    private final IVersionService skillVersionService;
+    private final IVersionService<SkillVersionBundleEntity> skillVersionService;
     private final RemoteResourceService remoteResourceService;
 
     @Operation(
@@ -119,7 +121,8 @@ public class SkillController {
     @PostMapping("/getSkillVersionBundleInfo")
     public R<SkillVersionBundleInfoResponse> getSkillVersionBundleInfo(@RequestParam String resourceId, Integer version) {
         assertSkillOwner(resourceId);
-        return R.ok(skillVersionService.getSkillVersionBundle(resourceId, version));
+        SkillVersionBundleEntity bundle = skillVersionService.getBundle(resourceId, version);
+        return R.ok(BeanUtil.copyProperties(bundle, SkillVersionBundleInfoResponse.class));
     }
 
     @Operation(
@@ -137,7 +140,7 @@ public class SkillController {
     @PostMapping("/publishSkillVersion")
     public R<Void> publishSkillVersion(@Validated @RequestBody SkillVersionPublishRequest request) {
         assertSkillOwner(request.getResourceId());
-        skillVersionService.publishSkillVersion(request);
+        skillVersionService.publishVersion(request.getResourceId());
         return R.ok();
     }
 
@@ -145,7 +148,7 @@ public class SkillController {
             summary = "初始化技能文件上传",
             description = """
                     - 用途：为技能资产草稿版本新增或替换一批资产文件，并申请对象存储上传凭证。
-                    - 请求：resourceId 指定技能资产；draftVersion 指定草稿版本；assets 中的 path、name、skillAssetResourceType、md5、expectedSize 描述待上传文件。
+                    - 请求：resourceId 指定技能资产；draftVersion 指定草稿版本；assets 中的 path、name、assetResourceType、md5、expectedSize 描述待上传文件。
                     - 约束：当前用户必须是资源所有者；目标版本必须是 DRAFT；path 必须以 / 开头且不能包含非法目录跳转；name 不能包含路径分隔符；资产列表不能为空。
                     - 处理：在草稿版本中查找或创建资产条目，向文件存储服务申请上传 URL 或秒传，更新资产 objectKey、大小和上传状态；被替换且不再被任何版本引用的旧文件会发布删除事件；不发布草稿版本。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN；当前用户不是资源所有者 -> SkillError.SKILL_PERMISSION_DENIED；版本不存在 -> SkillError.SKILL_VERSION_NOT_FOUND；版本不是草稿 -> SkillError.CANNOT_OPERATE_NON_DRAFT_SKILL_VERSION；资产路径非法 -> SkillError.SKILL_ASSET_PATH_INVALID；存储上传凭证申请失败 -> SkillError.SKILL_ASSET_UPLOAD_URL_APPLY_FAILED。
@@ -156,8 +159,8 @@ public class SkillController {
     @PostMapping("/initUploadSkillAssets")
     public R<AssetUploadInitResponse> initUploadSkillAssets(@Validated @RequestBody AssetUploadInitRequest request) {
         assertSkillOwner(request.getResourceId());
-        AssetUploadInitResponse skillAssetUploadInitResponse = skillVersionService.initUploadSkillAssets(request);
-        return R.ok(skillAssetUploadInitResponse);
+        AssetUploadInitResponse assetUploadInitResponse = skillVersionService.initUploadAssets(request);
+        return R.ok(assetUploadInitResponse);
     }
 
     @Operation(
@@ -175,7 +178,7 @@ public class SkillController {
     @PostMapping("/deleteSkillAssets")
     public R<Void> deleteSkillAssets(@Validated @RequestBody AssetDeleteRequest request) {
         assertSkillOwner(request.getResourceId());
-        skillVersionService.deleteSkillAssets(request);
+        skillVersionService.deleteAssets(request);
         return R.ok();
     }
 

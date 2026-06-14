@@ -2,7 +2,6 @@ package com.oriole.wisepen.ai.asset.domain.dto.req;
 
 import com.oriole.wisepen.ai.asset.constant.AIAssetValidationMsg;
 import com.oriole.wisepen.ai.asset.enums.AssetResourceType;
-import com.oriole.wisepen.common.core.domain.IBusinessSubject;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -20,13 +19,13 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AssetUploadInitRequest {
-    @NotBlank(message = AIAssetValidationMsg.SKILL_ID_NOT_BLANK)
+    @NotBlank(message = AIAssetValidationMsg.RESOURCE_ID_NOT_BLANK)
     private String resourceId;
 
     private Integer draftVersion;
 
     @Valid
-    @NotEmpty(message = AIAssetValidationMsg.SKILL_ASSET_LIST_NOT_EMPTY)
+    @NotEmpty(message = AIAssetValidationMsg.ASSET_LIST_NOT_EMPTY)
     @Builder.Default
     private List<AssetUploadRequest> assets = new ArrayList<>();
 
@@ -35,14 +34,14 @@ public class AssetUploadInitRequest {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class AssetUploadRequest {
-        @NotBlank(message = AIAssetValidationMsg.SKILL_ASSET_NAME_NOT_BLANK)
+        @NotBlank(message = AIAssetValidationMsg.ASSET_NAME_NOT_BLANK)
         private String name;
 
-        @NotBlank(message = AIAssetValidationMsg.SKILL_ASSET_PATH_NOT_BLANK)
+        @NotBlank(message = AIAssetValidationMsg.ASSET_PATH_NOT_BLANK)
         private String path;
 
-        @NotNull(message = AIAssetValidationMsg.SKILL_ASSET_TYPE_NOT_BLANK)
-        private AssetResourceType skillAssetResourceType;
+        @NotNull(message = AIAssetValidationMsg.ASSET_TYPE_NOT_BLANK)
+        private AssetResourceType assetResourceType;
 
         private String md5;
 

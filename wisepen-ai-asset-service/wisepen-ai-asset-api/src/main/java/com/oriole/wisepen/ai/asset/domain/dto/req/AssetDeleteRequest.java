@@ -17,12 +17,12 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AssetDeleteRequest {
-    @NotBlank(message = AIAssetValidationMsg.SKILL_ID_NOT_BLANK)
+    @NotBlank(message = AIAssetValidationMsg.RESOURCE_ID_NOT_BLANK)
     private String resourceId;
 
     private Integer draftVersion;
 
     @Valid
-    @NotEmpty(message = AIAssetValidationMsg.SKILL_ASSET_LIST_NOT_EMPTY)
+    @NotEmpty(message = AIAssetValidationMsg.ASSET_LIST_NOT_EMPTY)
     private List<String> assetIds = new ArrayList<>();
 }

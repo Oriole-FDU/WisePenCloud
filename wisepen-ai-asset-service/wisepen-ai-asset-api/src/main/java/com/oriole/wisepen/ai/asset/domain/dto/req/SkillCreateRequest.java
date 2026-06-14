@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class SkillCreateRequest {
-    @NotBlank(message = AIAssetValidationMsg.SKILL_TITLE_NOT_BLANK)
+    @NotBlank(message = AIAssetValidationMsg.TITLE_NOT_BLANK)
     private String title;
 
     private String name;

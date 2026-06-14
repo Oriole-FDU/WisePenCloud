@@ -20,7 +20,7 @@ public class SkillUpdateRequest {
 
     private String description;
 
-    @AssertTrue(message = AIAssetValidationMsg.SKILL_ID_NOT_BLANK)
+    @AssertTrue(message = AIAssetValidationMsg.RESOURCE_ID_NOT_BLANK)
     @JsonIgnore
     public boolean isResourceIdPresent() {
         return StringUtils.hasText(resourceId);

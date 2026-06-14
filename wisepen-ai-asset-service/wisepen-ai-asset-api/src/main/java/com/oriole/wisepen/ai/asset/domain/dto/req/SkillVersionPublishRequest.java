@@ -13,6 +13,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class SkillVersionPublishRequest {
-    @NotBlank(message = AIAssetValidationMsg.SKILL_ID_NOT_BLANK)
+    @NotBlank(message = AIAssetValidationMsg.RESOURCE_ID_NOT_BLANK)
     private String resourceId;
 }

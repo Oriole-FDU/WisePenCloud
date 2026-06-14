@@ -6,6 +6,7 @@ import com.oriole.wisepen.ai.asset.domain.dto.req.SkillCreateRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.req.SkillUpdateRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.res.SkillMetaInfoResponse;
 import com.oriole.wisepen.ai.asset.domain.entity.SkillEntity;
+import com.oriole.wisepen.ai.asset.domain.entity.SkillVersionBundleEntity;
 import com.oriole.wisepen.ai.asset.enums.SkillSourceType;
 import com.oriole.wisepen.ai.asset.exception.SkillError;
 import com.oriole.wisepen.ai.asset.repository.SkillRepository;
@@ -27,7 +28,7 @@ import java.util.List;
 public class SkillServiceImpl implements ISkillService {
 
     private final SkillRepository skillRepository;
-    private final IVersionService skillVersionService;
+    private final IVersionService<SkillVersionBundleEntity> skillVersionService;
     private final RemoteResourceService remoteResourceService;
 
     @Override
@@ -50,7 +51,7 @@ public class SkillServiceImpl implements ISkillService {
                 .build();
         skillRepository.save(entity);
         // 直接新建首份草案(1)
-        skillVersionService.createDraftSkillVersion(resourceId, 1);
+        skillVersionService.createDraft(resourceId, 1);
         return resourceId;
     }
 

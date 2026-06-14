@@ -9,13 +9,21 @@ import lombok.experimental.SuperBuilder;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * skill / agent 版本包的公共数据字段
+ */
 @Data
 @SuperBuilder
 @NoArgsConstructor
 public class VersionBundleBase {
+
     private Integer version;
-    private AssetInfoBase mainSkillMD;
+
     private VersionStatus status;
+
     @Default
-    private List<AssetInfoBase> skillAssets = new ArrayList<>();
+    private List<AssetInfoBase> assets = new ArrayList<>();
+
+    // agent 运行配置；skill 不使用，恒为 null
+    private AgentSpecInfoBase spec;
 }

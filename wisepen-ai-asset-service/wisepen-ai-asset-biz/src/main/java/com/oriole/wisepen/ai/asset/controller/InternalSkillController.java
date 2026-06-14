@@ -5,6 +5,8 @@ import com.oriole.wisepen.ai.asset.domain.base.SkillInfoBase;
 import com.oriole.wisepen.ai.asset.domain.dto.req.SkillMetaInfoListRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.res.SkillInfoResponse;
 import com.oriole.wisepen.ai.asset.domain.dto.res.SkillMetaInfoResponse;
+import com.oriole.wisepen.ai.asset.domain.dto.res.SkillVersionBundleInfoResponse;
+import com.oriole.wisepen.ai.asset.domain.entity.SkillVersionBundleEntity;
 import com.oriole.wisepen.ai.asset.exception.SkillError;
 import com.oriole.wisepen.ai.asset.service.ISkillService;
 import com.oriole.wisepen.ai.asset.service.IVersionService;
@@ -27,7 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class InternalSkillController {
 
     private final ISkillService skillService;
-    private final IVersionService skillVersionService;
+    private final IVersionService<SkillVersionBundleEntity> skillVersionService;
 
     @GetMapping("/getSkillByResourceId")
     public R<SkillInfoResponse> getPublishedSkillByResourceId(@RequestParam String resourceId, @RequestParam(required = false) Integer skillVersion) {
@@ -37,7 +39,8 @@ public class InternalSkillController {
             throw new ServiceException(SkillError.SKILL_VERSION_NOT_FOUND);
         }
         SkillInfoResponse response = BeanUtil.copyProperties(skill, SkillInfoResponse.class);
-        response.setSkillVersionBundle(skillVersionService.getSkillVersionBundle(resourceId, skillVersion));
+        SkillVersionBundleEntity bundle = skillVersionService.getBundle(resourceId, skillVersion);
+        response.setSkillVersionBundle(BeanUtil.copyProperties(bundle, SkillVersionBundleInfoResponse.class));
         return R.ok(response);
     }
 
