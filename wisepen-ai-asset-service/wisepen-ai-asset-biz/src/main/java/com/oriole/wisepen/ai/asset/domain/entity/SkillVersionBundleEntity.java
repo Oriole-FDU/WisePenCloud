@@ -13,7 +13,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @SuperBuilder
 @NoArgsConstructor
 @Document(collection = "wisepen_skill_versions")
-public class SkillVersionBundleEntity extends BaseVersionBundleEntity {
+public class SkillVersionBundleEntity extends VersionBundleBaseEntity {
 
     private static final String ROOT_PATH = "/";
     private static final String MAIN_SKILL_MD = "SKILL.md";

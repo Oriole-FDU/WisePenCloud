@@ -1,7 +1,7 @@
 package com.oriole.wisepen.ai.asset.controller;
 
 import cn.hutool.core.bean.BeanUtil;
-import com.oriole.wisepen.ai.asset.domain.base.SkillInfoBase;
+import com.oriole.wisepen.ai.asset.domain.base.AIResourceInfoBase;
 import com.oriole.wisepen.ai.asset.domain.dto.req.AssetDeleteRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.req.AssetUploadInitRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.req.SkillCreateRequest;
@@ -13,7 +13,7 @@ import com.oriole.wisepen.ai.asset.domain.dto.res.SkillVersionBundleInfoResponse
 import com.oriole.wisepen.ai.asset.domain.entity.SkillVersionBundleEntity;
 import com.oriole.wisepen.ai.asset.exception.SkillError;
 import com.oriole.wisepen.ai.asset.service.ISkillService;
-import com.oriole.wisepen.ai.asset.service.IVersionService;
+import com.oriole.wisepen.ai.asset.service.impl.SkillVersionServiceImpl;
 import com.oriole.wisepen.common.core.context.SecurityContextHolder;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.enums.BusinessType;
@@ -44,7 +44,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class SkillController {
 
     private final ISkillService skillService;
-    private final IVersionService<SkillVersionBundleEntity> skillVersionService;
+    private final SkillVersionServiceImpl skillVersionService;
     private final RemoteResourceService remoteResourceService;
 
     @Operation(
@@ -102,7 +102,7 @@ public class SkillController {
         ResourceItemResponse resourceInfo = remoteResourceService.getResourceInfo(new ResourceInfoGetReqDTO(
                 resourceId, SecurityContextHolder.getUserId(), SecurityContextHolder.getGroupRoleMap()
         )).getData();
-        SkillInfoBase skillInfo = skillService.getSkillInfo(resourceId);
+        AIResourceInfoBase skillInfo = skillService.getSkillInfo(resourceId);
         SkillResourceInfoResponse skillResourceInfoResponse = SkillResourceInfoResponse.builder().resourceInfo(resourceInfo).skillInfo(skillInfo).build();
         return R.ok(skillResourceInfoResponse);
     }
@@ -114,7 +114,7 @@ public class SkillController {
                     - 请求：resourceId 指定技能资产；version 为空时使用技能主档当前发布版本。
                     - 约束：当前用户必须是资源所有者；技能资产和目标版本必须存在。
                     - 处理：确定目标版本后读取版本记录及其资产文件列表；不生成下载地址，不改变草稿或发布状态。
-                    - 失败：未登录 -> PermissionError.NOT_LOGIN；当前用户不是资源所有者 -> SkillError.SKILL_PERMISSION_DENIED；技能不存在 -> SkillError.SKILL_NOT_FOUND；版本不存在 -> SkillError.SKILL_VERSION_NOT_FOUND。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；当前用户不是资源所有者 -> SkillError.SKILL_PERMISSION_DENIED；资源不存在 -> AIResourceError.AI_RESOURCE_NOT_FOUND；版本不存在 -> AIResourceError.AI_RESOURCE_VERSION_NOT_FOUND。
                     - 响应：返回技能版本包信息和资产文件元数据。
                     """
     )
@@ -132,7 +132,7 @@ public class SkillController {
                     - 请求：resourceId 指定技能资产；draftVersion 指定待发布草稿版本。
                     - 约束：当前用户必须是资源所有者；目标版本必须是 DRAFT；主技能文件必须存在且已上传完成；所有草稿资产都必须处于可用状态。
                     - 处理：将草稿版本标记为 PUBLISHED，更新技能主档当前版本号，并创建下一版草稿；不复制文件，也不修改已发布版本内容。
-                    - 失败：未登录 -> PermissionError.NOT_LOGIN；当前用户不是资源所有者 -> SkillError.SKILL_PERMISSION_DENIED；版本不存在 -> SkillError.SKILL_VERSION_NOT_FOUND；版本不是草稿 -> SkillError.CANNOT_OPERATE_NON_DRAFT_SKILL_VERSION；主文件缺失 -> SkillError.SKILL_CORE_ASSET_NOT_FOUND；存在上传中的资产 -> SkillError.SKILL_ASSET_NOT_READY。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；当前用户不是资源所有者 -> SkillError.SKILL_PERMISSION_DENIED；版本不存在 -> AIResourceError.AI_RESOURCE_VERSION_NOT_FOUND；版本不是草稿 -> AIResourceError.CANNOT_OPERATE_NON_DRAFT_VERSION；主文件缺失 -> SkillError.SKILL_CORE_ASSET_NOT_FOUND；存在上传中的资产 -> AIResourceError.AI_RESOURCE_ASSET_NOT_READY。
                     - 响应：成功时返回空结果。
                     """
     )
@@ -151,7 +151,7 @@ public class SkillController {
                     - 请求：resourceId 指定技能资产；draftVersion 指定草稿版本；assets 中的 path、name、assetResourceType、md5、expectedSize 描述待上传文件。
                     - 约束：当前用户必须是资源所有者；目标版本必须是 DRAFT；path 必须以 / 开头且不能包含非法目录跳转；name 不能包含路径分隔符；资产列表不能为空。
                     - 处理：在草稿版本中查找或创建资产条目，向文件存储服务申请上传 URL 或秒传，更新资产 objectKey、大小和上传状态；被替换且不再被任何版本引用的旧文件会发布删除事件；不发布草稿版本。
-                    - 失败：未登录 -> PermissionError.NOT_LOGIN；当前用户不是资源所有者 -> SkillError.SKILL_PERMISSION_DENIED；版本不存在 -> SkillError.SKILL_VERSION_NOT_FOUND；版本不是草稿 -> SkillError.CANNOT_OPERATE_NON_DRAFT_SKILL_VERSION；资产路径非法 -> SkillError.SKILL_ASSET_PATH_INVALID；存储上传凭证申请失败 -> SkillError.SKILL_ASSET_UPLOAD_URL_APPLY_FAILED。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；当前用户不是资源所有者 -> SkillError.SKILL_PERMISSION_DENIED；版本不存在 -> AIResourceError.AI_RESOURCE_VERSION_NOT_FOUND；版本不是草稿 -> AIResourceError.CANNOT_OPERATE_NON_DRAFT_VERSION；资产路径非法 -> AIResourceError.AI_RESOURCE_ASSET_PATH_INVALID；存储上传凭证申请失败 -> AIResourceError.AI_RESOURCE_ASSET_UPLOAD_URL_APPLY_FAILED。
                     - 响应：返回每个资产的 assetId、路径、文件名、objectKey、上传凭证和是否秒传。
                     """
     )
@@ -170,7 +170,7 @@ public class SkillController {
                     - 请求：resourceId 指定技能资产；draftVersion 指定草稿版本；assetIds 为待删除资产 ID 列表。
                     - 约束：当前用户必须是资源所有者；目标版本必须是 DRAFT；assetIds 不能为空。
                     - 处理：从草稿版本中移除匹配的主文件或普通资产文件，并对不再被任何版本引用的 objectKey 发布文件删除事件；不影响已发布版本中仍被引用的文件。
-                    - 失败：未登录 -> PermissionError.NOT_LOGIN；当前用户不是资源所有者 -> SkillError.SKILL_PERMISSION_DENIED；版本不存在 -> SkillError.SKILL_VERSION_NOT_FOUND；版本不是草稿 -> SkillError.CANNOT_OPERATE_NON_DRAFT_SKILL_VERSION。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；当前用户不是资源所有者 -> SkillError.SKILL_PERMISSION_DENIED；版本不存在 -> AIResourceError.AI_RESOURCE_VERSION_NOT_FOUND；版本不是草稿 -> AIResourceError.CANNOT_OPERATE_NON_DRAFT_VERSION。
                     - 响应：成功时返回空结果。
                     """
     )

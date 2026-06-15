@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
 @Data
 @SuperBuilder
 @NoArgsConstructor
-public abstract class BaseVersionBundleEntity extends VersionBundleBase {
+public abstract class VersionBundleBaseEntity extends VersionBundleBase {
 
     @Id
     private String id;
@@ -33,4 +33,10 @@ public abstract class BaseVersionBundleEntity extends VersionBundleBase {
 
     // 发布前的类型相关校验：skill 校验核心文件，agent 校验 spec
     public abstract void checkReadyToPublish();
+
+    // 建新草稿时从上一版本复制资源列表与运行配置
+    public void copyBy(VersionBundleBaseEntity source) {
+        setAssets(source.getAssets());
+        setSpec(source.getSpec());
+    }
 }

@@ -1,6 +1,6 @@
 package com.oriole.wisepen.ai.asset.domain.dto.res;
 
-import com.oriole.wisepen.ai.asset.domain.base.SkillInfoBase;
+import com.oriole.wisepen.ai.asset.domain.base.AIResourceInfoBase;
 import com.oriole.wisepen.ai.asset.domain.base.VersionBundleBase;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -11,7 +11,7 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @EqualsAndHashCode(callSuper = true)
-public class SkillInfoResponse extends SkillInfoBase {
+public class SkillInfoResponse extends AIResourceInfoBase {
     private String resourceId;
     private VersionBundleBase skillVersionBundle;
 }

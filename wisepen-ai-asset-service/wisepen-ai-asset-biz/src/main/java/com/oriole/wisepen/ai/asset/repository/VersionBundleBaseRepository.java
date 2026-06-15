@@ -1,6 +1,6 @@
 package com.oriole.wisepen.ai.asset.repository;
 
-import com.oriole.wisepen.ai.asset.domain.entity.BaseVersionBundleEntity;
+import com.oriole.wisepen.ai.asset.domain.entity.VersionBundleBaseEntity;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.data.repository.NoRepositoryBean;
@@ -12,7 +12,7 @@ import java.util.Optional;
  * skill / agent 版本包仓库的公共查询，由两个具名仓库各自绑定集合
  */
 @NoRepositoryBean
-public interface BaseVersionBundleRepository<T extends BaseVersionBundleEntity> extends MongoRepository<T, String> {
+public interface VersionBundleBaseRepository<T extends VersionBundleBaseEntity> extends MongoRepository<T, String> {
 
     Optional<T> findByResourceIdAndVersion(String resourceId, Integer version);
 

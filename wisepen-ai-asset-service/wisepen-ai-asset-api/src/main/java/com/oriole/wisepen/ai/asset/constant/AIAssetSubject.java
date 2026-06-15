@@ -10,7 +10,10 @@ public enum AIAssetSubject implements IBusinessSubject {
     SKILL_ASSET,
     AGENT,
     AGENT_VERSION,
-    AGENT_ASSET;
+    AGENT_ASSET,
+    AI_RESOURCE,
+    AI_RESOURCE_VERSION,
+    AI_RESOURCE_ASSET;
 
     @Override
     public String key() {

@@ -1,7 +1,7 @@
 package com.oriole.wisepen.ai.asset.domain.dto.req;
 
 import com.oriole.wisepen.ai.asset.constant.AIAssetValidationMsg;
-import com.oriole.wisepen.ai.asset.enums.SkillSourceType;
+import com.oriole.wisepen.ai.asset.enums.AIResourceSourceType;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -21,5 +21,5 @@ public class SkillCreateRequest {
     private String description;
 
     @Builder.Default
-    private SkillSourceType sourceType = SkillSourceType.MANUAL;
+    private AIResourceSourceType sourceType = AIResourceSourceType.MANUAL;
 }

@@ -1,17 +1,15 @@
 package com.oriole.wisepen.ai.asset.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
-import com.oriole.wisepen.ai.asset.domain.base.SkillInfoBase;
+import com.oriole.wisepen.ai.asset.domain.base.AIResourceInfoBase;
 import com.oriole.wisepen.ai.asset.domain.dto.req.SkillCreateRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.req.SkillUpdateRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.res.SkillMetaInfoResponse;
 import com.oriole.wisepen.ai.asset.domain.entity.SkillEntity;
-import com.oriole.wisepen.ai.asset.domain.entity.SkillVersionBundleEntity;
-import com.oriole.wisepen.ai.asset.enums.SkillSourceType;
+import com.oriole.wisepen.ai.asset.enums.AIResourceSourceType;
 import com.oriole.wisepen.ai.asset.exception.SkillError;
 import com.oriole.wisepen.ai.asset.repository.SkillRepository;
 import com.oriole.wisepen.ai.asset.service.ISkillService;
-import com.oriole.wisepen.ai.asset.service.IVersionService;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.resource.domain.dto.ResourceCreateReqDTO;
 import com.oriole.wisepen.resource.enums.ResourceType;
@@ -28,7 +26,7 @@ import java.util.List;
 public class SkillServiceImpl implements ISkillService {
 
     private final SkillRepository skillRepository;
-    private final IVersionService<SkillVersionBundleEntity> skillVersionService;
+    private final SkillVersionServiceImpl skillVersionService;
     private final RemoteResourceService remoteResourceService;
 
     @Override
@@ -47,7 +45,7 @@ public class SkillServiceImpl implements ISkillService {
                 .name(req.getName() == null ? "" : req.getName())
                 .description(req.getDescription() == null ? "" : req.getDescription())
                 .version(0)
-                .sourceType(req.getSourceType() == null ? SkillSourceType.MANUAL : req.getSourceType())
+                .sourceType(req.getSourceType() == null ? AIResourceSourceType.MANUAL : req.getSourceType())
                 .build();
         skillRepository.save(entity);
         // 直接新建首份草案(1)
@@ -74,7 +72,7 @@ public class SkillServiceImpl implements ISkillService {
     }
 
     @Override
-    public SkillInfoBase getSkillInfo(String resourceId) {
+    public AIResourceInfoBase getSkillInfo(String resourceId) {
         return skillRepository.findByResourceId(resourceId)
                 .orElseThrow(() -> new ServiceException(SkillError.SKILL_NOT_FOUND));
     }

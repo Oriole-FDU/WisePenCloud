@@ -7,7 +7,7 @@ import lombok.Getter;
 
 @Getter
 @AllArgsConstructor
-public enum SkillSourceType {
+public enum AIResourceSourceType {
     BY_AGENT(2,"BY_AGENT"),
     MANUAL(1,"MANUAL");
 
