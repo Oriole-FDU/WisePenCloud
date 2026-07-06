@@ -8,6 +8,7 @@ import com.oriole.wisepen.ai.asset.domain.dto.req.SkillUpdateRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.req.SkillVersionPublishRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.res.SkillAssetUploadInitResponse;
 import com.oriole.wisepen.ai.asset.domain.dto.res.SkillResourceInfoResponse;
+import com.oriole.wisepen.ai.asset.domain.dto.res.SkillVersionBundleContentInfoResponse;
 import com.oriole.wisepen.ai.asset.domain.dto.res.SkillVersionBundleInfoResponse;
 import com.oriole.wisepen.ai.asset.exception.SkillError;
 import com.oriole.wisepen.ai.asset.service.ISkillService;
@@ -120,6 +121,33 @@ public class SkillController {
     public R<SkillVersionBundleInfoResponse> getSkillVersionBundleInfo(@RequestParam String resourceId, Integer version) {
         assertSkillOwner(resourceId);
         return R.ok(skillVersionService.getSkillVersionBundle(resourceId, version));
+    }
+
+    @Operation(
+            summary = "获取技能版本文件下载信息",
+            description = """
+                    - 用途：为技能编辑器恢复版本文件内容提供资产元数据和限时下载地址。
+                    - 请求：resourceId 指定技能资产；version 为空时使用技能主档当前发布版本；duration 指定下载地址有效时长，默认 900 秒。
+                    - 约束：当前用户必须是资源所有者；技能资产和目标版本必须存在；只有已上传完成且带 objectKey 的资产会生成 downloadUrl。
+                    - 处理：读取版本记录及其资产文件列表，为可用资产调用文件存储服务生成限时下载地址；不读取文件正文，不修改草稿、发布状态或存储记录。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；当前用户不是资源所有者 -> AIResourceError.AI_RESOURCE_PERMISSION_DENIED；技能不存在 -> AIResourceError.AI_RESOURCE_NOT_FOUND；版本不存在 -> AIResourceError.AI_RESOURCE_VERSION_NOT_FOUND；下载地址生成失败 -> FileStorageError.STORAGE_PROVIDER_GET_FILE_DOWNLOAD_URL_FAILED。
+                    - 响应：返回技能版本包信息、资产文件元数据和可由前端读取的 downloadUrl；不可用资产的 downloadUrl 为空。
+                    """
+    )
+    @PostMapping("/getSkillVersionBundleContentInfo")
+    public R<SkillVersionBundleContentInfoResponse> getSkillVersionBundleContentInfo(
+            @RequestParam String resourceId,
+            @RequestParam(required = false) Integer version,
+            @RequestParam(value = "duration", defaultValue = "900") Long duration) {
+        assertSkillOwner(resourceId);
+        SkillVersionBundleEntity bundle = skillVersionService.getVersionBundle(resourceId, version);
+        SkillVersionBundleContentInfoResponse response = SkillVersionBundleContentInfoResponse.builder()
+                .resourceId(bundle.getResourceId())
+                .version(bundle.getVersion())
+                .status(bundle.getStatus())
+                .assets(skillVersionService.buildAssetContentInfoList(bundle, duration))
+                .build();
+        return R.ok(response);
     }
 
     @Operation(

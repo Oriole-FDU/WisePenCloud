@@ -2,6 +2,7 @@ package com.oriole.wisepen.ai.asset.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.IdUtil;
+import com.oriole.wisepen.ai.asset.domain.base.SkillAssetContentInfoBase;
 import com.oriole.wisepen.ai.asset.domain.base.SkillAssetInfoBase;
 import com.oriole.wisepen.ai.asset.domain.dto.req.SkillAssetDeleteRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.req.SkillAssetUploadInitRequest;
@@ -74,6 +75,21 @@ public class SkillVersionServiceImpl implements ISkillVersionService {
         SkillVersionBundleEntity entity = skillVersionBundleRepository.findByResourceIdAndVersion(resourceId, version)
                 .orElseThrow(() -> new ServiceException(SkillError.SKILL_VERSION_NOT_FOUND));
         return BeanUtil.copyProperties(entity, SkillVersionBundleInfoResponse.class);
+    }
+    
+    public List<SkillAssetContentInfoBase> buildAssetContentInfoList(SkillVersionBundleEntity versionBundle, Long durationSeconds) {
+        if (versionBundle.getSkillAssets() == null || versionBundle.getSkillAssets().isEmpty()) {
+            return new ArrayList<>();
+        }
+        return versionBundle.getSkillAssets().stream()
+                .map(asset -> {
+                    SkillAssetContentInfoBase contentInfo = BeanUtil.copyProperties(asset, SkillAssetContentInfoBase.class);
+                    if (!isSkillDraftUnavailable(asset)) {
+                        contentInfo.setDownloadUrl(remoteStorageService.getDownloadUrl(asset.getObjectKey(), durationSeconds).getData());
+                    }
+                    return contentInfo;
+                })
+                .toList();
     }
 
     @Override
