@@ -27,6 +27,12 @@ spring:
         - docker0 # 忽略常见的虚拟机网卡名称 (正则匹配)
       preferred-networks:
         - 10 #指定首选的网络号段 (校园网段10开头)
+    openfeign:
+      client:
+        config:
+          default:
+            connect-timeout: ${FEIGN_CONNECT_TIMEOUT:1000}
+            read-timeout: ${FEIGN_READ_TIMEOUT:3000}
   profiles:
     active: dev # 激活开发环境配置
 
