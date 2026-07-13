@@ -36,7 +36,6 @@
         <module name="wisepen-document-api" />
       </profile>
     </annotationProcessing>
-    <bytecodeTargetLevel target="21" />
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
