@@ -1,8 +1,6 @@
 package com.oriole.wisepen.common.gray;
 
 import com.alibaba.cloud.nacos.NacosDiscoveryProperties;
-import com.oriole.wisepen.common.core.constant.CommonConstants;
-import com.oriole.wisepen.common.core.context.GrayContextHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanPostProcessor;
@@ -45,8 +43,7 @@ public class DeveloperIsolationAutoConfiguration {
             String developer = System.getProperty("wisepen.developer.name");
             if (StringUtils.hasText(developer)) {
                 nacosProps.getMetadata().clear();
-                nacosProps.getMetadata().put(CommonConstants.GRAY_METADATA_DEV_KEY, developer);
-                GrayContextHolder.setProcessDefaultTag(developer);
+                GrayFacade.applyNacosMetadata(nacosProps.getMetadata(), developer);
                 log.warn("development isolation activated. source=systemProperty developer={}", developer);
             }
             return;
@@ -61,8 +58,7 @@ public class DeveloperIsolationAutoConfiguration {
             String enable = props.getProperty("wisepen.developer.enable");
 
             if ("true".equalsIgnoreCase(enable) && StringUtils.hasText(developer)) {
-                nacosProps.getMetadata().put(CommonConstants.GRAY_METADATA_DEV_KEY, developer);
-                GrayContextHolder.setProcessDefaultTag(developer);
+                GrayFacade.applyNacosMetadata(nacosProps.getMetadata(), developer);
                 log.warn("development isolation activated. source=devProperties developer={}", developer);
             }
         } catch (Exception e) {

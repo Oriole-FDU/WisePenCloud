@@ -1,13 +1,12 @@
 package com.oriole.wisepen.common.web.interceptor;
 
 import cn.hutool.core.util.StrUtil;
-import com.oriole.wisepen.common.core.constant.CommonConstants;
 import com.oriole.wisepen.common.core.constant.SecurityConstants;
 import com.oriole.wisepen.common.core.context.GrayContextHolder;
 import com.oriole.wisepen.common.core.context.SecurityContextHolder;
+import com.oriole.wisepen.common.gray.GrayFacade;
 
 import jakarta.servlet.http.Cookie;
-import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.HandlerInterceptor;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -60,10 +59,7 @@ public class HeaderInterceptor implements HandlerInterceptor {
         }
 
          // 灰度发布标记
-        String developer = request.getHeader(CommonConstants.GRAY_HEADER_DEV_KEY);
-        if (StringUtils.hasText(developer)) {
-            GrayContextHolder.setDeveloperTag(developer);
-        }
+        GrayFacade.applyInboundDeveloperTag(request);
 
         return true;
     }

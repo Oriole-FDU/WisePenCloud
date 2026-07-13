@@ -8,7 +8,6 @@ import com.oriole.wisepen.ai.asset.domain.dto.res.AIResourceMetaInfoResponse;
 import com.oriole.wisepen.ai.asset.domain.dto.res.SkillVersionBundleInfoResponse;
 import com.oriole.wisepen.ai.asset.domain.entity.SkillVersionBundleEntity;
 import com.oriole.wisepen.ai.asset.exception.AIResourceError;
-import com.oriole.wisepen.ai.asset.service.IAIResourceService;
 import com.oriole.wisepen.ai.asset.service.impl.SkillServiceImpl;
 import com.oriole.wisepen.ai.asset.service.impl.SkillVersionServiceImpl;
 import com.oriole.wisepen.common.core.domain.R;
@@ -47,6 +46,7 @@ public class InternalSkillController {
 
     @PostMapping("/listPublishedSkillsMetaByResourceIds")
     public R<List<AIResourceMetaInfoResponse>> listPublishedSkillMetasByResourceIds(@RequestBody AIResourceMetaInfoListRequest request) {
-        return R.ok(skillService.listPublishedAIResourcesMeta(request == null ? null : request.getResourceIds()));
+        List<String> resourceIds = request == null ? null : request.getResourceIds();
+        return R.ok(skillService.listPublishedAIResourcesMeta(resourceIds));
     }
 }

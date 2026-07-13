@@ -14,4 +14,5 @@ import lombok.experimental.SuperBuilder;
 @EqualsAndHashCode(callSuper = true)
 public class SkillVersionBundleInfoResponse extends VersionBundleBase {
     private String resourceId;
+    private String skillMd;
 }

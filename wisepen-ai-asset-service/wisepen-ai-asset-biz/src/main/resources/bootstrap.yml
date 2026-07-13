@@ -1,20 +1,20 @@
 server:
-  port: 19910 # 本地启动占用 9410 端口
+  port: 19910
 
 spring:
   application:
-    name: wisepen-ai-asset-service # 服务名，也是 Nacos 里的 Data ID
+    name: wisepen-ai-asset-service
   cloud:
     nacos:
       discovery:
-        server-addr: wisepen-dev-server:8848 # Nacos 注册中心地址
+        server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
         username: ${NACOS_USERNAME}
         password: ${NACOS_PASSWORD}
       config:
-        server-addr: wisepen-dev-server:8848 # Nacos 配置中心地址
+        server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
         username: ${NACOS_USERNAME}
         password: ${NACOS_PASSWORD}
-        file-extension: yaml # 配置文件后缀
+        file-extension: yaml
         group: DEFAULT_GROUP
         shared-configs:
           - data-id: wisepen-common-${spring.profiles.active}.yaml
@@ -24,17 +24,17 @@ spring:
       ignored-interfaces:
         - VMnet.*
         - vEthernet.*
-        - docker0 # 忽略常见的虚拟机网卡名称 (正则匹配)
+        - docker0
       preferred-networks:
-        - 10 # 指定首选的网络号段 (校园网段10开头)
+        - 10
   profiles:
-    active: dev # 激活开发环境配置
+    active: dev
 
 wisepen:
   openapi:
-    title: AI 资产服务 API
+    title: AI Asset Service API
     version: 1.0.0
-    description: WisePen 技能资产创建、编辑、发布与查询接口
+    description: WisePen AI asset APIs
 
 springwolf:
   plugin:
@@ -45,6 +45,6 @@ springwolf:
   docket:
     base-package: com.oriole.wisepen.ai.asset
     info:
-      title: AI 资产服务 Kafka Events
+      title: AI Asset Service Kafka Events
       version: 1.0.0
-      description: AI 资产文件上传、资源删除与文件清理相关 Kafka 消息契约
+      description: Kafka event contracts for AI asset service
