@@ -27,7 +27,7 @@
     </modules>
 
     <properties>
-        <java.version>21</java.version>
+        <java.version>25</java.version>
         <maven.compiler.release>${java.version}</maven.compiler.release>
         <maven.compiler.parameters>true</maven.compiler.parameters>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -163,8 +163,8 @@
                         <configuration>
                             <rules>
                                 <requireJavaVersion>
-                                    <version>[21,)</version>
-                                    <message>WisePenCloud must be built with JDK 21 or newer. Configure IDEA Maven Runner/Importer and JAVA_HOME to JDK 21.</message>
+                                    <version>[25,)</version>
+                                    <message>WisePenCloud must be built with JDK 25 or newer. Configure IDEA Maven Runner/Importer and JAVA_HOME to JDK 25.</message>
                                 </requireJavaVersion>
                                 <requireMavenVersion>
                                     <version>[3.9.0,)</version>
