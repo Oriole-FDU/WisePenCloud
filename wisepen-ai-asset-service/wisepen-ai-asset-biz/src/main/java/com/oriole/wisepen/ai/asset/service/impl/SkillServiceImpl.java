@@ -29,9 +29,4 @@ public class SkillServiceImpl extends AIResourceServiceImpl<SkillEntity, SkillVe
     protected ResourceType getResourceType() {
         return ResourceType.SKILL;
     }
-
-    @Override
-    protected String buildResourcePreview(String description) {
-        return description == null ? "" : description;
-    }
 }

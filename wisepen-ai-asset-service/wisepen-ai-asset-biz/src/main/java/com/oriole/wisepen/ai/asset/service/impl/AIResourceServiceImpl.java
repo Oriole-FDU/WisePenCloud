@@ -37,10 +37,6 @@ public abstract class AIResourceServiceImpl<AT extends AIResourceBaseEntity<AT>,
 
     protected abstract ResourceType getResourceType();
 
-    protected String buildResourcePreview(String description) {
-        return null;
-    }
-
     @Override
     public String createAIResource(AIResourceCreateRequest req, String userId) {
         String name = req.getName() == null ? "" : req.getName();
@@ -49,7 +45,7 @@ public abstract class AIResourceServiceImpl<AT extends AIResourceBaseEntity<AT>,
                 .resourceName(req.getTitle())
                 .resourceType(getResourceType())
                 .ownerId(userId)
-                .preview(buildResourcePreview(description))
+                .preview(description)
                 .build()).getData();
         if (!StringUtils.hasText(resourceId)) {
             throw new ServiceException(AIResourceError.AI_RESOURCE_REGISTER_FAILED);
@@ -79,7 +75,7 @@ public abstract class AIResourceServiceImpl<AT extends AIResourceBaseEntity<AT>,
                         .resourceName(req.getForkedResourceName())
                         .resourceType(getResourceType())
                         .ownerId(forkedResourceOwnerId)
-                        .preview(buildResourcePreview(sourceEntity.getDescription()))
+                        .preview(sourceEntity.getDescription())
                         .build()).getData();
             } catch (Exception e) {
                 throw new ServiceException(AIResourceError.AI_RESOURCE_REGISTER_FAILED, e.getMessage());
@@ -132,13 +128,10 @@ public abstract class AIResourceServiceImpl<AT extends AIResourceBaseEntity<AT>,
 
         aiResourceBaseRepository.save(entity);
         if (req.getDescription() != null) {
-            String preview = buildResourcePreview(req.getDescription());
-            if (preview != null) {
-                remoteResourceService.updateAttributes(ResourceUpdateReqDTO.builder()
-                        .resourceId(req.getResourceId())
-                        .preview(preview)
-                        .build());
-            }
+            remoteResourceService.updateAttributes(ResourceUpdateReqDTO.builder()
+                    .resourceId(req.getResourceId())
+                    .preview(req.getDescription())
+                    .build());
         }
     }
 
