@@ -10,9 +10,7 @@ import com.oriole.wisepen.system.domain.entity.FeedbackEntity;
 import com.oriole.wisepen.system.service.FeedbackService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -21,7 +19,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "管理员 - 用户反馈", description = "管理员查询和处理用户工单")
-@Validated
 @RestController
 @RequestMapping("/admin/system/feedback")
 @RequiredArgsConstructor
@@ -34,20 +31,20 @@ public class AdminFeedbackController {
             summary = "分页查询用户工单",
             description = """
                     - 用途：供管理员查看用户提交的全部工单。
-                    - 请求：page 和 size 控制分页；status 和 type 为可选筛选条件。
-                    - 约束：当前操作者必须具备管理员身份；page 和 size 必须为正数。
+                    - 请求：page 和 size 控制分页；status 和 type 指定筛选条件。
+                    - 约束：当前操作者必须具备管理员身份；status 和 type 必须传入。
                     - 处理：查询全部工单，并按创建时间倒序返回。
                     - 失败：当前操作者不是管理员 -> PermissionError.UNAUTHORIZED。
                     - 响应：返回工单分页数据。
                     """
     )
-    @GetMapping("/list")
-    public R<PageR<FeedbackEntity>> pageFeedbacks(
-            @Positive @RequestParam int page,
-            @Positive @RequestParam int size,
-            @RequestParam(required = false) FeedbackStatus status,
-            @RequestParam(required = false) FeedbackType type) {
-        return R.ok(feedbackService.pageFeedbacks(page, size, status, type));
+    @GetMapping("/listFeedback")
+    public R<PageR<FeedbackEntity>> listFeedback(
+            @RequestParam int page,
+            @RequestParam int size,
+            @RequestParam FeedbackStatus status,
+            @RequestParam FeedbackType type) {
+        return R.ok(feedbackService.listFeedback(page, size, status, type));
     }
 
     @Operation(
@@ -72,7 +69,7 @@ public class AdminFeedbackController {
                     - 用途：供管理员推进用户工单的处理状态。
                     - 请求：feedbackId 指定目标工单；status 指定更新后的状态。
                     - 约束：当前操作者必须具备管理员身份；status 必须是 FeedbackStatus 定义的状态。
-                    - 处理：更新目标工单状态并记录状态变更日志；不修改工单内容和问题类型。
+                    - 处理：更新目标工单状态；不修改工单内容和问题类型。
                     - 失败：当前操作者不是管理员 -> PermissionError.UNAUTHORIZED；工单不存在 -> SysError.FEEDBACK_NOT_FOUND。
                     - 响应：成功时返回空结果。
                     """

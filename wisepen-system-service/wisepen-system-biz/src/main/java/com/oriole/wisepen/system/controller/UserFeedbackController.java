@@ -11,8 +11,6 @@ import com.oriole.wisepen.system.domain.entity.FeedbackEntity;
 import com.oriole.wisepen.system.service.FeedbackService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,7 +22,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "用户反馈", description = "用户提交问题报错、功能建议与使用咨询")
-@Validated
 @RestController
 @RequestMapping("/system/feedback")
 @RequiredArgsConstructor
@@ -45,7 +42,7 @@ public class UserFeedbackController {
     )
     @CheckLogin
     @PostMapping("/addFeedback")
-    public R<Void> createFeedback(@Valid @RequestBody FeedbackRequest feedbackRequest) {
+    public R<Void> createFeedback(@Validated @RequestBody FeedbackRequest feedbackRequest) {
         feedbackService.createFeedback(SecurityContextHolder.getUserId(), feedbackRequest);
         return R.ok();
     }
@@ -54,8 +51,8 @@ public class UserFeedbackController {
             summary = "分页查询我的工单",
             description = """
                     - 用途：供登录用户查看自己提交的工单。
-                    - 请求：page 和 size 控制分页；status 和 type 为可选筛选条件。
-                    - 约束：当前用户必须已登录；page 和 size 必须为正数。
+                    - 请求：page 和 size 控制分页；status 和 type 指定筛选条件。
+                    - 约束：当前用户必须已登录；status 和 type 必须传入。
                     - 处理：仅查询当前用户的工单，并按创建时间倒序返回。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN。
                     - 响应：返回当前用户的工单分页数据。
@@ -63,12 +60,12 @@ public class UserFeedbackController {
     )
     @CheckLogin
     @GetMapping("/list")
-    public R<PageR<FeedbackEntity>> pageMyFeedbacks(
-            @Positive @RequestParam int page,
-            @Positive @RequestParam int size,
-            @RequestParam(required = false) FeedbackStatus status,
-            @RequestParam(required = false) FeedbackType type) {
-        return R.ok(feedbackService.pageMyFeedbacks(
+    public R<PageR<FeedbackEntity>> listMyFeedback(
+            @RequestParam int page,
+            @RequestParam int size,
+            @RequestParam FeedbackStatus status,
+            @RequestParam FeedbackType type) {
+        return R.ok(feedbackService.listMyFeedback(
                 SecurityContextHolder.getUserId(), page, size, status, type));
     }
 

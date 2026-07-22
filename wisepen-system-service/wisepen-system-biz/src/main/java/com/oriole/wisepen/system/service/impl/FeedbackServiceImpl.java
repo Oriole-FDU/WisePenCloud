@@ -14,13 +14,11 @@ import com.oriole.wisepen.system.excpetion.SysError;
 import com.oriole.wisepen.system.mapper.FeedbackMapper;
 import com.oriole.wisepen.system.service.FeedbackService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
  * @author Xiong Heng
  */
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class FeedbackServiceImpl implements FeedbackService {
@@ -35,26 +33,17 @@ public class FeedbackServiceImpl implements FeedbackService {
         feedbackEntity.setContact(feedbackRequest.getContact().trim());
         feedbackEntity.setStatus(FeedbackStatus.PENDING);
         feedbackMapper.insert(feedbackEntity);
-        log.info("feedback created. feedbackId={} userId={}", feedbackEntity.getId(), userId);
     }
 
     @Override
-    public PageR<FeedbackEntity> pageMyFeedbacks(Long userId, int page, int size,
-                                                 FeedbackStatus status, FeedbackType type) {
+    public PageR<FeedbackEntity> listMyFeedback(Long userId, int page, int size,
+                                                FeedbackStatus status, FeedbackType type) {
         LambdaQueryWrapper<FeedbackEntity> queryWrapper = Wrappers.<FeedbackEntity>lambdaQuery()
                 .eq(FeedbackEntity::getUserId, userId)
-                .eq(status != null, FeedbackEntity::getStatus, status)
+                .eq(FeedbackEntity::getStatus, status)
                 .orderByDesc(FeedbackEntity::getCreateTime);
 
-        if (type != null) {
-            switch (type) {
-                case BUG_REPORT -> queryWrapper.eq(FeedbackEntity::getBugReport, true);
-                case SUGGESTION -> queryWrapper.eq(FeedbackEntity::getSuggestion, true);
-                case CONSULTATION -> queryWrapper.eq(FeedbackEntity::getConsultation, true);
-                case COMPLAINT -> queryWrapper.eq(FeedbackEntity::getComplaint, true);
-                case OTHER -> queryWrapper.eq(FeedbackEntity::getOther, true);
-            }
-        }
+        applyTypeFilter(queryWrapper, type);
 
         Page<FeedbackEntity> feedbackPage = feedbackMapper.selectPage(new Page<>(page, size), queryWrapper);
         PageR<FeedbackEntity> result = new PageR<>(feedbackPage.getTotal(), page, size);
@@ -76,21 +65,13 @@ public class FeedbackServiceImpl implements FeedbackService {
     }
 
     @Override
-    public PageR<FeedbackEntity> pageFeedbacks(int page, int size,
-                                               FeedbackStatus status, FeedbackType type) {
+    public PageR<FeedbackEntity> listFeedback(int page, int size,
+                                              FeedbackStatus status, FeedbackType type) {
         LambdaQueryWrapper<FeedbackEntity> queryWrapper = Wrappers.<FeedbackEntity>lambdaQuery()
-                .eq(status != null, FeedbackEntity::getStatus, status)
+                .eq(FeedbackEntity::getStatus, status)
                 .orderByDesc(FeedbackEntity::getCreateTime);
 
-        if (type != null) {
-            switch (type) {
-                case BUG_REPORT -> queryWrapper.eq(FeedbackEntity::getBugReport, true);
-                case SUGGESTION -> queryWrapper.eq(FeedbackEntity::getSuggestion, true);
-                case CONSULTATION -> queryWrapper.eq(FeedbackEntity::getConsultation, true);
-                case COMPLAINT -> queryWrapper.eq(FeedbackEntity::getComplaint, true);
-                case OTHER -> queryWrapper.eq(FeedbackEntity::getOther, true);
-            }
-        }
+        applyTypeFilter(queryWrapper, type);
 
         Page<FeedbackEntity> feedbackPage = feedbackMapper.selectPage(new Page<>(page, size), queryWrapper);
         PageR<FeedbackEntity> result = new PageR<>(feedbackPage.getTotal(), page, size);
@@ -109,15 +90,25 @@ public class FeedbackServiceImpl implements FeedbackService {
 
     @Override
     public void updateFeedbackStatus(Long feedbackId, FeedbackStatus status) {
-        FeedbackEntity feedbackEntity = feedbackMapper.selectById(feedbackId);
-        if (feedbackEntity == null) {
+        FeedbackEntity feedbackEntity = new FeedbackEntity();
+        feedbackEntity.setStatus(status);
+        int updatedRows = feedbackMapper.update(
+                feedbackEntity,
+                Wrappers.<FeedbackEntity>lambdaUpdate()
+                        .eq(FeedbackEntity::getId, feedbackId)
+        );
+        if (updatedRows == 0) {
             throw new ServiceException(SysError.FEEDBACK_NOT_FOUND);
         }
+    }
 
-        FeedbackStatus previousStatus = feedbackEntity.getStatus();
-        feedbackEntity.setStatus(status);
-        feedbackMapper.updateById(feedbackEntity);
-        log.info("feedback status changed. feedbackId={} from={} to={}",
-                feedbackId, previousStatus, status);
+    private void applyTypeFilter(LambdaQueryWrapper<FeedbackEntity> queryWrapper, FeedbackType type) {
+        switch (type) {
+            case BUG_REPORT -> queryWrapper.eq(FeedbackEntity::getBugReport, true);
+            case SUGGESTION -> queryWrapper.eq(FeedbackEntity::getSuggestion, true);
+            case CONSULTATION -> queryWrapper.eq(FeedbackEntity::getConsultation, true);
+            case COMPLAINT -> queryWrapper.eq(FeedbackEntity::getComplaint, true);
+            case OTHER -> queryWrapper.eq(FeedbackEntity::getOther, true);
+        }
     }
 }

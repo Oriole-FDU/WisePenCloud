@@ -10,12 +10,13 @@ public interface FeedbackService {
 
     void createFeedback(Long userId, FeedbackRequest feedbackRequest);
 
-    PageR<FeedbackEntity> pageMyFeedbacks(Long userId, int page, int size,
-                                          FeedbackStatus status, FeedbackType type);
+    PageR<FeedbackEntity> listMyFeedback(Long userId, int page, int size,
+                                         FeedbackStatus status, FeedbackType type);
 
     FeedbackEntity getMyFeedbackDetail(Long userId, Long feedbackId);
 
-    PageR<FeedbackEntity> pageFeedbacks(int page, int size, FeedbackStatus status, FeedbackType type);
+    PageR<FeedbackEntity> listFeedback(int page, int size,
+                                       FeedbackStatus status, FeedbackType type);
 
     FeedbackEntity getFeedbackDetail(Long feedbackId);
 

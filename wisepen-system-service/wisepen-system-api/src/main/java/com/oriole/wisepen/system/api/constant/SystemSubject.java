@@ -1,5 +1,3 @@
-
-
 package com.oriole.wisepen.system.api.constant;
 
 import com.oriole.wisepen.common.core.domain.IBusinessSubject;
