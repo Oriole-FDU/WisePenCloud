@@ -11,6 +11,7 @@ import com.oriole.wisepen.resource.constant.ResourceConstants;
 import com.oriole.wisepen.resource.domain.ComputedGroupAcl;
 import com.oriole.wisepen.resource.domain.GroupTagBind;
 import com.oriole.wisepen.resource.domain.MarketSaleInfo;
+import com.oriole.wisepen.resource.domain.base.ResourceInteractionInfoBase;
 import com.oriole.wisepen.resource.domain.dto.*;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceRenameRequest;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceUpdateActionPermissionRequest;
@@ -384,6 +385,7 @@ public class ResourceServiceImpl implements IResourceService {
     public String createResourceItem(ResourceCreateReqDTO dto) {
         ResourceItemEntity entity = new ResourceItemEntity();
         BeanUtil.copyProperties(dto, entity);
+        entity.setResourceInteractionInfo(new ResourceInteractionInfoBase());
         resourceItemRepository.save(entity);
 
         String personalGroupId = ResourceConstants.PERSONAL_GROUP_PREFIX + dto.getOwnerId();

@@ -22,7 +22,7 @@ public class CustomResourceUserInteractionRecordRepository {
         Update update = new Update().set(field, value);
 
         return mongoTemplate.findAndModify(
-                query, update, FindAndModifyOptions.options().returnNew(false),
+                query, update, FindAndModifyOptions.options().upsert(true).returnNew(false),
                 ResourceUserInteractionRecordEntity.class);
     }
 

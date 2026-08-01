@@ -66,18 +66,18 @@ public class ResourceInteractionController {
     }
 
     @Operation(
-            summary = "切换资源点赞状态",
+            summary = "设置资源点赞状态",
             description = """
                     - 用途：让当前用户对资源执行点赞或取消点赞。
-                    - 请求：resourceId 指定目标资源。
+                    - 请求：resourceId 指定目标资源；liked=true 表示点赞，liked=false 表示取消点赞。
                     - 约束：当前用户必须已登录；目标资源必须存在且未被删除。
-                    - 处理：读取当前用户点赞状态并取反，写入新的点赞状态；点赞时资源点赞数加一，取消点赞时资源点赞数减一；不影响评分和阅读状态。
+                    - 处理：写入当前用户指定的点赞状态；仅在状态实际变化时更新资源点赞数；重复提交相同状态不重复改变统计；不影响评分和阅读状态。
                     - 失败：资源不存在或已被删除 -> ResourceError.RESOURCE_NOT_FOUND。
                     - 响应：成功时返回空结果。
                     """
     )
     @Log(title = "资源点赞", businessType = BusinessType.UPDATE)
-    @PostMapping("/toggleLike")
+    @PostMapping("/like")
     public R<Void> changeResourceLikeStatus(@Validated @RequestBody ResourceLikeRequest request) {
         String userId = SecurityContextHolder.getUserId().toString();
         resourceInteractionService.changeResourceLikeStatus(request, userId);

@@ -57,14 +57,15 @@ public class ResourceInteractionServiceImpl implements IResourceInteractionServi
     public void changeResourceLikeStatus(ResourceLikeRequest request, String userId) {
         String resourceId = request.getResourceId();
         resourceService.getResourceEntity(request.getResourceId());
-        boolean currentLiked = resourceUserInteractRecordRepository
-                .findByUserIdAndResourceId(userId, resourceId)
-                .map(r -> Boolean.TRUE.equals(r.getLiked()))
-                .orElse(false);
-        boolean wantLiked = !currentLiked;
-        customResourceUserInteractionRecordRepository.findAndSetLiked(resourceId, userId, wantLiked);
+        boolean wantLiked = Boolean.TRUE.equals(request.getLiked());
+        ResourceUserInteractionRecordEntity oldRecord =
+                customResourceUserInteractionRecordRepository.findAndSetLiked(resourceId, userId, wantLiked);
+        boolean oldLiked = oldRecord != null && Boolean.TRUE.equals(oldRecord.getLiked());
+        if (oldLiked == wantLiked) {
+            return;
+        }
         customResourceItemRepository.updateLikeCount(resourceId, wantLiked ? 1 : -1);
-        log.info("resource like toggled. resourceId={} userId={} wantLiked={}", resourceId, userId, wantLiked);
+        log.info("resource like status changed. resourceId={} userId={} liked={}", resourceId, userId, wantLiked);
     }
 
     @Override
@@ -84,5 +85,4 @@ public class ResourceInteractionServiceImpl implements IResourceInteractionServi
                 resourceId, userId, oldScore, newScore);
     }
 }
-
 

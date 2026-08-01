@@ -26,6 +26,7 @@ public interface ResourceValidationMsg {
     String FILE_ORG_LOGIC_NOT_NULL = "资源组织模式不能为空";
 
     // 互动相关校验
+    String LIKE_STATUS_NOT_NULL = "点赞状态不能为空";
     String SCORE_RANGE_INVALID = "评分必须在1到5之间";
 
     // Market 相关校验

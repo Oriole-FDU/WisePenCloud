@@ -108,38 +108,38 @@ public class CustomResourceItemRepository {
 
     /** 更新阅读量 */
     public void updateReadCount(String resourceId, int delta) {
-        updateInteractionField(resourceId, "interactionInfo.readCount", delta);
+        updateInteractionField(resourceId, "resourceInteractionInfo.readCount", delta);
     }
 
     /** 更新点赞数 */
     public void updateLikeCount(String resourceId, int delta) {
-        updateInteractionField(resourceId, "interactionInfo.likeCount", delta);
+        updateInteractionField(resourceId, "resourceInteractionInfo.likeCount", delta);
     }
 
     /** 更新收藏数 */
     public void updateFavoriteCount(String resourceId, int delta) {
-        updateInteractionField(resourceId, "interactionInfo.favoriteCount", delta);
+        updateInteractionField(resourceId, "resourceInteractionInfo.favoriteCount", delta);
     }
 
     /** 批量更新收藏数 */
     public void updateFavoriteCount(List<String> resourceIds, int delta) {
         if (resourceIds.isEmpty()) return;
         Query query = Query.query(Criteria.where("_id").in(resourceIds));
-        Update update = new Update().inc("interactionInfo.favoriteCount", delta);
+        Update update = new Update().inc("resourceInteractionInfo.favoriteCount", delta);
         mongoTemplate.updateMulti(query, update, ResourceItemEntity.class);
     }
 
     /** 更新评论总数（顶级评论 + 所有回复） */
     public void updateCommentCount(String resourceId, int delta) {
-        updateInteractionField(resourceId, "interactionInfo.commentCount", delta);
+        updateInteractionField(resourceId, "resourceInteractionInfo.commentCount", delta);
     }
 
     /** 更新评分 */
     public void updateScore(String resourceId, int scoreCountDelta, int scoreTotalDelta) {
         Query query = Query.query(Criteria.where("_id").is(resourceId));
         Update update = new Update()
-                .inc("interactionInfo.scoreCount", scoreCountDelta)
-                .inc("interactionInfo.scoreTotal", scoreTotalDelta);
+                .inc("resourceInteractionInfo.scoreCount", scoreCountDelta)
+                .inc("resourceInteractionInfo.scoreTotal", scoreTotalDelta);
         mongoTemplate.updateFirst(query, update, ResourceItemEntity.class);
     }
 
