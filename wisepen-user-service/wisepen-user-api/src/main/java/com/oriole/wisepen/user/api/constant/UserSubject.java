@@ -10,6 +10,7 @@ public enum UserSubject implements IBusinessSubject {
     USER,
     GROUP,
     GROUP_MEMBER,
+    GROUP_ANNOUNCEMENT,
     MESSAGE,
     WALLET,
     WALLET_TOKEN,

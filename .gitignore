@@ -12,6 +12,7 @@ dev.properties
 # 开发文档与本地测试
 docs
 AGENTS.md
+self_docs/
 .local-tests/
 
 # 环境变量 / 凭证

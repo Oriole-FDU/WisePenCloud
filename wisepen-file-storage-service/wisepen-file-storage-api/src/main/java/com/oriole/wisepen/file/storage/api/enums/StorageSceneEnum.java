@@ -19,7 +19,8 @@ public enum StorageSceneEnum {
     PRIVATE_IMAGE_FOR_NOTE(3, "PRIVATE_IMAGE_FOR_NOTE", "public/images/note"),  // 私密图床，如笔记中的图片
     PRIVATE_DOC(4, "PRIVATE_DOC", "private/docs"),      // 文档，如 PDF、Word，永远在私有域
     PRIVATE_SKILL_ASSET(5, "PRIVATE_SKILL_ASSET", "private/skills"), // Skill 文档与脚本等私有资产
-    PRIVATE_AGENT_ASSET(6, "PRIVATE_AGENT_ASSET", "private/agents"); // Agent 文档与工具等私有资产
+    PRIVATE_AGENT_ASSET(6, "PRIVATE_AGENT_ASSET", "private/agents"), // Agent 文档与工具等私有资产
+    PRIVATE_GROUP_ANNOUNCEMENT(7, "PRIVATE_GROUP_ANNOUNCEMENT", "private/group-announcements");
 
     private final int code;
 
