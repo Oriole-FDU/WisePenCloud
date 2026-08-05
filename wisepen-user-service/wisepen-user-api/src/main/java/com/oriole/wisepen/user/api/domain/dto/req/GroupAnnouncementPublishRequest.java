@@ -9,7 +9,7 @@ import lombok.Data;
 import java.util.List;
 
 @Data
-public class GroupAnnouncementCreateRequest {
+public class GroupAnnouncementPublishRequest {
 
     @NotNull
     private Long groupId;

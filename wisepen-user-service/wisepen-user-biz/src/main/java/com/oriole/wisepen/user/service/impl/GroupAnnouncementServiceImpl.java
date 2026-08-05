@@ -17,7 +17,7 @@ import com.oriole.wisepen.file.storage.api.feign.RemoteStorageService;
 import com.oriole.wisepen.user.api.domain.base.UserDisplayBase;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupAnnouncementAttachmentRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupAnnouncementAttachmentUploadInitRequest;
-import com.oriole.wisepen.user.api.domain.dto.req.GroupAnnouncementCreateRequest;
+import com.oriole.wisepen.user.api.domain.dto.req.GroupAnnouncementPublishRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupAnnouncementUpdateRequest;
 import com.oriole.wisepen.user.api.domain.dto.res.GroupAnnouncementAttachmentResponse;
 import com.oriole.wisepen.user.api.domain.dto.res.GroupAnnouncementAttachmentUploadInitResponse;
@@ -41,6 +41,7 @@ import com.oriole.wisepen.user.service.IUserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -97,7 +98,7 @@ public class GroupAnnouncementServiceImpl implements IGroupAnnouncementService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Long createAnnouncement(GroupAnnouncementCreateRequest req, Long publisherId) {
+    public Long publishAnnouncement(GroupAnnouncementPublishRequest req, Long publisherId) {
         if (groupMapper.selectById(req.getGroupId()) == null) {
             throw new ServiceException(UserError.GROUP_NOT_EXIST);
         }
@@ -123,7 +124,7 @@ public class GroupAnnouncementServiceImpl implements IGroupAnnouncementService {
                 .bizTraceId("group-announcement:%d:publish".formatted(announcement.getAnnouncementId()))
                 .receiverUserIds(receiverUserIds)
                 .build());
-        log.info("group announcement created. groupId={} announcementId={} publisherId={} attachmentCount={}",
+        log.info("group announcement published. groupId={} announcementId={} publisherId={} attachmentCount={}",
                 req.getGroupId(), announcement.getAnnouncementId(), publisherId, storageRecords.size());
         return announcement.getAnnouncementId();
     }
@@ -207,13 +208,22 @@ public class GroupAnnouncementServiceImpl implements IGroupAnnouncementService {
     public GroupAnnouncementDetailResponse getAnnouncementDetail(Long groupId, Long announcementId, Long userId) {
         GroupAnnouncementEntity announcement = getAnnouncement(groupId, announcementId);
         LocalDateTime now = LocalDateTime.now();
-        readMapper.insertIgnore(GroupAnnouncementReadEntity.builder()
-                .id(IdWorker.getId())
-                .announcementId(announcementId)
-                .userId(userId)
-                .readTime(now)
-                .createTime(now)
-                .build());
+        long existingReadCount = readMapper.selectCount(new LambdaQueryWrapper<GroupAnnouncementReadEntity>()
+                .eq(GroupAnnouncementReadEntity::getAnnouncementId, announcementId)
+                .eq(GroupAnnouncementReadEntity::getUserId, userId));
+        if (existingReadCount == 0) {
+            try {
+                readMapper.insert(GroupAnnouncementReadEntity.builder()
+                        .id(IdWorker.getId())
+                        .announcementId(announcementId)
+                        .userId(userId)
+                        .readTime(now)
+                        .createTime(now)
+                        .build());
+            } catch (DuplicateKeyException ignored) {
+                // 并发首次查看时依赖唯一键保持首次已读时间，不覆盖已有记录。
+            }
+        }
         List<GroupAnnouncementAttachmentEntity> attachments = attachmentMapper.selectList(
                 new LambdaQueryWrapper<GroupAnnouncementAttachmentEntity>()
                         .eq(GroupAnnouncementAttachmentEntity::getAnnouncementId, announcementId)
@@ -251,10 +261,12 @@ public class GroupAnnouncementServiceImpl implements IGroupAnnouncementService {
     public GroupAnnouncementReadStatsResponse getReadStats(Long groupId, Long announcementId, Long operatorUserId) {
         GroupAnnouncementEntity announcement = getAnnouncement(groupId, announcementId);
         assertPublisher(announcement, operatorUserId);
-        long memberCount = groupMemberMapper.selectCount(new LambdaQueryWrapper<GroupMemberEntity>()
-                .eq(GroupMemberEntity::getGroupId, groupId));
-        long readCount = readMapper.countCurrentReadMembers(groupId, announcementId);
-        return new GroupAnnouncementReadStatsResponse(readCount, memberCount - readCount);
+        List<Long> currentMemberIds = listCurrentMemberIds(groupId, null);
+        long readCount = currentMemberIds.isEmpty() ? 0L : readMapper.selectCount(
+                new LambdaQueryWrapper<GroupAnnouncementReadEntity>()
+                        .eq(GroupAnnouncementReadEntity::getAnnouncementId, announcementId)
+                        .in(GroupAnnouncementReadEntity::getUserId, currentMemberIds));
+        return new GroupAnnouncementReadStatsResponse(readCount, currentMemberIds.size() - readCount);
     }
 
     @Override
@@ -263,8 +275,18 @@ public class GroupAnnouncementServiceImpl implements IGroupAnnouncementService {
         GroupAnnouncementEntity announcement = getAnnouncement(groupId, announcementId);
         assertPublisher(announcement, operatorUserId);
         if (read) {
-            IPage<GroupAnnouncementReadEntity> readPage = readMapper.selectReadMemberPage(
-                    new Page<>(page, size), groupId, announcementId);
+            List<Long> currentMemberIds = listCurrentMemberIds(groupId, null);
+            if (currentMemberIds.isEmpty()) {
+                return new PageR<>(0, page, size);
+            }
+            IPage<GroupAnnouncementReadEntity> readPage = readMapper.selectPage(
+                    new Page<>(page, size),
+                    new LambdaQueryWrapper<GroupAnnouncementReadEntity>()
+                            .eq(GroupAnnouncementReadEntity::getAnnouncementId, announcementId)
+                            .in(GroupAnnouncementReadEntity::getUserId, currentMemberIds)
+                            .select(GroupAnnouncementReadEntity::getUserId, GroupAnnouncementReadEntity::getReadTime)
+                            .orderByAsc(GroupAnnouncementReadEntity::getReadTime)
+                            .orderByAsc(GroupAnnouncementReadEntity::getUserId));
             PageR<GroupAnnouncementReadMemberResponse> result = new PageR<>(readPage.getTotal(), page, size);
             Map<Long, UserDisplayBase> userMap = getUserDisplayInfo(readPage.getRecords().stream()
                     .map(GroupAnnouncementReadEntity::getUserId).collect(Collectors.toSet()));
@@ -278,13 +300,26 @@ public class GroupAnnouncementServiceImpl implements IGroupAnnouncementService {
             return result;
         }
 
-        IPage<Long> unreadPage = readMapper.selectUnreadUserIdPage(new Page<>(page, size), groupId, announcementId);
+        Set<Long> readUserIds = readMapper.selectList(new LambdaQueryWrapper<GroupAnnouncementReadEntity>()
+                        .eq(GroupAnnouncementReadEntity::getAnnouncementId, announcementId)
+                        .select(GroupAnnouncementReadEntity::getUserId))
+                .stream().map(GroupAnnouncementReadEntity::getUserId).collect(Collectors.toSet());
+        IPage<GroupMemberEntity> unreadPage = groupMemberMapper.selectPage(
+                new Page<>(page, size),
+                new LambdaQueryWrapper<GroupMemberEntity>()
+                        .eq(GroupMemberEntity::getGroupId, groupId)
+                        .notIn(!readUserIds.isEmpty(), GroupMemberEntity::getUserId, readUserIds)
+                        .select(GroupMemberEntity::getUserId)
+                        .orderByDesc(GroupMemberEntity::getJoinTime)
+                        .orderByAsc(GroupMemberEntity::getUserId));
         PageR<GroupAnnouncementReadMemberResponse> result = new PageR<>(unreadPage.getTotal(), page, size);
-        Map<Long, UserDisplayBase> userMap = getUserDisplayInfo(new HashSet<>(unreadPage.getRecords()));
-        result.addAll(unreadPage.getRecords().stream().map(userId -> {
+        Set<Long> unreadUserIds = unreadPage.getRecords().stream()
+                .map(GroupMemberEntity::getUserId).collect(Collectors.toSet());
+        Map<Long, UserDisplayBase> userMap = getUserDisplayInfo(unreadUserIds);
+        result.addAll(unreadPage.getRecords().stream().map(member -> {
             GroupAnnouncementReadMemberResponse response = new GroupAnnouncementReadMemberResponse();
-            response.setUserId(userId);
-            response.setUserInfo(userMap.get(userId));
+            response.setUserId(member.getUserId());
+            response.setUserInfo(userMap.get(member.getUserId()));
             return response;
         }).toList());
         return result;
@@ -328,11 +363,10 @@ public class GroupAnnouncementServiceImpl implements IGroupAnnouncementService {
         if (attachmentRequests == null || attachmentRequests.isEmpty()) {
             return;
         }
-        List<GroupAnnouncementAttachmentEntity> attachments = new java.util.ArrayList<>();
         for (int index = 0; index < attachmentRequests.size(); index++) {
             GroupAnnouncementAttachmentRequest attachmentRequest = attachmentRequests.get(index);
             StorageRecordDTO storageRecord = storageRecords.get(attachmentRequest.getObjectKey());
-            attachments.add(GroupAnnouncementAttachmentEntity.builder()
+            GroupAnnouncementAttachmentEntity attachment = GroupAnnouncementAttachmentEntity.builder()
                     .attachmentId(IdWorker.getId())
                     .announcementId(announcementId)
                     .objectKey(attachmentRequest.getObjectKey())
@@ -340,18 +374,18 @@ public class GroupAnnouncementServiceImpl implements IGroupAnnouncementService {
                     .fileSize(storageRecord.getSize())
                     .sortOrder(index)
                     .createTime(now)
-                    .build());
+                    .build();
+            attachmentMapper.insert(attachment);
         }
-        attachmentMapper.insertBatch(attachments);
     }
 
     private List<Long> listCurrentMemberIds(Long groupId, Long excludedUserId) {
         return groupMemberMapper.selectList(new LambdaQueryWrapper<GroupMemberEntity>()
-                        .eq(GroupMemberEntity::getGroupId, groupId)
-                        .select(GroupMemberEntity::getUserId))
+                .eq(GroupMemberEntity::getGroupId, groupId)
+                .select(GroupMemberEntity::getUserId))
                 .stream()
                 .map(GroupMemberEntity::getUserId)
-                .filter(userId -> !excludedUserId.equals(userId))
+                .filter(userId -> excludedUserId == null || !excludedUserId.equals(userId))
                 .toList();
     }
 

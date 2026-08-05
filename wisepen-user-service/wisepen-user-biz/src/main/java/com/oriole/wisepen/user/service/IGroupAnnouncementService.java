@@ -2,7 +2,7 @@ package com.oriole.wisepen.user.service;
 
 import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupAnnouncementAttachmentUploadInitRequest;
-import com.oriole.wisepen.user.api.domain.dto.req.GroupAnnouncementCreateRequest;
+import com.oriole.wisepen.user.api.domain.dto.req.GroupAnnouncementPublishRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupAnnouncementUpdateRequest;
 import com.oriole.wisepen.user.api.domain.dto.res.GroupAnnouncementAttachmentUploadInitResponse;
 import com.oriole.wisepen.user.api.domain.dto.res.GroupAnnouncementDetailResponse;
@@ -15,7 +15,7 @@ public interface IGroupAnnouncementService {
     GroupAnnouncementAttachmentUploadInitResponse initAttachmentUpload(
             GroupAnnouncementAttachmentUploadInitRequest req, Long operatorUserId);
 
-    Long createAnnouncement(GroupAnnouncementCreateRequest req, Long publisherId);
+    Long publishAnnouncement(GroupAnnouncementPublishRequest req, Long publisherId);
 
     void updateAnnouncement(GroupAnnouncementUpdateRequest req, Long operatorUserId);
 

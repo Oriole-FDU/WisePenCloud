@@ -8,7 +8,7 @@ import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.security.annotation.CheckLogin;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupAnnouncementAttachmentUploadInitRequest;
-import com.oriole.wisepen.user.api.domain.dto.req.GroupAnnouncementCreateRequest;
+import com.oriole.wisepen.user.api.domain.dto.req.GroupAnnouncementPublishRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupAnnouncementUpdateRequest;
 import com.oriole.wisepen.user.api.domain.dto.res.GroupAnnouncementAttachmentUploadInitResponse;
 import com.oriole.wisepen.user.api.domain.dto.res.GroupAnnouncementDetailResponse;
@@ -64,16 +64,16 @@ public class GroupAnnouncementController {
                     - 用途：由小组 OWNER 或 ADMIN 发布一条对当前组成员可见的公告。
                     - 请求：groupId 指定目标小组；content 是公告正文；attachments 是已上传附件的完整关联列表。
                     - 约束：当前用户必须是目标小组 OWNER 或 ADMIN；附件 objectKey 必须属于该小组的私有公告存储目录且已存在。
-                    - 处理：创建公告和附件关联记录，并在事务提交后向操作时的当前组成员发送站内信；不创建草稿或定时发布任务。
+                    - 处理：创建公告和附件关联记录，并在事务提交后向除操作人本人外的当前组成员发送站内信；不创建草稿或定时发布任务。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN；当前用户不是 OWNER/ADMIN -> PermissionError.PERMISSION_DENIED；小组不存在 -> UserError.GROUP_NOT_EXIST；附件无效 -> UserError.GROUP_ANNOUNCEMENT_ATTACHMENT_INVALID；附件校验失败 -> UserError.GROUP_ANNOUNCEMENT_ATTACHMENT_VALIDATION_FAILED。
                     - 响应：返回新建公告 ID。
                     """
     )
     @Log(title = "发布小组公告", businessType = BusinessType.INSERT)
-    @PostMapping("/create")
-    public R<Long> createAnnouncement(@RequestBody @Valid GroupAnnouncementCreateRequest req) {
+    @PostMapping("/publishAnnouncement")
+    public R<Long> publishAnnouncement(@RequestBody @Valid GroupAnnouncementPublishRequest req) {
         SecurityContextHolder.assertGroupRole(req.getGroupId(), GroupRoleType.OWNER, GroupRoleType.ADMIN);
-        return R.ok(announcementService.createAnnouncement(req, SecurityContextHolder.getUserId()));
+        return R.ok(announcementService.publishAnnouncement(req, SecurityContextHolder.getUserId()));
     }
 
     @Operation(
@@ -82,7 +82,7 @@ public class GroupAnnouncementController {
                     - 用途：更新已发布小组公告的正文和附件。
                     - 请求：groupId 和 announcementId 指定目标公告；content 是更新后的正文；attachments 是更新后的完整附件列表。
                     - 约束：当前用户必须是目标小组 OWNER 或 ADMIN，且必须是公告发布者本人；附件必须属于目标小组的私有公告存储目录。
-                    - 处理：更新公告和附件关联记录，清空该公告全部已读记录，并在事务提交后向操作时的当前组成员发送站内信。
+                    - 处理：更新公告和附件关联记录，清空该公告全部已读记录，并在事务提交后向除操作人本人外的当前组成员发送站内信。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN；当前用户不是 OWNER/ADMIN 或不是发布者 -> PermissionError.PERMISSION_DENIED；公告不存在或不属于目标小组 -> UserError.GROUP_ANNOUNCEMENT_NOT_FOUND；附件无效 -> UserError.GROUP_ANNOUNCEMENT_ATTACHMENT_INVALID；附件校验失败 -> UserError.GROUP_ANNOUNCEMENT_ATTACHMENT_VALIDATION_FAILED。
                     - 响应：成功时返回空结果。
                     """
