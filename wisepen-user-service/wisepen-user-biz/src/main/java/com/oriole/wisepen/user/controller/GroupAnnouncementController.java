@@ -51,8 +51,8 @@ public class GroupAnnouncementController {
                     """
     )
     @Log(title = "初始化公告附件上传", businessType = BusinessType.INSERT, isSaveResponseData = false)
-    @PostMapping("/initAttachmentUpload")
-    public R<GroupAnnouncementAttachmentUploadInitResponse> initAttachmentUpload(
+    @PostMapping("/initAnnouncementAttachmentUpload")
+    public R<GroupAnnouncementAttachmentUploadInitResponse> initAnnouncementAttachmentUpload(
             @RequestBody @Valid GroupAnnouncementAttachmentUploadInitRequest req) {
         SecurityContextHolder.assertGroupRole(req.getGroupId(), GroupRoleType.OWNER, GroupRoleType.ADMIN);
         return R.ok(announcementService.initAttachmentUpload(req, SecurityContextHolder.getUserId()));
@@ -88,10 +88,10 @@ public class GroupAnnouncementController {
                     """
     )
     @Log(title = "更新小组公告", businessType = BusinessType.UPDATE)
-    @PostMapping("/update")
-    public R<Void> updateAnnouncement(@RequestBody @Valid GroupAnnouncementUpdateRequest req) {
+    @PostMapping("/changeAnnouncement")
+    public R<Void> changeAnnouncement(@RequestBody @Valid GroupAnnouncementUpdateRequest req) {
         SecurityContextHolder.assertGroupRole(req.getGroupId(), GroupRoleType.OWNER, GroupRoleType.ADMIN);
-        announcementService.updateAnnouncement(req, SecurityContextHolder.getUserId());
+        announcementService.changeAnnouncement(req, SecurityContextHolder.getUserId());
         return R.ok();
     }
 
@@ -107,11 +107,11 @@ public class GroupAnnouncementController {
                     """
     )
     @Log(title = "删除小组公告", businessType = BusinessType.DELETE)
-    @PostMapping("/delete")
-    public R<Void> deleteAnnouncement(@RequestParam("groupId") Long groupId,
+    @PostMapping("/removeAnnouncement")
+    public R<Void> removeAnnouncement(@RequestParam("groupId") Long groupId,
                                       @RequestParam("announcementId") Long announcementId) {
         SecurityContextHolder.assertGroupRole(groupId, GroupRoleType.OWNER, GroupRoleType.ADMIN);
-        announcementService.deleteAnnouncement(groupId, announcementId, SecurityContextHolder.getUserId());
+        announcementService.removeAnnouncement(groupId, announcementId, SecurityContextHolder.getUserId());
         return R.ok();
     }
 
@@ -126,7 +126,7 @@ public class GroupAnnouncementController {
                     - 响应：返回公告分页列表。
                     """
     )
-    @GetMapping("/list")
+    @GetMapping("/listAnnouncements")
     public R<PageR<GroupAnnouncementListItemResponse>> listAnnouncements(
             @RequestParam("groupId") Long groupId,
             @RequestParam(value = "page", defaultValue = "1") @Min(1) int page,
@@ -146,7 +146,7 @@ public class GroupAnnouncementController {
                     - 响应：返回公告详情。
                     """
     )
-    @GetMapping("/detail")
+    @GetMapping("/getAnnouncementDetail")
     public R<GroupAnnouncementDetailResponse> getAnnouncementDetail(
             @RequestParam("groupId") Long groupId,
             @RequestParam("announcementId") Long announcementId) {
@@ -165,8 +165,8 @@ public class GroupAnnouncementController {
                     - 响应：返回短时下载地址。
                     """
     )
-    @GetMapping("/attachment/downloadUrl")
-    public R<String> getAttachmentDownloadUrl(
+    @GetMapping("/getAnnouncementAttachmentDownloadUrl")
+    public R<String> getAnnouncementAttachmentDownloadUrl(
             @RequestParam("groupId") Long groupId,
             @RequestParam("announcementId") Long announcementId,
             @RequestParam("attachmentId") Long attachmentId) {
@@ -185,8 +185,8 @@ public class GroupAnnouncementController {
                     - 响应：返回已读人数和未读人数。
                     """
     )
-    @GetMapping("/readStats")
-    public R<GroupAnnouncementReadStatsResponse> getReadStats(
+    @GetMapping("/getAnnouncementReadStats")
+    public R<GroupAnnouncementReadStatsResponse> getAnnouncementReadStats(
             @RequestParam("groupId") Long groupId,
             @RequestParam("announcementId") Long announcementId) {
         SecurityContextHolder.assertInGroup(groupId);
@@ -204,8 +204,8 @@ public class GroupAnnouncementController {
                     - 响应：返回成员分页列表。
                     """
     )
-    @GetMapping("/readMembers")
-    public R<PageR<GroupAnnouncementReadMemberResponse>> listReadMembers(
+    @GetMapping("/listAnnouncementReadMembers")
+    public R<PageR<GroupAnnouncementReadMemberResponse>> listAnnouncementReadMembers(
             @RequestParam("groupId") Long groupId,
             @RequestParam("announcementId") Long announcementId,
             @RequestParam("read") boolean read,

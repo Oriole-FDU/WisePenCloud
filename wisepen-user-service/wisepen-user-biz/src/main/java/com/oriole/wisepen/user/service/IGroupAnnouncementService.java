@@ -17,9 +17,9 @@ public interface IGroupAnnouncementService {
 
     Long publishAnnouncement(GroupAnnouncementPublishRequest req, Long publisherId);
 
-    void updateAnnouncement(GroupAnnouncementUpdateRequest req, Long operatorUserId);
+    void changeAnnouncement(GroupAnnouncementUpdateRequest req, Long operatorUserId);
 
-    void deleteAnnouncement(Long groupId, Long announcementId, Long operatorUserId);
+    void removeAnnouncement(Long groupId, Long announcementId, Long operatorUserId);
 
     PageR<GroupAnnouncementListItemResponse> listAnnouncements(Long groupId, Long userId, int page, int size);
 

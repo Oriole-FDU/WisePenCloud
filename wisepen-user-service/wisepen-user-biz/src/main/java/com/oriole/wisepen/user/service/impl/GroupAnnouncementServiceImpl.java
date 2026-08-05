@@ -131,7 +131,7 @@ public class GroupAnnouncementServiceImpl implements IGroupAnnouncementService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void updateAnnouncement(GroupAnnouncementUpdateRequest req, Long operatorUserId) {
+    public void changeAnnouncement(GroupAnnouncementUpdateRequest req, Long operatorUserId) {
         GroupAnnouncementEntity announcement = getAnnouncement(req.getGroupId(), req.getAnnouncementId());
         assertPublisher(announcement, operatorUserId);
         Map<String, StorageRecordDTO> storageRecords = validateAttachments(req.getGroupId(), req.getAttachments());
@@ -158,7 +158,7 @@ public class GroupAnnouncementServiceImpl implements IGroupAnnouncementService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void deleteAnnouncement(Long groupId, Long announcementId, Long operatorUserId) {
+    public void removeAnnouncement(Long groupId, Long announcementId, Long operatorUserId) {
         GroupAnnouncementEntity announcement = getAnnouncement(groupId, announcementId);
         assertPublisher(announcement, operatorUserId);
         announcementMapper.deleteById(announcementId);

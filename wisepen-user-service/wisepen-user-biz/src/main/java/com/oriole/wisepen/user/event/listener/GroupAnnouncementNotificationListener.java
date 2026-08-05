@@ -31,7 +31,7 @@ public class GroupAnnouncementNotificationListener {
             request.setMessageType(MessageType.GROUP);
             request.setTitle(event.getTitle());
             request.setContent(event.getContent());
-            request.setJumpUrl("/group/announcement/detail?groupId=%d&announcementId=%d"
+            request.setJumpUrl("/group/announcement/getAnnouncementDetail?groupId=%d&announcementId=%d"
                     .formatted(event.getGroupId(), event.getAnnouncementId()));
             request.setSourceService(BusinessDomain.USER);
             request.setBizTraceId(event.getBizTraceId());
