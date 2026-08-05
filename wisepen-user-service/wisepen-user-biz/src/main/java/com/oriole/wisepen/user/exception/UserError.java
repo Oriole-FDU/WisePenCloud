@@ -43,6 +43,11 @@ public enum UserError implements IResult {
     GROUP_MEMBER_ALREADY_EXISTS(3521, new ResultKey(BusinessDomain.USER, UserSubject.GROUP_MEMBER, ErrorReason.ALREADY_EXISTS),"小组成员已存在"),
     CANNOT_QUIT_GROUP_AS_OWNER(3531, new ResultKey(BusinessDomain.USER, UserSubject.GROUP_MEMBER, ErrorReason.NOT_ALLOWED), "组长不能退出小组"),
 
+    // 小组公告相关异常
+    GROUP_ANNOUNCEMENT_NOT_FOUND(3561, new ResultKey(BusinessDomain.USER, UserSubject.GROUP_ANNOUNCEMENT, ErrorReason.NOT_FOUND), "小组公告不存在"),
+    GROUP_ANNOUNCEMENT_ATTACHMENT_INVALID(3562, new ResultKey(BusinessDomain.USER, UserSubject.GROUP_ANNOUNCEMENT, ErrorReason.INVALID), "公告附件无效"),
+    GROUP_ANNOUNCEMENT_ATTACHMENT_VALIDATION_FAILED(3563, new ResultKey(BusinessDomain.USER, UserSubject.GROUP_ANNOUNCEMENT, ErrorReason.FAILED), "公告附件校验失败"),
+
     // 钱包相关异常
     CANNOT_CONFIGURE_GROUP_WALLET_QUOTA(3611, new ResultKey(BusinessDomain.USER, UserSubject.WALLET, ErrorReason.NOT_ALLOWED),"小组不能配置配额"),
     // TOKEN钱包相关异常

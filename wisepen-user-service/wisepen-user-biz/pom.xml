@@ -30,6 +30,11 @@
             <artifactId>wisepen-resource-api</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.oriole</groupId>
+            <artifactId>wisepen-file-storage-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <!--业务日志包-->
         <dependency>
             <groupId>com.oriole</groupId>
