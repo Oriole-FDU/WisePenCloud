@@ -10,6 +10,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.user.api.domain.dto.req.MessagePublishRequest;
+import com.oriole.wisepen.user.api.domain.dto.res.AdminMessageInfoResponse;
 import com.oriole.wisepen.user.api.domain.dto.res.MessageInfoResponse;
 import com.oriole.wisepen.user.api.enums.MessageDeliveryScope;
 import com.oriole.wisepen.user.api.enums.MessageType;
@@ -59,6 +60,7 @@ public class MessageServiceImpl implements IMessageService {
         if (message == null) {
             // 不存在则插入消息
             message = BeanUtil.copyProperties(req, MessageEntity.class);
+            message.setReadCount(0L);
             messageMapper.insert(message);
         }
 
@@ -115,6 +117,22 @@ public class MessageServiceImpl implements IMessageService {
     }
 
     @Override
+    public PageR<AdminMessageInfoResponse> listAdminMessages(Integer page, Integer size) {
+        Page<MessageEntity> pageParam = new Page<>(page, size);
+        LambdaQueryWrapper<MessageEntity> messageWrapper = new LambdaQueryWrapper<>();
+        messageWrapper.orderByDesc(MessageEntity::getCreateTime).orderByDesc(MessageEntity::getMessageId);
+
+        IPage<MessageEntity> messagePage = messageMapper.selectPage(pageParam, messageWrapper);
+        PageR<AdminMessageInfoResponse> pageR = new PageR<>(messagePage.getTotal(), page, size);
+
+        List<AdminMessageInfoResponse> records = messagePage.getRecords().stream()
+                .map(message -> BeanUtil.copyProperties(message, AdminMessageInfoResponse.class))
+                .toList();
+        pageR.addAll(records);
+        return pageR;
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public Long getUnreadMessageCount(Long userId) {
         syncAllUserMessages(userId);
@@ -135,18 +153,40 @@ public class MessageServiceImpl implements IMessageService {
                 .isNull(MessageRecipientEntity::getDeleteTime)
                 .isNull(MessageRecipientEntity::getReadTime)
                 .set(MessageRecipientEntity::getReadTime, LocalDateTime.now());
-        messageRecipientMapper.update(null, wrapper);
+        int affectedRows = messageRecipientMapper.update(null, wrapper);
+        if (affectedRows > 0) {
+            messageMapper.incrementReadCount(messageId, (long) affectedRows);
+        }
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void readAllMessages(Long userId) {
-        LambdaUpdateWrapper<MessageRecipientEntity> wrapper = new LambdaUpdateWrapper<>();
-        wrapper.eq(MessageRecipientEntity::getUserId, userId)
+        LambdaQueryWrapper<MessageRecipientEntity> unreadWrapper = new LambdaQueryWrapper<>();
+        unreadWrapper.eq(MessageRecipientEntity::getUserId, userId)
                 .isNull(MessageRecipientEntity::getDeleteTime)
-                .isNull(MessageRecipientEntity::getReadTime)
-                .set(MessageRecipientEntity::getReadTime, LocalDateTime.now());
-        messageRecipientMapper.update(null, wrapper);
+                .isNull(MessageRecipientEntity::getReadTime);
+        List<Long> unreadMessageIds = messageRecipientMapper.selectList(unreadWrapper).stream()
+                .map(MessageRecipientEntity::getMessageId)
+                .distinct()
+                .toList();
+        if (CollectionUtils.isEmpty(unreadMessageIds)) {
+            return;
+        }
+
+        LocalDateTime readTime = LocalDateTime.now();
+        for (Long messageId : unreadMessageIds) {
+            LambdaUpdateWrapper<MessageRecipientEntity> wrapper = new LambdaUpdateWrapper<>();
+            wrapper.eq(MessageRecipientEntity::getUserId, userId)
+                    .eq(MessageRecipientEntity::getMessageId, messageId)
+                    .isNull(MessageRecipientEntity::getDeleteTime)
+                    .isNull(MessageRecipientEntity::getReadTime)
+                    .set(MessageRecipientEntity::getReadTime, readTime);
+            int affectedRows = messageRecipientMapper.update(null, wrapper);
+            if (affectedRows > 0) {
+                messageMapper.incrementReadCount(messageId, (long) affectedRows);
+            }
+        }
     }
 
     @Override

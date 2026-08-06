@@ -26,6 +26,8 @@ public class MessageEntity extends MessageBase {
 
     private String bizTraceId;
 
+    private Long readCount;
+
     @TableField(value = "create_time", fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 }
