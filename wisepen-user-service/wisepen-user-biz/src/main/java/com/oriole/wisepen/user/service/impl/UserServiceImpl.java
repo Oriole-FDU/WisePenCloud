@@ -12,6 +12,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.enums.IdentityType;
+import com.oriole.wisepen.common.core.domain.enums.UserStatus;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.system.api.domain.dto.MailSendDTO;
 import com.oriole.wisepen.system.api.feign.RemoteMailService;
@@ -22,7 +23,6 @@ import com.oriole.wisepen.user.api.domain.base.UserProfileBase;
 import com.oriole.wisepen.user.api.domain.dto.req.*;
 import com.oriole.wisepen.user.api.domain.dto.res.UserDetailInfoResponse;
 import com.oriole.wisepen.user.api.domain.dto.res.UserSearchUserResponse;
-import com.oriole.wisepen.user.api.enums.Status;
 import com.oriole.wisepen.user.cache.RedisCacheManager;
 import com.oriole.wisepen.user.domain.entity.GroupMemberEntity;
 import com.oriole.wisepen.user.domain.entity.UserEntity;
@@ -108,7 +108,7 @@ public class UserServiceImpl implements IUserService {
         String searchKeyword = keyword.trim();
         LambdaQueryWrapper<UserEntity> userWrapper = Wrappers.<UserEntity>lambdaQuery();
         // 被搜索的用户必须是已经认证的用户
-        userWrapper.eq(UserEntity::getStatus, Status.NORMAL).isNotNull(UserEntity::getVerificationMode)
+        userWrapper.eq(UserEntity::getUserStatus, UserStatus.NORMAL).isNotNull(UserEntity::getVerificationMode)
                 .and(wrapper -> wrapper.eq(UserEntity::getUsername, searchKeyword)
                         .or().eq(UserEntity::getRealName, searchKeyword)
                         .or().eq(UserEntity::getEmail, searchKeyword)
@@ -142,7 +142,7 @@ public class UserServiceImpl implements IUserService {
 
         LambdaQueryWrapper<UserEntity> userWrapper = Wrappers.<UserEntity>lambdaQuery();
         userWrapper.in(UserEntity::getUserId, groupUserIds)
-                .eq(UserEntity::getStatus, Status.NORMAL)
+                .eq(UserEntity::getUserStatus, UserStatus.NORMAL)
                 .isNotNull(UserEntity::getVerificationMode)
                 .and(wrapper -> wrapper.likeRight(UserEntity::getUsername, searchKeyword)
                         .or().likeRight(UserEntity::getRealName, searchKeyword)
@@ -169,7 +169,7 @@ public class UserServiceImpl implements IUserService {
                 .username(req.getUsername())
                 .nickname(req.getUsername())
                 .identityType(IdentityType.STUDENT)
-                .status(Status.UNIDENTIFIED)
+                .userStatus(UserStatus.UNIDENTIFIED)
                 .build();
 
         // 加密用户密码
@@ -197,7 +197,7 @@ public class UserServiceImpl implements IUserService {
         if (userEntity == null) {
             log.warn("password reset mail skipped for unknown user. username={}", username);
             return; // 处于安全考虑，不存在也不报错，防止撞库
-        } else if (userEntity.getStatus() == Status.UNIDENTIFIED) {
+        } else if (userEntity.getUserStatus() == UserStatus.UNIDENTIFIED) {
             // 未通过身份认证，不能找回密码
             throw new ServiceException(UserError.CANNOT_OPERATE_BEFORE_AUTH_VERIFICATION);
         }
@@ -243,7 +243,7 @@ public class UserServiceImpl implements IUserService {
         res.setUserProfile(BeanUtil.copyProperties(userProfileEntity, UserProfileBase.class));
 
         // 如果已验证
-        if (userEntity.getStatus() != Status.UNIDENTIFIED) {
+        if (userEntity.getUserStatus() != UserStatus.UNIDENTIFIED) {
             // 设置只读字段
             List<String> readonlyFields = strategyFactory.getStrategy(userEntity.getVerificationMode())
                     .getReadonlyFields();
@@ -284,7 +284,7 @@ public class UserServiceImpl implements IUserService {
     @Override
     public void updateProfile(Long userId, UserProfileUpdateRequest req) {
         UserEntity userEntity = userMapper.selectById(userId);
-        if (userEntity.getStatus() == Status.UNIDENTIFIED) {
+        if (userEntity.getUserStatus() == UserStatus.UNIDENTIFIED) {
             // 未通过身份认证，不能更新Profile
             throw new ServiceException(UserError.CANNOT_OPERATE_BEFORE_AUTH_VERIFICATION);
         }
@@ -326,7 +326,7 @@ public class UserServiceImpl implements IUserService {
         Long userId = req.getUserId();
         UserEntity userEntity = userMapper.selectById(userId);
         boolean authContextChanged = (req.getIdentityType() != null && !req.getIdentityType().equals(userEntity.getIdentityType()))
-                || (req.getStatus() != null && !req.getStatus().equals(userEntity.getStatus()));
+                || (req.getUserStatus() != null && !req.getUserStatus().equals(userEntity.getUserStatus()));
 
         // 唯一性校验 username
         if (req.getUsername() != null && !req.getUsername().equals(userEntity.getUsername())) {
@@ -340,7 +340,7 @@ public class UserServiceImpl implements IUserService {
         if (req.getCampusNo() != null && !req.getCampusNo().equals(userEntity.getCampusNo())) {
             if (userMapper.selectCount(Wrappers.<UserEntity>lambdaQuery()
                     .eq(UserEntity::getCampusNo, req.getCampusNo())
-                    .eq(UserEntity::getStatus, Status.NORMAL)
+                    .eq(UserEntity::getUserStatus, UserStatus.NORMAL)
                     .ne(UserEntity::getUserId, userId)) > 0) {
                 throw new ServiceException(UserError.CAMPUS_NO_ALREADY_EXISTS);
             }
@@ -370,15 +370,15 @@ public class UserServiceImpl implements IUserService {
     }
 
     @Override
-    public PageR<UserEntity> getUserListAdmin(int page, int size, String keyword, Status status,
+    public PageR<UserEntity> getUserListAdmin(int page, int size, String keyword, UserStatus userStatus,
             IdentityType identityType) {
         page = Math.max(1, page);
         size = Math.max(1, size);
 
         // 构建查询条件
         LambdaQueryWrapper<UserEntity> queryWrapper = Wrappers.<UserEntity>lambdaQuery().eq(UserEntity::getDelFlag, 0);
-        if (status != null) {
-            queryWrapper.eq(UserEntity::getStatus, status);
+        if (userStatus != null) {
+            queryWrapper.eq(UserEntity::getUserStatus, userStatus);
         }
         if (identityType != null) {
             queryWrapper.eq(UserEntity::getIdentityType, identityType);

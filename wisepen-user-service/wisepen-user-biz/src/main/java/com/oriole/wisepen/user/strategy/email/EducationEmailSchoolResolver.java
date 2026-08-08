@@ -18,19 +18,32 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+/**
+ * 教育邮箱学校解析器。
+ *
+ * 启动时加载教育邮箱域名索引，并根据邮箱地址或域名解析对应的学校。
+ * 域名查询支持从完整子域名逐级回退到父域名。
+ */
 @Slf4j
 @Component
-public class EducationEmailSchoolRegistry {
+public class EducationEmailSchoolResolver {
 
+    /** 教育邮箱学校索引文件。 */
     private static final String DATA_RESOURCE = "data/edu-email-schools.json";
+
+    /** 允许参与学校解析的教育邮箱域名后缀。 */
     private static final Set<String> TARGET_SUFFIXES = Set.of(".edu", ".edu.cn");
+
     private final ObjectMapper objectMapper;
+
+    /** 规范化后的学校域名索引，key 为域名，value 为学校信息。 */
     private Map<String, EducationEmailSchool> schoolsByDomain = Collections.emptyMap();
 
-    public EducationEmailSchoolRegistry(ObjectMapper objectMapper) {
+    public EducationEmailSchoolResolver(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
+    /** 加载并规范化教育邮箱学校域名索引。 */
     @PostConstruct
     public void load() {
         ClassPathResource resource = new ClassPathResource(DATA_RESOURCE);
@@ -41,14 +54,21 @@ public class EducationEmailSchoolRegistry {
                     schoolsByDomain.size(), index.getSourceCommit());
         } catch (IOException e) {
             log.error("education email school index load failed. resource={}", DATA_RESOURCE, e);
-            throw new IllegalStateException("教育邮箱学校索引加载失败", e);
+            throw new IllegalStateException("education email school index load failed.", e);
         }
     }
 
+    /** 根据邮箱地址提取域名，并解析对应的学校。 */
     public Optional<EducationEmailSchool> findByEmail(String email) {
         return findByDomain(extractDomain(email));
     }
 
+    /**
+     * 根据域名解析学校。
+     *
+     * 优先匹配完整域名；未匹配时逐级移除最左侧子域名，
+     * 以支持诸如 {@code student.example.edu} 这类邮箱域名。</p>
+     */
     public Optional<EducationEmailSchool> findByDomain(String domain) {
         String candidateDomain = normalizeDomain(domain);
         if (!isTargetDomain(candidateDomain)) {
@@ -68,6 +88,7 @@ public class EducationEmailSchoolRegistry {
         return Optional.empty();
     }
 
+    /** 从邮箱地址中提取 {@code @} 后面的域名部分。 */
     private static String extractDomain(String email) {
         if (StrUtil.isBlank(email)) {
             return "";
@@ -79,6 +100,7 @@ public class EducationEmailSchoolRegistry {
         return email.substring(atIndex + 1);
     }
 
+    /** 统一域名格式，避免大小写和首尾空格影响匹配。 */
     private static String normalizeDomain(String domain) {
         if (StrUtil.isBlank(domain)) {
             return "";
@@ -86,6 +108,7 @@ public class EducationEmailSchoolRegistry {
         return domain.trim().toLowerCase(Locale.ROOT);
     }
 
+    /** 过滤无效数据，并构建不可变的规范化域名索引。 */
     private static Map<String, EducationEmailSchool> normalizeSchools(Map<String, EducationEmailSchool> source) {
         if (source == null || source.isEmpty()) {
             return Collections.emptyMap();
@@ -105,6 +128,7 @@ public class EducationEmailSchoolRegistry {
         return Collections.unmodifiableMap(normalized);
     }
 
+    /** 判断域名是否属于支持的教育邮箱域名范围。 */
     private static boolean isTargetDomain(String domain) {
         return TARGET_SUFFIXES.stream().anyMatch(domain::endsWith);
     }

@@ -41,5 +41,5 @@ public interface ResourceValidationMsg {
     // 收藏相关校验
     String COLLECTION_ID_NOT_BLANK = "收藏集合ID不能为空";
     String COLLECTION_NAME_NOT_BLANK = "收藏集合名称不能为空";
-    String FAVORITE_STATUS_NOT_NULL = "favorite status must not be null";
+    String FAVORITE_STATUS_NOT_NULL = "收藏状态不能为空";
 }

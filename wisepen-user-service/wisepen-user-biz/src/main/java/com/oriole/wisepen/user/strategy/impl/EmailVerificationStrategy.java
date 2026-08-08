@@ -4,25 +4,25 @@ import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.oriole.wisepen.common.core.domain.enums.IdentityType;
+import com.oriole.wisepen.common.core.domain.enums.UserStatus;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.system.api.domain.dto.MailSendDTO;
 import com.oriole.wisepen.system.api.feign.RemoteMailService;
 import com.oriole.wisepen.user.api.config.UserProperties;
 import com.oriole.wisepen.user.api.domain.dto.VerificationResultDTO;
-import com.oriole.wisepen.user.api.enums.Status;
 import com.oriole.wisepen.user.api.enums.UserVerificationMode;
 import com.oriole.wisepen.user.cache.RedisCacheManager;
-import com.oriole.wisepen.user.domain.dto.EmailVerificationTicket;
 import com.oriole.wisepen.user.domain.entity.UserEntity;
 import com.oriole.wisepen.user.domain.entity.UserProfileEntity;
 import com.oriole.wisepen.user.exception.UserError;
 import com.oriole.wisepen.user.mapper.UserMapper;
 import com.oriole.wisepen.user.mapper.UserProfileMapper;
 import com.oriole.wisepen.user.strategy.email.EducationEmailSchool;
-import com.oriole.wisepen.user.strategy.email.EducationEmailSchoolRegistry;
+import com.oriole.wisepen.user.strategy.email.EducationEmailSchoolResolver;
 import com.oriole.wisepen.user.strategy.UserVerificationStrategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.thymeleaf.TemplateEngine;
@@ -46,7 +46,7 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
     private final UserMapper userMapper;
     private final UserProfileMapper userProfileMapper;
     private final UserProperties userProperties;
-    private final EducationEmailSchoolRegistry educationEmailSchoolRegistry;
+    private final EducationEmailSchoolResolver educationEmailSchoolResolver;
 
     private final TemplateEngine templateEngine;
 
@@ -60,15 +60,13 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
         String email = StrUtil.blankToDefault((String) payload.get("email"), "").trim().toLowerCase(Locale.ROOT);
 
         if (StrUtil.isBlank(email) || !EMAIL_PATTERN.matcher(email).matches()) {
-            log.warn("email verification skipped. email={} userId={} reason=\"invalid email format\"",
-                    email, userId);
+            log.warn("email verification skipped. email={} userId={} reason=\"invalid email format\"", email, userId);
             throw new ServiceException(UserError.VERIFICATION_EMAIL_INVALID);
         }
 
-        EducationEmailSchool school = educationEmailSchoolRegistry.findByEmail(email)
+        educationEmailSchoolResolver.findByEmail(email)
                 .orElseThrow(() -> {
-                    log.warn("email verification skipped. email={} userId={} reason=\"unsupported education email domain\"",
-                            email, userId);
+                    log.warn("email verification skipped. email={} userId={} reason=\"unsupported education email domain\"", email, userId);
                     return new ServiceException(UserError.VERIFICATION_EMAIL_INVALID);
                 });
 
@@ -77,7 +75,7 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
 
         long existed = userMapper.selectCount(Wrappers.<UserEntity>lambdaQuery()
                 .eq(UserEntity::getEmail, email)
-                .eq(UserEntity::getStatus, Status.NORMAL)
+                .eq(UserEntity::getUserStatus, UserStatus.NORMAL)
                 .ne(UserEntity::getUserId, userId));
 
         if (existed > 0) {
@@ -85,14 +83,14 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
             throw new ServiceException(UserError.VERIFICATION_EMAIL_ALREADY_EXISTS);
         }
 
-        String token = redisCacheManager.setEmailVerificationCode(email, userId, school.getDomain(), school.getNameZh());
+        String token = redisCacheManager.setEmailVerificationCode(email, userId);
 
         // 构建验证链接
-        String resetLink = userProperties.getApiDomain() + "/verify-email?token=" + token;
+        String verifyLink = userProperties.getApiDomain() + "/verify-email?token=" + token;
 
         // 构建验证邮件
         Context context = new Context();
-        context.setVariable("verify_link", resetLink);
+        context.setVariable("verify_link", verifyLink);
         context.setVariable("current_date", DateUtil.now());
         // Thymeleaf 渲染
         String emailContent = templateEngine.process("verifyMailTemplate", context);
@@ -110,14 +108,14 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public VerificationResultDTO verify(Map<String, Object> payload) {
-        EmailVerificationTicket verifyInfo = redisCacheManager.getEmailVerificationTicket((String) payload.get("token"));
+        ImmutablePair<Long, String> verifyInfo = redisCacheManager.getEmailVerificationUser((String) payload.get("token"));
         if (verifyInfo == null) {
             throw new ServiceException(UserError.VERIFICATION_EMAIL_TOKEN_EXPIRED);
         }
-        Long userId = verifyInfo.getUserId();
-        String email = verifyInfo.getEmail();
+        Long userId = verifyInfo.getLeft();
+        String email = verifyInfo.getRight();
 
-        EducationEmailSchool school = educationEmailSchoolRegistry.findByEmail(email)
+        EducationEmailSchool school = educationEmailSchoolResolver.findByEmail(email)
                 .orElseThrow(() -> new ServiceException(UserError.VERIFICATION_EMAIL_INVALID));
 
         UserEntity currentUser = userMapper.selectById(userId);
@@ -126,7 +124,7 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
         // 在最终更新状态前，再次检查邮箱唯一性
         long existed = userMapper.selectCount(Wrappers.<UserEntity>lambdaQuery()
                 .eq(UserEntity::getEmail, email)
-                .eq(UserEntity::getStatus, Status.NORMAL)
+                .eq(UserEntity::getUserStatus, UserStatus.NORMAL)
                 .ne(UserEntity::getUserId, userId));
 
         if (existed > 0) {
@@ -137,31 +135,31 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
         UserEntity userEntity = new UserEntity();
         userEntity.setUserId(userId);
         userEntity.setEmail(email);
-        userEntity.setStatus(Status.NORMAL);
+        userEntity.setUserStatus(UserStatus.NORMAL);
         userEntity.setVerificationMode(UserVerificationMode.EDU_EMAIL);
 
         userMapper.updateById(userEntity);
 
         UserProfileEntity userProfileEntity = new UserProfileEntity();
         userProfileEntity.setUserId(userId);
-        userProfileEntity.setUniversity(verifyInfo.getUniversity());
+        userProfileEntity.setUniversity(school.getNameZh());
         userProfileMapper.updateById(userProfileEntity);
 
-        redisCacheManager.updateUserStatusInSession(userId, Status.NORMAL);
+        redisCacheManager.updateUserStatusInSession(userId, UserStatus.NORMAL);
         log.info("email verification succeeded. userId={} emailDomain={} university={}",
-                userId, school.getDomain(), verifyInfo.getUniversity());
+                userId, school.getDomain(), school.getNameZh());
         return VerificationResultDTO.success();
     }
 
     @Override
     public List<String> getReadonlyFields() {
-        return Arrays.asList("username", "email", "status", "university");
+        return Arrays.asList("username", "email", "userStatus", "university");
     }
 
     private void validateEmailVerificationState(UserEntity userEntity, Long userId, String email) {
         if (userEntity == null
-                || userEntity.getStatus() == Status.BANNED
-                || !IdentityType.STUDENT.equals(userEntity.getIdentityType())
+                || userEntity.getUserStatus() == UserStatus.BANNED // 被封禁的账号不能认证
+                || !IdentityType.STUDENT.equals(userEntity.getIdentityType()) // 仅学生可通过邮箱认证
                 || (userEntity.getVerificationMode() != null
                 && userEntity.getVerificationMode() != UserVerificationMode.EDU_EMAIL)) {
             log.warn("email verification skipped. email={} userId={} reason=\"user state invalid\"", email, userId);
