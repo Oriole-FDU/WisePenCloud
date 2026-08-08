@@ -115,30 +115,32 @@ public class GroupServiceImpl implements IGroupService {
     }
 
     @Override
-    public PageR<GroupItemInfoResponse> getGroupList(Long userId, GroupRoleFilter groupRoleFilter, int page, int size) {
-        Page<GroupMemberEntity> memberPage = new Page<>(page, size);
-
-        LambdaQueryWrapper<GroupMemberEntity> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(GroupMemberEntity::getUserId, userId);
+    public PageR<GroupItemInfoResponse> getGroupList(Long userId, GroupRoleFilter groupRoleFilter, GroupType groupType, int page, int size) {
+        LambdaQueryWrapper<GroupMemberEntity> memberWrapper = new LambdaQueryWrapper<>();
+        memberWrapper.eq(GroupMemberEntity::getUserId, userId)
+                .select(GroupMemberEntity::getGroupId);
         if (groupRoleFilter == GroupRoleFilter.ALL) {
-            wrapper.in(GroupMemberEntity::getRole, GroupRoleType.ADMIN, GroupRoleType.OWNER, GroupRoleType.MEMBER);
+            memberWrapper.in(GroupMemberEntity::getRole, GroupRoleType.ADMIN, GroupRoleType.OWNER, GroupRoleType.MEMBER);
         } else if (groupRoleFilter == GroupRoleFilter.MANAGED) {
-            wrapper.in(GroupMemberEntity::getRole, GroupRoleType.ADMIN, GroupRoleType.OWNER);
+            memberWrapper.in(GroupMemberEntity::getRole, GroupRoleType.ADMIN, GroupRoleType.OWNER);
         } else {
-            wrapper.in(GroupMemberEntity::getRole, GroupRoleType.MEMBER);
+            memberWrapper.in(GroupMemberEntity::getRole, GroupRoleType.MEMBER);
         }
-        Page<GroupMemberEntity> resultPage = groupMemberMapper.selectPage(memberPage, wrapper);
 
-        List<Long> groupIds = resultPage.getRecords().stream()
+        List<Long> groupIds = groupMemberMapper.selectList(memberWrapper).stream()
                 .map(GroupMemberEntity::getGroupId)
                 .collect(Collectors.toList());
-
-        PageR<GroupItemInfoResponse> pageR = new PageR<>(resultPage.getTotal(), page, size);
         if (groupIds.isEmpty()) {
-            return pageR;
+            return new PageR<>(0, page, size);
         }
 
-        List<GroupEntity> groups = groupMapper.selectBatchIds(groupIds);
+        LambdaQueryWrapper<GroupEntity> groupWrapper = new LambdaQueryWrapper<GroupEntity>()
+                .eq(groupType != null, GroupEntity::getGroupType, groupType)
+                .in(GroupEntity::getGroupId, groupIds);
+        Page<GroupEntity> resultPage = groupMapper.selectPage(new Page<>(page, size), groupWrapper);
+
+        PageR<GroupItemInfoResponse> pageR = new PageR<>(resultPage.getTotal(), page, size);
+        List<GroupEntity> groups = resultPage.getRecords();
         Set<Long> ownerIds = groups.stream().map(GroupEntity::getOwnerId).collect(Collectors.toSet());
         Map<Long, UserDisplayBase> ownerMap = userService.getUserDisplayInfoByIds(ownerIds);
 
