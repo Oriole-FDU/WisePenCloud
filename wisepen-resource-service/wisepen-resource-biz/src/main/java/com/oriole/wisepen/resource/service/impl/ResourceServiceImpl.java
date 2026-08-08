@@ -139,6 +139,20 @@ public class ResourceServiceImpl implements IResourceService {
         }
     }
 
+    @Override
+    public void assertResourceOwner(List<String> resourceIds, String userId) {
+        List<ResourceItemEntity> entities = findValidResourceEntities(resourceIds);
+        List<String> deniedResourceIds = entities.stream()
+                .filter(entity -> !userId.equals(entity.getOwnerId()))
+                .map(ResourceItemEntity::getResourceId)
+                .toList();
+        if (!deniedResourceIds.isEmpty()) {
+            log.warn("resource permission denied. deniedResources={} deniedResourceIds={} userId={}",
+                    deniedResourceIds.size(), summarizeIds(deniedResourceIds), userId);
+            throw new ServiceException(ResourceError.RESOURCE_PERMISSION_DENIED);
+        }
+    }
+
     public ResourceItemEntity getResourceEntity(String resourceId) {
         ResourceItemEntity resource = resourceItemRepository.findById(resourceId)
                 .orElseThrow(() -> new ServiceException(ResourceError.RESOURCE_NOT_FOUND));
@@ -146,6 +160,24 @@ public class ResourceServiceImpl implements IResourceService {
             throw new ServiceException(ResourceError.RESOURCE_NOT_FOUND);
         }
         return resource;
+    }
+
+    private List<ResourceItemEntity> findValidResourceEntities(List<String> resourceIds) {
+        resourceIds = resourceIds.stream().filter(StringUtils::hasText).distinct().toList();
+        if (resourceIds.isEmpty()) {
+            throw new ServiceException(ResourceError.RESOURCE_NOT_FOUND);
+        }
+
+        List<ResourceItemEntity> entities = resourceItemRepository.findAllById(resourceIds);
+        Set<String> foundResourceIds = entities.stream()
+                .filter(entity -> entity.getDeletedAt() == null)
+                .map(ResourceItemEntity::getResourceId)
+                .collect(Collectors.toSet());
+        if (foundResourceIds.size() != resourceIds.size()
+                || !foundResourceIds.containsAll(resourceIds)) {
+            throw new ServiceException(ResourceError.RESOURCE_NOT_FOUND);
+        }
+        return entities;
     }
 
     @Override
@@ -218,9 +250,8 @@ public class ResourceServiceImpl implements IResourceService {
     }
 
     @Override
-    public void updatePersonalResourceTags (String resourceId, String groupId, List<String> tagIds) {
-        ResourceItemEntity entity = getResourceEntity(resourceId);
-
+    public void updatePersonalResourceTags(List<String> resourceIds, String groupId, List<String> tagIds) {
+        List<ResourceItemEntity> entities = findValidResourceEntities(resourceIds);
         boolean isTrashed = false;
 
         if (tagIds == null || tagIds.isEmpty()) {
@@ -239,33 +270,43 @@ public class ResourceServiceImpl implements IResourceService {
         // 检查目标路径是否属于回收站
         if (tagService.isNodeInTrash(groupId, pathTags.getFirst().getTagId()) != ITagService.TagType.NOT_IN_TRASH) {
             isTrashed = true;
-            // 移入回收站会卸载除了个人组的所有节点，如果此前有发布到市场，则还需移除市场索引
-            entity.getGroupBinds().stream()
-                    .filter(bind -> bind.getMarketSaleInfo() != null)
-                    .forEach(bind -> searchSyncService.deleteMarketResourceIndexesByResourceIdAndMarketGroupId(
-                            entity.getResourceId(), bind.getGroupId()));
-            entity.getGroupBinds().removeIf(bind -> !bind.getGroupId().startsWith(ResourceConstants.PERSONAL_GROUP_PREFIX));
-            entity.setOverrideGrantedActionsMask(null);
-            entity.setSpecifiedUsersGrantedActionsMask(null);
-            entity.setComputedGroupAcls(null);
         }
 
-        entity.setGroupBinds(updateResourceGroupBinds(entity.getGroupBinds(), groupId, tagIds));
-        resourceItemRepository.save(entity);
-        log.info("resource tags changed. resourceId={} groupId={} tagCount={}",
-                entity.getResourceId(), groupId, tagIds.size());
+        for (ResourceItemEntity entity : entities) {
+            if (isTrashed) {
+                // 移入回收站会卸载除了个人组的所有节点，如果此前有发布到市场，则还需移除市场索引
+                entity.getGroupBinds().stream()
+                        .filter(bind -> bind.getMarketSaleInfo() != null)
+                        .forEach(bind -> searchSyncService.deleteMarketResourceIndexesByResourceIdAndMarketGroupId(
+                                entity.getResourceId(), bind.getGroupId()));
+                entity.getGroupBinds().removeIf(bind -> !bind.getGroupId().startsWith(ResourceConstants.PERSONAL_GROUP_PREFIX));
+                entity.setOverrideGrantedActionsMask(null);
+                entity.setSpecifiedUsersGrantedActionsMask(null);
+                entity.setComputedGroupAcls(null);
+            }
+            entity.setGroupBinds(updateResourceGroupBinds(entity.getGroupBinds(), groupId, tagIds));
+        }
+
+        resourceItemRepository.saveAll(entities);
+        log.info("resource tags changed. affectedResources={} affectedResourceIds={} groupId={} tagCount={}",
+                entities.size(),
+                summarizeIds(entities.stream().map(ResourceItemEntity::getResourceId).toList()),
+                groupId,
+                tagIds.size());
         if (isTrashed) {
-            eventPublisher.publishAclRecalculateEvent(entity.getResourceId(), "STRIP_GROUP_PERMISSION");
+            for (ResourceItemEntity entity : entities) {
+                eventPublisher.publishAclRecalculateEvent(entity.getResourceId(), "STRIP_GROUP_PERMISSION");
+            }
         }
     }
 
     @Override
-    public void updateGroupResourceTags(String resourceId, String groupId, String userId, GroupRoleType groupRole, List<String> tagIds) {
-        ResourceItemEntity entity = getResourceEntity(resourceId);
-        updateGroupResourceTags(entity, groupId, userId, groupRole, tagIds);
+    public void updateGroupResourceTags(List<String> resourceIds, String groupId, String userId, GroupRoleType groupRole, List<String> tagIds) {
+        List<ResourceItemEntity> entities = findValidResourceEntities(resourceIds);
+        updateGroupResourceTagsByEntities(entities, groupId, userId, groupRole, tagIds);
     }
 
-    public void updateGroupResourceTags(ResourceItemEntity entity, String groupId, String userId, GroupRoleType groupRole, List<String> tagIds) {
+    private void updateGroupResourceTagsByEntities(List<ResourceItemEntity> entities, String groupId, String userId, GroupRoleType groupRole, List<String> tagIds) {
         if (tagIds != null && !tagIds.isEmpty()) {
             // 查找并检查Tag
             // MARKET 组的 Tag 无法通过这种方法找到（在 MARKET_GROUP_PREFIX 前缀的 groupId 下）因此无法通过该方法绑定
@@ -285,11 +326,18 @@ public class ResourceServiceImpl implements IResourceService {
             }
         }
 
-        entity.setGroupBinds(updateResourceGroupBinds(entity.getGroupBinds(), groupId, tagIds));
-        resourceItemRepository.save(entity);
-        log.info("resource tags changed. resourceId={} groupId={} tagCount={}",
-                entity.getResourceId(), groupId, tagIds == null ? 0 : tagIds.size());
-        eventPublisher.publishAclRecalculateEvent(entity.getResourceId(), "RESOURCE_TAGS_CHANGED");
+        for (ResourceItemEntity entity : entities) {
+            entity.setGroupBinds(updateResourceGroupBinds(entity.getGroupBinds(), groupId, tagIds));
+        }
+        resourceItemRepository.saveAll(entities);
+        log.info("resource tags changed. affectedResources={} affectedResourceIds={} groupId={} tagCount={}",
+                entities.size(),
+                summarizeIds(entities.stream().map(ResourceItemEntity::getResourceId).toList()),
+                groupId,
+                tagIds == null ? 0 : tagIds.size());
+        for (ResourceItemEntity entity : entities) {
+            eventPublisher.publishAclRecalculateEvent(entity.getResourceId(), "RESOURCE_TAGS_CHANGED");
+        }
     }
 
     public List<TagEntity> findAndValidateTags(String groupId, List<String> tagIds) {
@@ -492,20 +540,20 @@ public class ResourceServiceImpl implements IResourceService {
                         personalGroupId, "0", ResourceConstants.SHARED_TAG_NAME).orElseThrow(
                         () -> new ServiceException(ResourceError.TAG_NODE_NOT_FOUND)
                 ).getTagId();
-                this.updatePersonalResourceTags(entity.getResourceId(), personalGroupId, List.of(sharedTagId));
+                this.updatePersonalResourceTags(List.of(entity.getResourceId()), personalGroupId, List.of(sharedTagId));
 
                 try {
                     // 确定用户有权限挂载到对应位置
                     GroupRoleType groupRole = dto.getOwnerGroupRoles().get(Long.valueOf(mountTargetTag.getGroupId()));
                     // 挂载标签
-                    updateGroupResourceTags(entity, mountTargetTag.getGroupId(), dto.getOwnerId(), groupRole, List.of(mountTargetTagID));
+                    updateGroupResourceTagsByEntities(List.of(entity), mountTargetTag.getGroupId(), dto.getOwnerId(), groupRole, List.of(mountTargetTagID));
                 } catch (Exception ignored) {
                     // 如果没有权限或出现其他错误，静默失败
                     // TODO: 给用户发送站内信
                 }
             } else {
                 // 个人 Tag 直接更新
-                this.updatePersonalResourceTags(entity.getResourceId(), personalGroupId, List.of(mountTargetTagID));
+                this.updatePersonalResourceTags(List.of(entity.getResourceId()), personalGroupId, List.of(mountTargetTagID));
             }
         } catch (Exception e) {
             // 创建资源失败，回滚
