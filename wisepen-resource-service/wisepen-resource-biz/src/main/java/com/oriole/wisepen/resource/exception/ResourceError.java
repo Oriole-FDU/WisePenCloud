@@ -33,6 +33,7 @@ public enum ResourceError implements IResult {
     CANNOT_MOVE_TAG_NODE_ACROSS_TAG_TYPE(5312, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.TAG_TREE, ErrorReason.NOT_ALLOWED),"不能跨节点类型(目录/标签)移动或挂载标签节点"),
     CANNOT_MOVE_TAG_NODE_TO_SELF(5321, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.TAG_TREE, ErrorReason.UNSUPPORTED), "不能将标签节点移动到自身之下"),
     CANNOT_MOVE_TAG_NODE_TO_DESCENDANT(5322, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.TAG_TREE, ErrorReason.UNSUPPORTED), "不能将标签节点移动到其子孙节点之下"),
+    CANNOT_OPERATE_ANCESTOR_DESCENDANT_TAG_NODES(5323, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.TAG_TREE, ErrorReason.UNSUPPORTED), "不能批量操作互为祖先和子孙的标签节点"),
 
     // 资源相关异常
     RESOURCE_NOT_FOUND(5411, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.RESOURCE, ErrorReason.NOT_FOUND),"资源不存在"),

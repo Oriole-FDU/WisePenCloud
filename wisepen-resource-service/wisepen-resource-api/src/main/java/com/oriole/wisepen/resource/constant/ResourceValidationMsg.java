@@ -14,6 +14,7 @@ public interface ResourceValidationMsg {
     // 拓扑与组织关系校验
     String GROUP_ID_NOT_BLANK = "组ID不能为空";
     String TAG_IDS_NOT_NULL = "标签列表不能为null";
+    String TAG_IDS_NOT_EMPTY = "标签列表不能为空";
 
     String TAG_ID_NOT_BLANK = "目标标签ID不能为空";
     String TAG_NAME_NOT_BLANK = "标签名称不能为空";
