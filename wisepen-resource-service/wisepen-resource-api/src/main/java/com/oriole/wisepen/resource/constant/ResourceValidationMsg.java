@@ -3,6 +3,7 @@ package com.oriole.wisepen.resource.constant;
 public interface ResourceValidationMsg {
     // 基础资源属性校验
     String RESOURCE_ID_NOT_BLANK = "资源ID不能为空";
+    String RESOURCE_IDS_NOT_EMPTY = "资源ID列表不能为空";
     String RESOURCE_NAME_NOT_BLANK = "资源名称不能为空";
     String RESOURCE_NEW_NAME_NOT_BLANK = "资源新名称不能为空";
     String RESOURCE_TYPE_NOT_NULL = "资源类型不能为空";

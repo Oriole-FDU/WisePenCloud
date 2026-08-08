@@ -276,13 +276,7 @@ public class ResourceServiceImpl implements IResourceService {
             if (FileOrganizationLogic.FOLDER == logic && tagIds.size() > 1)
                 throw new ServiceException(ResourceError.CANNOT_BIND_MULTIPLE_RESOURCE_TAGS_IN_FOLDER_MODE);
 
-            // 检查是否有权限挂载
-            if (groupRole == null || groupRole == GroupRoleType.NOT_MEMBER) {
-                throw new ServiceException(ResourceError.BIND_RESOURCE_TO_TAG_NODE_DENIED);
-            }
-            if (groupRole != GroupRoleType.ADMIN && groupRole != GroupRoleType.OWNER) {
-                checkGroupMemberTagMountPermission(userId, validTags);
-            }
+            assertCanUpdateGroupResourceTags(entity, userId, groupRole, validTags);
         }
 
         entity.setGroupBinds(updateResourceGroupBinds(entity.getGroupBinds(), groupId, tagIds));
@@ -290,6 +284,57 @@ public class ResourceServiceImpl implements IResourceService {
         log.info("resource tags changed. resourceId={} groupId={} tagCount={}",
                 entity.getResourceId(), groupId, tagIds == null ? 0 : tagIds.size());
         eventPublisher.publishAclRecalculateEvent(entity.getResourceId(), "RESOURCE_TAGS_CHANGED");
+    }
+
+    @Override
+    public void mountResourcesToGroupTag(List<String> resourceIds, String groupId, String tagId, String userId, GroupRoleType groupRole) {
+        LinkedHashSet<String> normalizedResourceIds = resourceIds.stream()
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (normalizedResourceIds.isEmpty()) {
+            throw new ServiceException(ResourceError.RESOURCE_NOT_FOUND);
+        }
+
+        List<ResourceItemEntity> resources = resourceItemRepository.findAllById(normalizedResourceIds);
+        if (resources.size() != normalizedResourceIds.size()
+                || resources.stream().anyMatch(resource -> resource.getDeletedAt() != null)) {
+            throw new ServiceException(ResourceError.RESOURCE_NOT_FOUND);
+        }
+
+        int changedCount = 0;
+        for (ResourceItemEntity resource : resources) {
+            Optional<List<String>> nextTagIds = resolveMountedGroupTagIds(resource, groupId, tagId);
+            if (nextTagIds.isEmpty()) {
+                continue;
+            }
+            updateGroupResourceTags(resource, groupId, userId, groupRole, nextTagIds.get());
+            changedCount++;
+        }
+
+        if (changedCount == 0) {
+            log.info("resource group tag mount skipped. groupId={} tagId={} resourceCount=0", groupId, tagId);
+            return;
+        }
+        log.info("resources mounted to group tag. groupId={} tagId={} resourceCount={}",
+                groupId, tagId, changedCount);
+    }
+
+    private Optional<List<String>> resolveMountedGroupTagIds(ResourceItemEntity resource, String groupId, String tagId) {
+        List<GroupTagBind> groupBinds = resource.getGroupBinds() == null
+                ? Collections.emptyList()
+                : resource.getGroupBinds();
+        List<String> currentTagIds = groupBinds.stream()
+                .filter(bind -> groupId.equals(bind.getGroupId()))
+                .findFirst()
+                .map(GroupTagBind::getTagIds)
+                .orElse(Collections.emptyList());
+        if (currentTagIds.contains(tagId)) {
+            return Optional.empty();
+        }
+
+        List<String> nextTagIds = new ArrayList<>(currentTagIds);
+        nextTagIds.add(tagId);
+        return Optional.of(nextTagIds);
     }
 
     public List<TagEntity> findAndValidateTags(String groupId, List<String> tagIds) {
@@ -314,6 +359,21 @@ public class ResourceServiceImpl implements IResourceService {
                 throw new ServiceException(ResourceError.BIND_RESOURCE_TO_TAG_NODE_DENIED);
             }
         }
+    }
+
+    private void assertCanUpdateGroupResourceTags(ResourceItemEntity resource, String userId, GroupRoleType groupRole, List<TagEntity> tags) {
+        if (groupRole == null || groupRole == GroupRoleType.NOT_MEMBER) {
+            throw new ServiceException(ResourceError.BIND_RESOURCE_TO_TAG_NODE_DENIED);
+        }
+        if (groupRole == GroupRoleType.ADMIN || groupRole == GroupRoleType.OWNER) {
+            return;
+        }
+        if (!userId.equals(resource.getOwnerId())) {
+            log.warn("resource permission denied. resourceId={} userId={} ownerId={}",
+                    resource.getResourceId(), userId, resource.getOwnerId());
+            throw new ServiceException(ResourceError.RESOURCE_PERMISSION_DENIED);
+        }
+        checkGroupMemberTagMountPermission(userId, tags);
     }
 
     @Override

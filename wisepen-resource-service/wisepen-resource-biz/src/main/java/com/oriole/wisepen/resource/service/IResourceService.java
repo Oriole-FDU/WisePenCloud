@@ -36,6 +36,8 @@ public interface IResourceService {
 
     void updateGroupResourceTags(String resourceId, String groupId, String userId, GroupRoleType groupRole, List<String> tagIds);
 
+    void mountResourcesToGroupTag(List<String> resourceIds, String groupId, String tagId, String userId, GroupRoleType groupRole);
+
     List<TagEntity> findAndValidateTags(String groupId, List<String> tagIds);
 
     void updateResourceActionPermission(ResourceUpdateActionPermissionRequest req);

@@ -16,6 +16,7 @@ import com.oriole.wisepen.resource.constant.ResourceValidationMsg;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceUpdateActionPermissionRequest;
 import com.oriole.wisepen.resource.domain.dto.res.ResourceBaseInfoResponse;
 import com.oriole.wisepen.resource.domain.dto.res.ResourceItemResponse;
+import com.oriole.wisepen.resource.domain.dto.req.ResourceMountGroupTagRequest;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceRenameRequest;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceUpdateTagsRequest;
 import com.oriole.wisepen.resource.enums.ResourceSortBy;
@@ -135,10 +136,6 @@ public class ResourceItemController {
             }
             // 资源所有者或小组管理员可以修改资源挂载的小组标签
             GroupRoleType groupRole = SecurityContextHolder.getGroupRole(Long.parseLong(req.getGroupId()));
-            if (groupRole != GroupRoleType.ADMIN && groupRole != GroupRoleType.OWNER) {
-                // 非小组管理员不能添加或修改资源挂载的小组标签，除非是资源所有者且拥有该标签的资源挂载权限
-                resourceService.assertResourceOwner(req.getResourceId(), userId);
-            }
             resourceService.updateGroupResourceTags(
                     req.getResourceId(),
                     req.getGroupId(),
@@ -147,6 +144,35 @@ public class ResourceItemController {
                     req.getTagIds()
             );
         }
+        return R.ok();
+    }
+
+    @Operation(
+            summary = "挂载资源到小组标签",
+            description = """
+                    - 用途：将一个或多个资源挂载到同一个小组标签下，用于上传到小组、分享到小组和课程大纲挂载。
+                    - 请求：resourceIds 指定待挂载资源列表；groupId 指定目标小组；tagId 指定单个目标标签。
+                    - 约束：目标小组不能是集市组；小组 OWNER、ADMIN 可挂载资源；普通成员必须同时是资源所有者并满足目标标签挂载权限；小组 FOLDER 模式下资源已在该组挂载其它标签时不能追加 link。
+                    - 处理：资源未在该组挂载时以 tagId 初始化主挂载；已在该组挂载时将 tagId 作为 link 追加；已挂载到 tagId 时幂等跳过；不修改个人空间标签和资源文件内容。
+                    - 失败：资源不存在 -> ResourceError.RESOURCE_NOT_FOUND；标签不存在或不属于目标小组 -> ResourceError.TAG_NODE_NOT_FOUND；目标小组是集市组 -> ResourceError.CANNOT_BIND_MARKET_GROUP_TAG_DIRECTLY；文件夹模式下重复绑定 -> ResourceError.CANNOT_BIND_MULTIPLE_RESOURCE_TAGS_IN_FOLDER_MODE；普通成员不是资源所有者 -> ResourceError.RESOURCE_PERMISSION_DENIED；普通成员无标签挂载权限 -> ResourceError.BIND_RESOURCE_TO_TAG_NODE_DENIED。
+                    - 响应：成功时返回空结果。
+                    """
+    )
+    @Log(title = "挂载资源到小组标签", businessType = BusinessType.UPDATE)
+    @PostMapping("/mountResourcesToGroupTag")
+    public R<Void> mountResourcesToGroupTag(@Validated @RequestBody ResourceMountGroupTagRequest req) {
+        if (req.getGroupId().startsWith(ResourceConstants.MARKET_GROUP_PREFIX)) {
+            throw new ServiceException(ResourceError.CANNOT_BIND_MARKET_GROUP_TAG_DIRECTLY);
+        }
+        String userId = SecurityContextHolder.getUserId().toString();
+        GroupRoleType groupRole = SecurityContextHolder.getGroupRole(Long.parseLong(req.getGroupId()));
+        resourceService.mountResourcesToGroupTag(
+                req.getResourceIds(),
+                req.getGroupId(),
+                req.getTagId(),
+                userId,
+                groupRole
+        );
         return R.ok();
     }
 
