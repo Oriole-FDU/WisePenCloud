@@ -4,6 +4,8 @@ import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.user.api.domain.dto.req.MessagePublishRequest;
 import com.oriole.wisepen.user.api.domain.dto.res.MessageInfoResponse;
 
+import java.util.List;
+
 public interface IMessageService {
 
     void publishMessage(MessagePublishRequest req);
@@ -12,7 +14,7 @@ public interface IMessageService {
 
     Long getUnreadMessageCount(Long userId);
 
-    void readMessage(Long userId, Long messageId);
+    void readMessages(Long userId, List<Long> messageIds);
 
     void readAllMessages(Long userId);
 
