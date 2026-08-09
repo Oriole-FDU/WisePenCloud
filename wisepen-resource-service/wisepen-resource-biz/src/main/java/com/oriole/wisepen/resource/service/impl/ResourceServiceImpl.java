@@ -818,12 +818,15 @@ public class ResourceServiceImpl implements IResourceService {
         }
 
         Query query = new Query(Criteria.where("_id").is(resourceId));
-        Update update = new Update().set("computedGroupAcls", computedGroupAcls);
+        Update update = new Update()
+                .set("computedGroupAcls", computedGroupAcls)
+                .set("updateTime", LocalDateTime.now());
         mongoTemplate.updateFirst(query, update, ResourceItemEntity.class);
         log.debug("acl recalculation finished. resourceId={} groupCount={} costMs={}",
                 resourceId, computedGroupAcls.size(), System.currentTimeMillis() - start);
 
         bindEntity.setComputedGroupAcls(computedGroupAcls);
+        bindEntity.setUpdateTime(LocalDateTime.now());
         return Optional.of(bindEntity);
     }
 
