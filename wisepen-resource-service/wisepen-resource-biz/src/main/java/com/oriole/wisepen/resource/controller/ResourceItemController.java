@@ -108,9 +108,9 @@ public class ResourceItemController {
             summary = "批量更新资源标签",
             description = """
                     - 用途：调整资源挂载到个人标签空间或小组标签空间下的位置与标签集合。
-                    - 请求：resourceIds 指定目标资源列表；groupId 为空表示个人标签空间，不为空表示小组标签空间；tagIds 按业务顺序给出目标标签列表。
-                    - 约束：个人标签更新必须由资源所有者发起，且 tagIds 必须包含唯一的路径标签并位于首位；小组标签更新允许小组 OWNER、ADMIN 操作，普通成员必须同时是所有目标资源的所有者并满足标签挂载权限。
-                    - 处理：个人空间会覆盖这些资源在个人标签空间的绑定；若移入个人回收站，会剥离非个人小组绑定、资源独立权限和已计算小组 ACL。小组空间会覆盖该小组下的绑定，并触发资源 ACL 重算；不修改资源文件内容。
+                    - 请求：resourceIds 指定目标资源列表；groupId 为空表示个人标签空间，不为空表示小组标签空间；tagIds 按业务顺序给出目标标签列表；mode 表示标签绑定变更模式，REPLACE 为全量替换，ADD 为追加绑定，REMOVE 为移除绑定，默认 REPLACE。
+                    - 约束：个人标签更新必须由资源所有者发起，最终标签列表必须包含唯一的路径标签并位于首位；小组标签更新允许小组 OWNER、ADMIN 操作，普通成员必须同时是所有目标资源的所有者并满足新增标签挂载权限。
+                    - 处理：REPLACE 使用 tagIds 全量覆盖当前空间下的绑定；ADD 在当前绑定后追加 tagIds 并去重；REMOVE 从当前绑定中移除 tagIds。若个人资源移入个人回收站，会剥离非个人小组绑定、资源独立权限和已计算小组 ACL。小组空间变更会触发资源 ACL 重算；不修改资源文件内容。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN；资源不存在 -> ResourceError.RESOURCE_NOT_FOUND；当前用户不是资源所有者 -> ResourceError.RESOURCE_PERMISSION_DENIED；标签不存在或不属于目标空间 -> ResourceError.TAG_NODE_NOT_FOUND；个人路径标签数量不唯一 -> ResourceError.CANNOT_BIND_RESOURCE_TO_MULTIPLE_PATH_NODES；个人路径标签未放在首位 -> ResourceError.CANNOT_PLACE_RESOURCE_PATH_TAG_AFTER_TAGS；小组 FOLDER 模式下绑定多个标签 -> ResourceError.CANNOT_BIND_MULTIPLE_RESOURCE_TAGS_IN_FOLDER_MODE；普通成员无标签挂载权限 -> ResourceError.BIND_RESOURCE_TO_TAG_NODE_DENIED；搜索索引同步失败 -> ResourceError.RESOURCE_SEARCH_FAILED。
                     - 响应：成功时返回空结果。
                     """
@@ -125,7 +125,8 @@ public class ResourceItemController {
             resourceService.updatePersonalResourceTags(
                     req.getResourceIds(),
                     ResourceConstants.PERSONAL_GROUP_PREFIX + userId,
-                    req.getTagIds()
+                    req.getTagIds(),
+                    req.getMode()
             );
         } else {
             if (req.getGroupId().startsWith(ResourceConstants.MARKET_GROUP_PREFIX)) {
@@ -142,7 +143,8 @@ public class ResourceItemController {
                     req.getGroupId(),
                     userId,
                     groupRole,
-                    req.getTagIds()
+                    req.getTagIds(),
+                    req.getMode()
             );
         }
         return R.ok();
