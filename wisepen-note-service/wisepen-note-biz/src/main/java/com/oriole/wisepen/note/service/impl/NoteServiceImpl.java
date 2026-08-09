@@ -178,8 +178,7 @@ public class NoteServiceImpl implements INoteService {
             }
 
             Integer maxVersion = targetVersions.stream().map(NoteVersionEntity::getVersion).max(Integer::compareTo).orElse(0);
-            targetInfo.setVersion(maxVersion);
-            noteInfoRepository.save(targetInfo);
+            noteInfoRepository.updateVersionByResourceId(targetResourceId, maxVersion);
 
             log.info("note fork finished. sourceResourceId={} resourceId={} version={}",
                     request.getResourceId(), targetResourceId, forkedResourceVersion);

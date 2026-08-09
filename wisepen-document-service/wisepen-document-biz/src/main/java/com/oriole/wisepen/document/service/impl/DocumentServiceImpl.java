@@ -585,8 +585,7 @@ public class DocumentServiceImpl implements IDocumentService {
                 throw new ServiceException(DocumentError.DOCUMENT_REGISTER_RESOURCE_FAILED, e.getMessage());
             }
 
-            targetVersion.setResourceId(resourceId);
-            documentVersionRepository.save(targetVersion);
+            documentVersionRepository.updateResourceIdById(targetDocumentId, resourceId);
 
             // 新建 DocumentInfoEntity
             DocumentInfoEntity targetInfo = DocumentInfoEntity.builder().resourceId(resourceId).version(1).build();
