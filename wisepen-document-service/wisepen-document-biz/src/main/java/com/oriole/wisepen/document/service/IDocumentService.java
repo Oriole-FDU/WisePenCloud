@@ -67,9 +67,6 @@ public interface IDocumentService {
     // 更新文档状态
     void updateStatus(String documentId, DocumentStatus status);
 
-    // 使用调用方已持有的最新文档版本实体更新状态
-    DocumentVersionEntity updateStatus(DocumentVersionEntity versionEntity, DocumentStatus status);
-
     // 归档文档解析的结果
     void saveConversionAndParseResult(String documentId, String previewObjectKey, DocumentPdfMetaEntity meta, DocumentContentEntity content);
 

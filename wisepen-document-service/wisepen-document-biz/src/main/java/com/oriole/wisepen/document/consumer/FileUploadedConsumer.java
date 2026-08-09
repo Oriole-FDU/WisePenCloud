@@ -84,7 +84,7 @@ public class FileUploadedConsumer {
         entity = documentVersionRepository.save(entity);
 
         // 推进状态机
-        documentService.updateStatus(entity, new DocumentStatus(DocumentStatusEnum.UPLOADED));
+        documentService.updateStatus(entity.getDocumentId(), new DocumentStatus(DocumentStatusEnum.UPLOADED));
         eventPublisher.publishParseTask(
                 DocumentParseTaskMessage.builder()
                         .documentId(entity.getDocumentId())
