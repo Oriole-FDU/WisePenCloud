@@ -576,7 +576,7 @@ public class ResourceServiceImpl implements IResourceService {
                         personalGroupId, "0", ResourceConstants.SHARED_TAG_NAME).orElseThrow(
                         () -> new ServiceException(ResourceError.TAG_NODE_NOT_FOUND)
                 ).getTagId();
-                resourcePlacementService.setPersonalResourcesPathTag(List.of(entity.getResourceId()), personalGroupId, sharedTagId);
+                resourcePlacementService.setPersonalResourcesPathTag(List.of(entity.getResourceId()), dto.getOwnerId(), sharedTagId);
 
                 try {
                     // 确定用户有权限挂载到对应位置
@@ -589,7 +589,7 @@ public class ResourceServiceImpl implements IResourceService {
                 }
             } else {
                 // 个人 Tag 直接更新
-                resourcePlacementService.setPersonalResourcesPathTag(List.of(entity.getResourceId()), personalGroupId, mountTargetTagID);
+                resourcePlacementService.setPersonalResourcesPathTag(List.of(entity.getResourceId()), dto.getOwnerId(), mountTargetTagID);
             }
         } catch (Exception e) {
             // 创建资源失败，回滚

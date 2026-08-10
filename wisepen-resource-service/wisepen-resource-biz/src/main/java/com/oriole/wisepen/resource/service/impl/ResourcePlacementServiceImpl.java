@@ -59,7 +59,8 @@ public class ResourcePlacementServiceImpl implements IResourcePlacementService {
                     .filter(bind -> groupId.equals(bind.getGroupId())).findFirst().map(GroupTagBind::getTagIds)
                     .orElseGet(ArrayList::new);
 
-            currentTagIds.set(0, newPathTagId); // 修改首节点
+            if (!currentTagIds.isEmpty()) currentTagIds.set(0, newPathTagId); // 修改首节点
+            else currentTagIds.add(newPathTagId);
 
             if (isTrashed) {
                 // 移入回收站会卸载除了个人组的所有节点，如果此前有发布到市场，则还需移除市场索引
