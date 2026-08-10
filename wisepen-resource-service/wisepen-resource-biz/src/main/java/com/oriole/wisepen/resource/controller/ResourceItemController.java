@@ -106,6 +106,7 @@ public class ResourceItemController {
     // 编辑资源的所属标签
     @Operation(
             summary = "批量更新资源标签",
+            deprecated = true,
             description = """
                     - 用途：调整资源挂载到个人标签空间或小组标签空间下的位置与标签集合。
                     - 请求：resourceIds 指定目标资源列表；groupId 为空表示个人标签空间，不为空表示小组标签空间；tagIds 按业务顺序给出目标标签列表；mode 表示标签绑定变更模式，REPLACE 为全量替换，ADD 为追加绑定，REMOVE 为移除绑定，默认 REPLACE。
@@ -117,6 +118,7 @@ public class ResourceItemController {
     )
     @Log(title = "修改资源标签", businessType = BusinessType.UPDATE)
     @PostMapping("/changeResourceTags")
+    @Deprecated
     public R<Void> updateResourceTags(@Validated @RequestBody BatchResourceUpdateTagsRequest req) {
         String userId = SecurityContextHolder.getUserId().toString();
         if (!StringUtils.hasText(req.getGroupId())) {

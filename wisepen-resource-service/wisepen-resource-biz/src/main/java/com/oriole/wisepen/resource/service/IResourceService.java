@@ -35,11 +35,15 @@ public interface IResourceService {
 
     List<GroupTagBind> updateResourceGroupBinds(List<GroupTagBind> groupBinds, String groupId, List<String> tagIds);
 
+    @Deprecated
     void updatePersonalResourceTags(List<String> resourceIds, String groupId, List<String> tagIds, ResourceTagUpdateMode mode);
 
+    @Deprecated
     void updateGroupResourceTags(List<String> resourceIds, String groupId, String userId, GroupRoleType groupRole, List<String> tagIds, ResourceTagUpdateMode mode);
 
     List<TagEntity> findAndValidateTags(String groupId, List<String> tagIds);
+
+    void checkGroupMemberTagMountPermission(String userId, List<TagEntity> tags);
 
     void updateResourceActionPermission(ResourceUpdateActionPermissionRequest req);
 

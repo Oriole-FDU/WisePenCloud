@@ -30,18 +30,17 @@ import com.oriole.wisepen.resource.event.TagTrashedEvent;
 import com.oriole.wisepen.resource.exception.ResourceError;
 import com.oriole.wisepen.resource.repository.*;
 import com.oriole.wisepen.resource.mq.IResourceEventPublisher;
+import com.oriole.wisepen.resource.service.*;
 import com.oriole.wisepen.resource.service.assembler.ResourceItemResponseAssembler;
-import com.oriole.wisepen.resource.service.IGroupResService;
-import com.oriole.wisepen.resource.service.IResourceService;
-import com.oriole.wisepen.resource.service.ISearchSyncService;
-import com.oriole.wisepen.resource.service.ITagService;
 import com.oriole.wisepen.user.api.domain.base.UserDisplayBase;
 import com.oriole.wisepen.user.api.enums.ResourceGroupDashboardMetricType;
 import com.oriole.wisepen.user.api.feign.RemoteUserService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -89,6 +88,10 @@ public class ResourceServiceImpl implements IResourceService {
     private final ApplicationEventPublisher applicationEventPublisher;
 
     private final RemoteUserService remoteUserService;
+
+    @Autowired
+    @Lazy
+    private IResourcePlacementService resourcePlacementService;
 
     @EventListener
     public void handleTagTrashedEvent(TagTrashedEvent event) {
@@ -249,6 +252,7 @@ public class ResourceServiceImpl implements IResourceService {
         return groupBinds;
     }
 
+    @Deprecated
     private List<String> resolveTargetTagIds(List<String> currentTagIds, List<String> targetTagIds, ResourceTagUpdateMode mode) {
         targetTagIds = targetTagIds == null ? Collections.emptyList() : targetTagIds;
         List<String> resolvedTagIds = new ArrayList<>(currentTagIds == null ? Collections.emptyList() : currentTagIds);
@@ -260,6 +264,8 @@ public class ResourceServiceImpl implements IResourceService {
     }
 
     @Override
+    @Deprecated
+    // 此方法已弃用，相关职责由 setPersonalResourcesPathTag movePersonalResourcesToTrash replacePersonalNormalTags 替代
     public void updatePersonalResourceTags(List<String> resourceIds, String groupId, List<String> tagIds, ResourceTagUpdateMode mode) {
         ResourceTagUpdateMode resolvedMode = mode == null ? ResourceTagUpdateMode.REPLACE : mode;
         List<ResourceItemEntity> entities = findValidResourceEntities(resourceIds);
@@ -316,11 +322,15 @@ public class ResourceServiceImpl implements IResourceService {
     }
 
     @Override
+    @Deprecated
+    // 此方法已弃用，相关职责由 mountResourcesToGroup unmountGroupResources moveResourcesInGroup 替代
     public void updateGroupResourceTags(List<String> resourceIds, String groupId, String userId, GroupRoleType groupRole, List<String> tagIds, ResourceTagUpdateMode mode) {
         List<ResourceItemEntity> entities = findValidResourceEntities(resourceIds);
         updateGroupResourceTagsByEntities(entities, groupId, userId, groupRole, tagIds, mode);
     }
 
+    @Deprecated
+    // 此方法已弃用，相关职责由 mountResourcesToGroup unmountGroupResources moveResourcesInGroup 替代
     private void updateGroupResourceTagsByEntities(List<ResourceItemEntity> entities, String groupId, String userId, GroupRoleType groupRole, List<String> tagIds, ResourceTagUpdateMode mode) {
         ResourceTagUpdateMode resolvedMode = mode == null ? ResourceTagUpdateMode.REPLACE : mode;
         if (tagIds != null && !tagIds.isEmpty()) {
@@ -566,20 +576,20 @@ public class ResourceServiceImpl implements IResourceService {
                         personalGroupId, "0", ResourceConstants.SHARED_TAG_NAME).orElseThrow(
                         () -> new ServiceException(ResourceError.TAG_NODE_NOT_FOUND)
                 ).getTagId();
-                this.updatePersonalResourceTags(List.of(entity.getResourceId()), personalGroupId, List.of(sharedTagId), ResourceTagUpdateMode.REPLACE);
+                resourcePlacementService.setPersonalResourcesPathTag(List.of(entity.getResourceId()), personalGroupId, sharedTagId);
 
                 try {
                     // 确定用户有权限挂载到对应位置
                     GroupRoleType groupRole = dto.getOwnerGroupRoles().get(Long.valueOf(mountTargetTag.getGroupId()));
                     // 挂载标签
-                    updateGroupResourceTagsByEntities(List.of(entity), mountTargetTag.getGroupId(), dto.getOwnerId(), groupRole, List.of(mountTargetTagID), ResourceTagUpdateMode.REPLACE);
+                    resourcePlacementService.mountResourcesToGroup(List.of(entity.getResourceId()), mountTargetTag.getGroupId(), dto.getOwnerId(), groupRole, mountTargetTagID);
                 } catch (Exception ignored) {
                     // 如果没有权限或出现其他错误，静默失败
                     // TODO: 给用户发送站内信
                 }
             } else {
                 // 个人 Tag 直接更新
-                this.updatePersonalResourceTags(List.of(entity.getResourceId()), personalGroupId, List.of(mountTargetTagID), ResourceTagUpdateMode.REPLACE);
+                resourcePlacementService.setPersonalResourcesPathTag(List.of(entity.getResourceId()), personalGroupId, mountTargetTagID);
             }
         } catch (Exception e) {
             // 创建资源失败，回滚
