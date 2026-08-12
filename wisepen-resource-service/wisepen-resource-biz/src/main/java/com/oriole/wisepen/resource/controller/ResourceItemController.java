@@ -14,6 +14,7 @@ import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.resource.constant.ResourceConstants;
 import com.oriole.wisepen.resource.constant.ResourceValidationMsg;
 import com.oriole.wisepen.resource.domain.dto.req.BatchResourceUpdateTagsRequest;
+import com.oriole.wisepen.resource.domain.dto.req.ResourceDeleteRequest;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceUpdateActionPermissionRequest;
 import com.oriole.wisepen.resource.domain.dto.res.ResourceBaseInfoResponse;
 import com.oriole.wisepen.resource.domain.dto.res.ResourceItemResponse;
@@ -96,10 +97,10 @@ public class ResourceItemController {
     )
     @Log(title = "删除资源", businessType = BusinessType.DELETE)
     @PostMapping("/removeResources")
-    public R<Void> deleteResource(@RequestParam List<String> resourceIds) {
+    public R<Void> deleteResource(@Validated @RequestBody ResourceDeleteRequest req) {
         String currentUserId = SecurityContextHolder.getUserId().toString();
-        resourceService.assertResourceOwner(resourceIds, currentUserId);
-        resourceService.softRemoveResources(resourceIds);
+        resourceService.assertResourceOwner(req.getResourceIds(), currentUserId);
+        resourceService.softRemoveResources(req.getResourceIds());
         return R.ok();
     }
 
