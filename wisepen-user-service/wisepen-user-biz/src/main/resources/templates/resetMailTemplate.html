@@ -2,29 +2,205 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        .container { font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e9e9e9; }
-        .header { border-bottom: 2px solid #005bac; padding-bottom: 10px; margin-bottom: 20px; }
-        .footer { margin-top: 30px; font-size: 12px; color: #888; border-top: 1px solid #eee; padding-top: 10px; }
-        .btn { display: inline-block; background-color: #005bac; color: #ffffff !important; padding: 10px 20px; text-decoration: none; border-radius: 4px; margin: 15px 0; }
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f3fbfb;
+            color: #1e293b;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .page {
+            width: 100%;
+            padding: 32px 16px;
+            background-color: #f3fbfb;
+        }
+
+        .container {
+            max-width: 640px;
+            margin: 0 auto;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background-color: #ffffff;
+            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+        }
+
+        .header {
+            padding: 28px 32px 24px;
+            border-bottom: 1px solid #bbe8ea;
+            background-color: #fafefe;
+        }
+
+        .brand {
+            display: table;
+            margin: 0 0 18px;
+            color: #11777b;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0;
+        }
+
+        .logo {
+            display: inline-block;
+            width: 28px;
+            height: 28px;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+
+        .brandName {
+            display: inline-block;
+            vertical-align: middle;
+        }
+
+        .title {
+            margin: 0;
+            color: #0f172a;
+            font-size: 24px;
+            font-weight: 700;
+            line-height: 1.3;
+        }
+
+        .subtitle {
+            margin: 8px 0 0;
+            color: #64748b;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .content {
+            padding: 28px 32px 32px;
+        }
+
+        .content > p {
+            margin: 0 0 16px;
+            font-size: 14px;
+        }
+
+        .infoBox {
+            margin: 20px 0 24px;
+            padding: 16px;
+            border: 1px solid #a5dbdd;
+            border-radius: 8px;
+            background-color: #e1f7f8;
+        }
+
+        .infoText {
+            margin: 0 !important;
+            color: #1c3f40;
+            font-size: 14px;
+        }
+
+        .actionWrap {
+            margin: 24px 0;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 11px 20px;
+            border-radius: 8px;
+            background-color: #248286;
+            color: #ffffff !important;
+            font-size: 14px;
+            font-weight: 700;
+            line-height: 20px;
+            text-decoration: none;
+        }
+
+        .fallbackLabel {
+            margin-bottom: 8px !important;
+            color: #64748b;
+            font-size: 13px !important;
+        }
+
+        .resetLink {
+            margin: 0 0 20px !important;
+            padding: 12px;
+            border-radius: 6px;
+            background-color: #f3fbfb;
+            color: #11777b;
+            font-size: 13px !important;
+            line-height: 1.5;
+            word-break: break-all;
+        }
+
+        .footer {
+            padding: 18px 32px 24px;
+            border-top: 1px solid #bbe8ea;
+            background-color: #f3fbfb;
+            color: #64748b;
+            font-size: 12px;
+            line-height: 1.7;
+        }
+
+        @media screen and (max-width: 520px) {
+            .page {
+                padding: 16px 8px;
+            }
+
+            .header,
+            .content,
+            .footer {
+                padding-left: 20px;
+                padding-right: 20px;
+            }
+
+            .title {
+                font-size: 22px;
+            }
+
+            .btn {
+                display: block;
+                text-align: center;
+            }
+        }
     </style>
 </head>
 <body>
-<div class="container">
-    <div class="header"><h2>WisePen 系统通知</h2></div>
-    <p>尊敬的 WisePen 用户：</p>
-    <p>您好！</p>
-    <p>系统收到了一项关于您的账号（学号：<strong th:text="${username}"></strong>）的密码重置请求。</p>
-    <p>请点击下方按钮设置新密码：</p>
-    <a class="btn" th:href="${reset_link}">立即设置新密码</a>
-    <p>如果按钮无法点击，请复制下方链接到浏览器地址栏访问：</p>
-    <p style="word-break: break-all; color: #005bac;" th:text="${reset_link}"></p>
-    <p>为了保障您的账号安全，该链接将在 <strong>15 分钟</strong> 后失效。</p>
-    <p>如果您未发起此请求，说明有人误输入了您的学号，请忽略本邮件，无需进行任何操作。</p>
-    <div class="footer">
-        此致<br/>
-        WisePen 系统团队<br/>
-        <span th:text="${current_date}"></span>
+<div class="page">
+    <div class="container">
+        <div class="header">
+            <p class="brand">
+                <svg class="logo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="WisePen Aqua">
+                    <g fill="none" stroke-linecap="round" stroke-width="8">
+                        <path d="M17 37c6 34 26 42 33 17 7-27 28-23 33 10" stroke="#8ACACD" />
+                        <path d="M17 63C23 28 43 21 50 46c7 27 28 23 33-11" stroke="#248286" />
+                    </g>
+                </svg>
+                <span class="brandName">WisePen</span>
+            </p >
+            <h1 class="title">密码重置请求</h1>
+            <p class="subtitle">我们收到了您为 WisePen 账号提交的密码重置请求，请在有效期内完成操作。</p >
+        </div>
+
+        <div class="content">
+            <p>尊敬的 WisePen 用户：</p >
+            <p>您好！我们收到了一项针对账号 <strong th:text="${username}"></strong> 的密码重置请求。请确认该操作由您本人发起。如果您没有申请重置密码，请忽略本邮件。您的当前密码不会因此被修改。</p >
+
+            <p>如需继续重置密码，请点击下方按钮：</p >
+
+            <div class="actionWrap">
+                <a class="btn" th:href="${reset_link}">重置密码</a >
+            </div>
+
+            <p class="fallbackLabel">如果按钮无法正常打开，请复制以下链接，并粘贴到浏览器地址栏访问：</p >
+            <p class="resetLink" th:text="${reset_link}"></p >
+
+            <div class="infoBox">
+                <p class="infoText">出于账号安全考虑，本次重置链接将在 <strong>15 分钟</strong> 后失效。链接过期后，您可以重新发起密码重置。</p >
+            </div>
+        </div>
+
+        <div class="footer">
+            此致<br/>
+            WisePen 系统团队<br/>
+            <span th:text="${current_date}"></span>
+        </div>
     </div>
 </div>
 </body>

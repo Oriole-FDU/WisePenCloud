@@ -12,9 +12,9 @@ public interface UserValidationMsg {
     /**
      * 用户名相关消息
      */
-    String USERNAME_INVALID = "用户名必须是4-20位字母、数字或下划线";
+    String USERNAME_INVALID = "用户名必须是 4-20 位字母、数字或下划线";
     String USERNAME_EMPTY = "用户名不能为空";
-    String USERNAME_EXISTED = "用户名已存在";
+    String USERNAME_INVALID_SPECIAL_FORMAT= "用户名不能使用系统禁止的特殊格式";
 
     /**
      * 密码相关消息
