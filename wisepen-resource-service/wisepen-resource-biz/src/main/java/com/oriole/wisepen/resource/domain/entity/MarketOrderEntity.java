@@ -1,6 +1,7 @@
 package com.oriole.wisepen.resource.domain.entity;
 
 import com.oriole.wisepen.resource.domain.base.MarketOrderBase;
+import com.oriole.wisepen.resource.enums.MarketOrderStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -24,6 +25,9 @@ import java.time.LocalDateTime;
 public class MarketOrderEntity extends MarketOrderBase {
     @Id
     private String orderId;
+
+    private String purchasedOfferId;
+    private MarketOrderStatus status;
 
     @CreatedDate
     private LocalDateTime createTime;

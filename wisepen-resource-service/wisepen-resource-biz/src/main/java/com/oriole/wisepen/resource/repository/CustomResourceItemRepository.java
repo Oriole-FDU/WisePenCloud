@@ -1,5 +1,6 @@
 package com.oriole.wisepen.resource.repository;
 
+import com.mongodb.client.result.UpdateResult;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.core.domain.enums.list.QueryLogicEnum;
 import com.oriole.wisepen.resource.constant.ResourceConstants;
@@ -15,7 +16,9 @@ import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 @Repository
@@ -141,6 +144,26 @@ public class CustomResourceItemRepository {
                 .inc("resourceInteractionInfo.scoreCount", scoreCountDelta)
                 .inc("resourceInteractionInfo.scoreTotal", scoreTotalDelta);
         mongoTemplate.updateFirst(query, update, ResourceItemEntity.class);
+    }
+
+    /** 原子追加集市购买授权，重复执行时保持幂等。 */
+    public boolean grantMarketActions(String resourceId, String marketGroupId, String buyerId, int grantedActionsMask) {
+        String userMasksPath = "groupBinds.$.marketSaleInfo.marketSpecifiedUsersGrantedActionsMask";
+        Criteria marketBindCriteria = Criteria.where("groupId").is(marketGroupId).and("marketSaleInfo").ne(null);
+
+        Query initializeQuery = Query.query(Criteria.where("_id").is(resourceId)
+                .and("groupBinds").elemMatch(Criteria.where("groupId").is(marketGroupId)
+                        .and("marketSaleInfo").ne(null)
+                        .and("marketSaleInfo.marketSpecifiedUsersGrantedActionsMask").is(null)));
+        mongoTemplate.updateFirst(initializeQuery, new Update().set(userMasksPath, new HashMap<>()), ResourceItemEntity.class);
+
+        Query grantQuery = Query.query(Criteria.where("_id").is(resourceId)
+                .and("groupBinds").elemMatch(marketBindCriteria));
+        Update grantUpdate = new Update()
+                .bitwise(userMasksPath + "." + buyerId).or(grantedActionsMask)
+                .set("updateTime", LocalDateTime.now());
+        UpdateResult result = mongoTemplate.updateFirst(grantQuery, grantUpdate, ResourceItemEntity.class);
+        return result.getMatchedCount() == 1;
     }
 
     /** 单字段原子 $inc 模板 */

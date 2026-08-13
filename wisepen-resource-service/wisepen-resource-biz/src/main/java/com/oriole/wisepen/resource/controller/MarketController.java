@@ -1,9 +1,11 @@
 package com.oriole.wisepen.resource.controller;
 
 import com.oriole.wisepen.common.core.context.SecurityContextHolder;
+import com.oriole.wisepen.common.core.constant.CommonError;
 import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.enums.BusinessType;
+import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.resource.domain.dto.req.MarketSalePublishRequest;
@@ -84,9 +86,9 @@ public class MarketController {
             description = """
                     - 用途：买家购买集市资源的某个售卖档位授权。
                     - 请求：resourceId 指定资源；marketGroupId 使用原始集市组ID，定位该资源在目标集市组中的销售信息；offerId 指定要购买的售卖档位。
-                    - 约束：集市销售信息必须存在且状态为 PUBLISHED；买家不能购买自己上架的资源；offerId 必须命中当前售卖档位；买家尚未完整拥有该档位授权。
-                    - 处理：按 offerId 选中售卖档位并请求钱包结算；创建购买订单，记录 traceId、购买版本、授权动作和支付价格；将售卖档位授权按位或写入 marketSpecifiedUsersGrantedActionsMask 并触发 ACL 重算。
-                    - 失败：未登录 -> PermissionError.NOT_LOGIN；资源不存在 -> ResourceError.RESOURCE_NOT_FOUND；集市销售信息不存在 -> ResourceError.MARKET_SALE_INFO_NOT_FOUND；集市销售信息未上架 -> ResourceError.CANNOT_PURCHASE_OFF_SHELF_MARKET_SALE；购买自己上架的资源 -> ResourceError.CANNOT_PURCHASE_OWN_MARKET_SALE；售卖档位不存在 -> ResourceError.MARKET_SALE_TIER_NOT_FOUND；已拥有该售卖档位授权 -> ResourceError.MARKET_SALE_TIER_GRANT_ALREADY_EXISTS。
+                    - 约束：当前用户必须属于目标集市组；集市销售信息必须存在且状态为 PUBLISHED；买家不能购买自己上架的资源；offerId 必须命中当前售卖档位；买家尚未完整拥有该档位授权。
+                    - 处理：按买家、资源、版本和售卖档位创建可恢复订单并请求钱包幂等结算；支付成功后原子追加购买授权并触发 ACL 重算。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；marketGroupId 非数字 -> CommonError.REQUEST_PARAM_INVALID；当前用户不属于目标集市组 -> PermissionError.PERMISSION_DENIED；资源不存在 -> ResourceError.RESOURCE_NOT_FOUND；集市销售信息不存在 -> ResourceError.MARKET_SALE_INFO_NOT_FOUND；集市销售信息未上架 -> ResourceError.CANNOT_PURCHASE_OFF_SHELF_MARKET_SALE；购买自己上架的资源 -> ResourceError.CANNOT_PURCHASE_OWN_MARKET_SALE；售卖档位不存在 -> ResourceError.MARKET_SALE_TIER_NOT_FOUND；已拥有该售卖档位授权 -> ResourceError.MARKET_SALE_TIER_GRANT_ALREADY_EXISTS；钱包结算失败 -> ResourceError.MARKET_PAYMENT_FAILED。
                     - 响应：返回本次购买记录信息。
                     """
     )
@@ -94,6 +96,14 @@ public class MarketController {
     @PostMapping("/purchaseResource")
     public R<MarketOrderResponse> purchaseResource(@Valid @RequestBody MarketPurchaseRequest request) {
         String userId = SecurityContextHolder.getUserId().toString();
+        Long marketGroupId;
+        try {
+            marketGroupId = Long.valueOf(request.getMarketGroupId());
+        } catch (NumberFormatException e) {
+            // marketGroupId 来自请求体，非法字符串应返回参数错误，不能落入兜底 500。
+            throw new ServiceException(CommonError.REQUEST_PARAM_INVALID);
+        }
+        SecurityContextHolder.assertInGroup(marketGroupId);
 
         return R.ok(marketService.purchaseResource(request, userId));
     }

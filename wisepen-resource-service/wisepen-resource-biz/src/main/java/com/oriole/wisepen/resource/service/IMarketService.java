@@ -17,5 +17,7 @@ public interface IMarketService {
 
     MarketOrderResponse purchaseResource(MarketPurchaseRequest request, String buyerId);
 
+    void recoverPendingOrder(String orderId);
+
     PageR<MarketOrderResponse> listOrders(String buyerId, int page, int size);
 }

@@ -65,6 +65,7 @@ public enum ResourceError implements IResult {
     MARKET_AUDIT_MESSAGE_INVALID(5734, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.MARKET, ErrorReason.INVALID), "集市售卖信息审核信息无效"),
     MARKET_SALE_TIER_ACTIONS_DUPLICATED(5735, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.MARKET, ErrorReason.CONFLICT), "集市售卖档位权限不能重复"),
     MARKET_AUDIT_VERSION_CONFLICT(5736, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.MARKET, ErrorReason.CONFLICT), "集市售卖信息审核版本与当前提交版本不一致"),
+    MARKET_PAYMENT_FAILED(5741, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.MARKET, ErrorReason.FAILED), "集市购买支付失败"),
 
     // 收藏相关异常
     FAVORITE_COLLECTION_NOT_FOUND(5811, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.FAVORITE, ErrorReason.NOT_FOUND), "收藏集合不存在"),

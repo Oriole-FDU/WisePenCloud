@@ -1,8 +1,8 @@
 package com.oriole.wisepen.resource.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.core.util.IdUtil;
 import com.oriole.wisepen.common.core.domain.PageR;
+import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.enums.GroupType;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.resource.domain.GroupTagBind;
@@ -15,10 +15,12 @@ import com.oriole.wisepen.resource.domain.dto.req.MarketPurchaseRequest;
 import com.oriole.wisepen.resource.domain.dto.res.MarketOrderResponse;
 import com.oriole.wisepen.resource.domain.entity.MarketOrderEntity;
 import com.oriole.wisepen.resource.domain.entity.ResourceItemEntity;
+import com.oriole.wisepen.resource.enums.MarketOrderStatus;
 import com.oriole.wisepen.resource.enums.MarketSaleStatus;
 import com.oriole.wisepen.resource.enums.ResourceAction;
 import com.oriole.wisepen.resource.exception.ResourceError;
 import com.oriole.wisepen.resource.mq.IResourceEventPublisher;
+import com.oriole.wisepen.resource.repository.CustomResourceItemRepository;
 import com.oriole.wisepen.resource.repository.MarketOrderRepository;
 import com.oriole.wisepen.resource.repository.ResourceItemRepository;
 import com.oriole.wisepen.resource.service.IMarketService;
@@ -30,12 +32,14 @@ import com.oriole.wisepen.user.api.feign.RemoteUserService;
 import com.oriole.wisepen.user.api.feign.RemoteWalletService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -50,6 +54,7 @@ public class MarketServiceImpl implements IMarketService {
 
     private final MarketOrderRepository marketOrderRepository;
     private final ResourceItemRepository resourceItemRepository;
+    private final CustomResourceItemRepository customResourceItemRepository;
     private final IResourceEventPublisher resourceEventPublisher;
     private final RemoteUserService remoteUserService;
     private final RemoteWalletService remoteWalletService;
@@ -243,59 +248,173 @@ public class MarketServiceImpl implements IMarketService {
                 .findFirst()
                 .orElseThrow(() -> new ServiceException(ResourceError.MARKET_SALE_TIER_NOT_FOUND));
 
+        String traceSeed = String.join("\u001f", "MARKET_PURCHASE", buyerId, marketGroupId,
+                resource.getResourceId(), marketSaleInfo.getOfferVersion().toString(), marketSaleTier.getOfferId());
+        String traceId = UUID.nameUUIDFromBytes(traceSeed.getBytes(StandardCharsets.UTF_8))
+                .toString().replace("-", "");
+        MarketOrderEntity existingOrder = marketOrderRepository.findById(traceId).orElse(null);
+        if (existingOrder != null) {
+            if (existingOrder.getStatus() == MarketOrderStatus.COMPLETED) {
+                return BeanUtil.copyProperties(existingOrder, MarketOrderResponse.class);
+            }
+            if (existingOrder.getStatus() == MarketOrderStatus.PENDING) {
+                return BeanUtil.copyProperties(completeOrder(existingOrder), MarketOrderResponse.class);
+            }
+            if (existingOrder.getStatus() == MarketOrderStatus.REFUNDED) {
+                throw new ServiceException(ResourceError.MARKET_SALE_INFO_NOT_FOUND);
+            }
+        }
+
         // 不能重复购买，检查要购买的权限该用户是否本身就完全拥有
-        Map<String, Integer> userMasks = marketSaleInfo.getMarketSpecifiedUsersGrantedActionsMask() == null ? new HashMap<>() : marketSaleInfo.getMarketSpecifiedUsersGrantedActionsMask();
+        Map<String, Integer> userMasks = marketSaleInfo.getMarketSpecifiedUsersGrantedActionsMask() == null
+                ? new HashMap<>() : marketSaleInfo.getMarketSpecifiedUsersGrantedActionsMask();
         int existingMask = userMasks.getOrDefault(buyerId, 0);
 
-        if ((existingMask & marketSaleTier.getGrantedActionsMask()) == marketSaleTier.getGrantedActionsMask()){
+        if ((existingMask & marketSaleTier.getGrantedActionsMask()) == marketSaleTier.getGrantedActionsMask()) {
             throw new ServiceException(ResourceError.MARKET_SALE_TIER_GRANT_ALREADY_EXISTS);
         }
 
-        String traceId = IdUtil.fastSimpleUUID();
         Integer paidPrice = marketSaleTier.getPrice();
 
-        List<ResourceAction> offerGrantedActions = ResourceAction.permissionCodeToActions(marketSaleTier.getGrantedActionsMask());
-        String billMeta = "%s (%s)".formatted(resource.getResourceId(), offerGrantedActions.stream().map(Enum::name).toList().toString());
+        MarketOrderEntity order;
+        if (existingOrder != null) { // 即 existingOrder.getStatus() == MarketOrderStatus.FAILED
+            order = transitionOrderStatus(existingOrder, MarketOrderStatus.PENDING);
+        } else {
+            order = MarketOrderEntity.builder()
+                    .orderId(traceId)
+                    .traceId(traceId)
+                    .buyerId(buyerId).sellerId(resource.getOwnerId())
+                    .marketGroupId(marketGroupId)
+                    .purchasedResourceId(resource.getResourceId())
+                    .purchasedOfferVersion(marketSaleInfo.getOfferVersion())
+                    .purchasedOfferId(marketSaleTier.getOfferId())
+                    .buyerGrantedActionsMask(marketSaleTier.getGrantedActionsMask()).buyerPaidPrice(paidPrice)
+                    .status(MarketOrderStatus.PENDING)
+                    .build();
 
-        // 请求交易
-        remoteWalletService.settleCoinTrade(WalletSettleCoinTradeRequest.builder()
-                .traceId(traceId)
-                .buyerId(Long.valueOf(buyerId)).sellerId(Long.valueOf(resource.getOwnerId()))
-                .price(paidPrice).meta(billMeta)
-                .build());
+            try {
+                order = marketOrderRepository.insert(order);
+                log.info("market order status changed. orderId={} resourceId={} from=null to={}",
+                        order.getOrderId(), order.getPurchasedResourceId(), MarketOrderStatus.PENDING);
+            } catch (DuplicateKeyException e) {
+                order = marketOrderRepository.findById(traceId).orElseThrow(() -> e);
+            }
+        }
 
-        // 记录交易记录
-        MarketOrderEntity order = MarketOrderEntity.builder()
-                .traceId(traceId)
-                .buyerId(buyerId).sellerId(resource.getOwnerId())
-                .marketGroupId(marketGroupId)
-                .purchasedResourceId(resource.getResourceId())
-                .purchasedOfferVersion(marketSaleInfo.getOfferVersion())
-                .buyerGrantedActionsMask(marketSaleTier.getGrantedActionsMask()).buyerPaidPrice(paidPrice).build();
-        MarketOrderEntity saved = marketOrderRepository.save(order);
+        if (order.getStatus() == MarketOrderStatus.COMPLETED) {
+            return BeanUtil.copyProperties(order, MarketOrderResponse.class);
+        }
+        if (order.getStatus() == MarketOrderStatus.FAILED) {
+            order = transitionOrderStatus(order, MarketOrderStatus.PENDING);
+        }
+        return BeanUtil.copyProperties(completeOrder(order), MarketOrderResponse.class);
+    }
 
-        // 添加权限
-        userMasks.put(buyerId, existingMask | marketSaleTier.getGrantedActionsMask());
-        marketSaleInfo.setMarketSpecifiedUsersGrantedActionsMask(userMasks);
-
-        resourceItemRepository.save(resource);
-        resourceEventPublisher.publishAclRecalculateEvent(resource.getResourceId(), "MARKET_PURCHASE");
-
-        log.info("market order created. orderId={} resourceId={} marketGroupId={} buyerId={} grantedActionsMask={} offerVersion={}",
-                saved.getOrderId(), resource.getResourceId(), marketGroupId, buyerId, marketSaleTier.getGrantedActionsMask() , marketSaleInfo.getOfferVersion());
-        return BeanUtil.copyProperties(saved, MarketOrderResponse.class);
+    @Override
+    public void recoverPendingOrder(String orderId) {
+        marketOrderRepository.findById(orderId)
+                .filter(order -> order.getStatus() == MarketOrderStatus.PENDING)
+                .ifPresent(this::completeOrder);
     }
 
     @Override
     public PageR<MarketOrderResponse> listOrders(String buyerId, int page, int size) {
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), size);
-        Page<MarketOrderEntity> entityPage = marketOrderRepository.findByBuyerId(buyerId, pageable);
+        Page<MarketOrderEntity> entityPage = marketOrderRepository.findByBuyerIdAndStatus(
+                buyerId, MarketOrderStatus.COMPLETED, pageable);
         PageR<MarketOrderResponse> pageR = new PageR<>(entityPage.getTotalElements(), page, size);
 
         pageR.addAll(entityPage.getContent().stream()
                 .map(entity -> BeanUtil.copyProperties(entity, MarketOrderResponse.class))
                 .toList());
         return pageR;
+    }
+
+    private MarketOrderEntity completeOrder(MarketOrderEntity order) {
+        List<ResourceAction> grantedActions = ResourceAction.permissionCodeToActions(order.getBuyerGrantedActionsMask());
+        String billMeta = "%s (%s)".formatted(order.getPurchasedResourceId(),
+                grantedActions.stream().map(Enum::name).toList());
+
+        Integer paidPrice = order.getBuyerPaidPrice();
+        if (paidPrice == null || paidPrice < 0) {
+            transitionOrderStatus(order, MarketOrderStatus.FAILED);
+            throw new ServiceException(ResourceError.MARKET_PAYMENT_FAILED);
+        }
+
+        if (paidPrice > 0) {
+            R<Void> paymentResult;
+            try {
+                paymentResult = remoteWalletService.settleCoinTrade(WalletSettleCoinTradeRequest.builder()
+                        .traceId(order.getTraceId())
+                        .buyerId(Long.valueOf(order.getBuyerId())).sellerId(Long.valueOf(order.getSellerId()))
+                        .price(paidPrice).meta(billMeta)
+                        .build());
+            } catch (RuntimeException e) {
+                // 钱包调用结果未知时保留 PENDING，交给定时任务继续用同一 traceId 幂等恢复。
+                throw new ServiceException(ResourceError.MARKET_PAYMENT_FAILED);
+            }
+            if (paymentResult == null) {
+                throw new ServiceException(ResourceError.MARKET_PAYMENT_FAILED);
+            }
+            if (!Objects.equals(paymentResult.getCode(), 200)) {
+                transitionOrderStatus(order, MarketOrderStatus.FAILED);
+                if (!StringUtils.hasText(paymentResult.getMsg())) {
+                    throw new ServiceException(ResourceError.MARKET_PAYMENT_FAILED);
+                }
+                throw new ServiceException(ResourceError.MARKET_PAYMENT_FAILED, paymentResult.getMsg());
+            }
+        }
+
+        boolean granted = customResourceItemRepository.grantMarketActions(
+                order.getPurchasedResourceId(), order.getMarketGroupId(), order.getBuyerId(),
+                order.getBuyerGrantedActionsMask());
+        if (!granted) {
+            if (paidPrice > 0) {
+                R<Void> refundResult;
+                try {
+                    // 支付已成功但资源无法交付时，使用反向结算退款；退款失败则保留 PENDING 等待恢复任务重试。
+                    refundResult = remoteWalletService.settleCoinTrade(WalletSettleCoinTradeRequest.builder()
+                            .traceId(order.getTraceId() + ":refund")
+                            .buyerId(Long.valueOf(order.getSellerId())).sellerId(Long.valueOf(order.getBuyerId()))
+                            .price(paidPrice).meta("refund " + billMeta)
+                            .build());
+                } catch (RuntimeException e) {
+                    throw new ServiceException(ResourceError.MARKET_PAYMENT_FAILED);
+                }
+                if (refundResult == null || !Objects.equals(refundResult.getCode(), 200)) {
+                    throw new ServiceException(ResourceError.MARKET_PAYMENT_FAILED);
+                }
+                transitionOrderStatus(order, MarketOrderStatus.REFUNDED);
+            } else {
+                transitionOrderStatus(order, MarketOrderStatus.FAILED);
+            }
+            throw new ServiceException(ResourceError.MARKET_SALE_INFO_NOT_FOUND);
+        }
+
+        MarketOrderEntity completedOrder = transitionOrderStatus(order, MarketOrderStatus.COMPLETED);
+        resourceEventPublisher.publishAclRecalculateEvent(order.getPurchasedResourceId(), "MARKET_PURCHASE");
+        return completedOrder;
+    }
+
+    private MarketOrderEntity transitionOrderStatus(MarketOrderEntity order, MarketOrderStatus targetStatus) {
+        MarketOrderStatus previousStatus = order.getStatus();
+        if (previousStatus == targetStatus || previousStatus == MarketOrderStatus.COMPLETED
+                || previousStatus == MarketOrderStatus.REFUNDED) {
+            return order;
+        }
+
+        LocalDateTime updateTime = LocalDateTime.now();
+        long updated = marketOrderRepository.updateStatusIfCurrent(
+                order.getOrderId(), previousStatus, targetStatus, updateTime);
+        if (updated == 0) {
+            return marketOrderRepository.findById(order.getOrderId()).orElseThrow();
+        }
+
+        order.setStatus(targetStatus);
+        order.setUpdateTime(updateTime);
+        log.info("market order status changed. orderId={} resourceId={} from={} to={}",
+                order.getOrderId(), order.getPurchasedResourceId(), previousStatus, targetStatus);
+        return order;
     }
 
     private MarketSaleInfo getmarketSaleInfo(ResourceItemEntity resource, String marketGroupId) {

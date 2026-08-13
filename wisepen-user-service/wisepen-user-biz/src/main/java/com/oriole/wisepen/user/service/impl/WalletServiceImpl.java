@@ -452,10 +452,12 @@ public class WalletServiceImpl implements IWalletService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void settleCoinTrade(WalletSettleCoinTradeRequest req) {
+        // 同一买家的结算串行化，确保并发重试在检查幂等记录前等待首笔交易提交。（悲观锁）
+        userWalletsMapper.selectByIdForUpdate(req.getBuyerId());
         LambdaQueryWrapper<WalletTransactionRecordEntity> wrapper = new LambdaQueryWrapper<WalletTransactionRecordEntity>().eq(
                 WalletTransactionRecordEntity::getTraceId, req.getTraceId());
         // 避免重复处理业务
-        if (walletTransactionRecordMapper.selectOne(wrapper) != null) {
+        if (walletTransactionRecordMapper.selectCount(wrapper) > 0) {
             return;
         }
         // 必须先扣除再增加，防止无法扣费
