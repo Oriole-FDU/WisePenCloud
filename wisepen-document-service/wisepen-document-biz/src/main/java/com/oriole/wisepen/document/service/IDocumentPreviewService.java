@@ -1,5 +1,6 @@
 package com.oriole.wisepen.document.service;
 
+import com.oriole.wisepen.document.api.enums.DocumentDownloadType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -10,4 +11,12 @@ public interface IDocumentPreviewService {
                               String resourceId,
                               Integer targetVersion,
                               String userId);
+
+    // 处理下载请求
+    void handleDownloadRequest(HttpServletRequest request,
+                               HttpServletResponse response,
+                               String resourceId,
+                               Integer targetVersion,
+                               String userId,
+                               DocumentDownloadType downloadType);
 }

@@ -21,7 +21,7 @@ public enum ResourceAction {
     COMMENT(1 << 8),            // 256: 评论
     MARKET_VIEW(1 << 9);        // 512: 市场阅读（仅能从 MARKET 市场获取该权限）
 
-    public static final int ALL_ACTIONS = DISCOVER.code | VIEW.code | LOAD.code | EDIT.code | INLINE_COMMENT.code | DOWNLOAD_ORIGINAL.code | FORK.code | COMMENT.code;
+    public static final int ALL_ACTIONS = DISCOVER.code | VIEW.code | LOAD.code | EDIT.code | INLINE_COMMENT.code | DOWNLOAD_WATERMARK.code | DOWNLOAD_ORIGINAL.code | FORK.code | COMMENT.code;
 
     public static final int DEFAULT_MEMBER_ACTIONS = DISCOVER.code | VIEW.code | DOWNLOAD_WATERMARK.code;
 
