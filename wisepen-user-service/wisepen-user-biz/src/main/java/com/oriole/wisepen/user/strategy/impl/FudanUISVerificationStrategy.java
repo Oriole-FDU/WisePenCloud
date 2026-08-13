@@ -3,6 +3,7 @@ package com.oriole.wisepen.user.strategy.impl;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.oriole.wisepen.common.core.domain.R;
+import com.oriole.wisepen.common.core.domain.enums.UserStatus;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.extension.fudan.domain.dto.FudanUISTaskResultDTO;
 import com.oriole.wisepen.extension.fudan.domain.mq.FudanUISAuthRequestMessage;
@@ -11,8 +12,8 @@ import com.oriole.wisepen.extension.fudan.feign.RemoteFudanExtensionService;
 import com.oriole.wisepen.user.api.domain.dto.VerificationResultDTO;
 import com.oriole.wisepen.user.api.enums.DegreeLevel;
 import com.oriole.wisepen.user.api.enums.GenderType;
-import com.oriole.wisepen.user.api.enums.Status;
 import com.oriole.wisepen.user.api.enums.UserVerificationMode;
+import com.oriole.wisepen.user.cache.RedisCacheManager;
 import com.oriole.wisepen.user.domain.entity.UserEntity;
 import com.oriole.wisepen.user.domain.entity.UserProfileEntity;
 import com.oriole.wisepen.user.exception.UserError;
@@ -37,6 +38,7 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
     private final UserProfileMapper userProfileMapper;
     private final RemoteFudanExtensionService remoteFudanExtensionService;
     private final KafkaUserEventPublisher kafkaUserEventPublisher;
+    private final RedisCacheManager redisCacheManager;
 
     @Override
     public UserVerificationMode getMode() {
@@ -46,7 +48,7 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
     @Override
     public List<String> getReadonlyFields() {
         return Arrays.asList(
-                "username", "realName", "campusNo", "email", "mobile", "status",
+                "username", "realName", "campusNo", "email", "mobile", "userStatus",
                 "sex", "university", "college", "major",
                 "className", "enrollmentYear", "degreeLevel"
         );
@@ -94,7 +96,7 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
         String campusNo = profile.get("学号");
         long existed = userMapper.selectCount(Wrappers.<UserEntity>lambdaQuery()
                 .eq(UserEntity::getCampusNo, campusNo)
-                .eq(UserEntity::getStatus, Status.NORMAL)
+                .eq(UserEntity::getUserStatus, UserStatus.NORMAL)
                 .ne(UserEntity::getUserId, userId));
         if (existed > 0) {
             log.warn("fudan uis verify rejected for bound campus number. userId={} campusNo={}",
@@ -113,7 +115,7 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
         if (StrUtil.isNotBlank(email)) {
             userEntity.setEmail(email);
         }
-        userEntity.setStatus(Status.NORMAL);
+        userEntity.setUserStatus(UserStatus.NORMAL);
         userEntity.setVerificationMode(UserVerificationMode.FDU_UIS_SYS);
 
         // 设置性别、院系、专业、年级、培养层次等信息
@@ -143,6 +145,7 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
         userProfileEntity.setUserId(userId);
         userProfileMapper.updateById(userProfileEntity);
 
+        redisCacheManager.updateUserStatusInSession(userId, UserStatus.NORMAL);
         log.info("fudan uis verify succeeded. userId={} campusNo={}", userId, campusNo);
         return VerificationResultDTO.success();
     }

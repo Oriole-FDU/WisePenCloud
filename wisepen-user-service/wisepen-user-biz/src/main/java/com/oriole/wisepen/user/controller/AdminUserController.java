@@ -3,11 +3,11 @@ package com.oriole.wisepen.user.controller;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.enums.BusinessType;
+import com.oriole.wisepen.common.core.domain.enums.IdentityType;
+import com.oriole.wisepen.common.core.domain.enums.UserStatus;
 import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.security.annotation.CheckRole;
-import com.oriole.wisepen.common.core.domain.enums.IdentityType;
 import com.oriole.wisepen.user.api.domain.dto.req.*;
-import com.oriole.wisepen.user.api.enums.Status;
 import com.oriole.wisepen.user.domain.entity.UserEntity;
 import com.oriole.wisepen.user.domain.entity.UserProfileEntity;
 import com.oriole.wisepen.user.service.IUserService;
@@ -30,7 +30,7 @@ public class AdminUserController {
             summary = "分页查询用户",
             description = """
                     - 用途：管理员按关键字、账号状态和身份类型筛选用户列表。
-                    - 请求：keyword 支持真实姓名模糊匹配，或学工号、用户名、用户 ID 精确匹配；status 和 identityType 为可选过滤条件；page 和 size 控制分页。
+                    - 请求：keyword 支持真实姓名模糊匹配，或学工号、用户名、用户 ID 精确匹配；userStatus 和 identityType 为可选过滤条件；page 和 size 控制分页。
                     - 约束：当前操作者必须具备管理员身份；keyword 作为用户 ID 匹配时需可转换为数字。
                     - 处理：查询未逻辑删除用户并按创建时间倒序分页，返回前清空密码字段；不返回用户资料扩展详情。
                     - 失败：当前操作者不是管理员 -> PermissionError.UNAUTHORIZED。
@@ -43,10 +43,10 @@ public class AdminUserController {
             @RequestParam(value = "page", defaultValue = "1") int page,
             @RequestParam(value = "size", defaultValue = "20") int size,
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) Status status,
+            @RequestParam(required = false) UserStatus userStatus,
             @RequestParam(required = false) IdentityType identityType
     ) {
-        return R.ok(userService.getUserListAdmin(page, size, keyword, status, identityType));
+        return R.ok(userService.getUserListAdmin(page, size, keyword, userStatus, identityType));
     }
 
     @Operation(
@@ -88,7 +88,7 @@ public class AdminUserController {
             summary = "更新用户账号信息",
             description = """
                     - 用途：管理员维护指定用户的账号展示信息、认证信息、身份类型和账号状态。
-                    - 请求：userId 指定被维护用户；username、campusNo、email、mobile、verificationMode、status、identityType 等字段属于用户账号域，对应 sys_user。
+                    - 请求：userId 指定被维护用户；username、campusNo、email、mobile、verificationMode、userStatus、identityType 等字段属于用户账号域，对应 sys_user。
                     - 约束：当前操作者必须具备管理员身份；目标用户必须存在；username 在全量用户中必须唯一；正常状态用户的 campusNo 必须唯一。
                     - 处理：更新用户账号域；当 identityType 发生变化时，同步清理不适用于新身份的资料字段：切换为学生时清空职称，切换为教师时清空专业、班级、入学年份和学历层次。
                     - 失败：当前操作者不是管理员 -> PermissionError.UNAUTHORIZED；用户名重复 -> UserError.USERNAME_ALREADY_EXISTS；学工号冲突 -> UserError.CAMPUS_NO_ALREADY_EXISTS。

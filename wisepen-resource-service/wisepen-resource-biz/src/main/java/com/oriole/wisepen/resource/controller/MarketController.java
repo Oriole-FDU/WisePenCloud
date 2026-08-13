@@ -7,7 +7,7 @@ import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.common.log.annotation.Log;
-import com.oriole.wisepen.common.security.annotation.CheckLogin;
+import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.resource.domain.dto.req.MarketSalePublishRequest;
 import com.oriole.wisepen.resource.domain.dto.req.MarketSaleOffShelfRequest;
 import com.oriole.wisepen.resource.domain.dto.req.MarketPurchaseRequest;
@@ -31,7 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/resource/market")
 @RequiredArgsConstructor
-@CheckLogin
+@CheckRole
 @Validated
 public class MarketController {
 

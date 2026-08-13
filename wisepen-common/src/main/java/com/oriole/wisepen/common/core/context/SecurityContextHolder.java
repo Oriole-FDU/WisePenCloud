@@ -64,6 +64,12 @@ public class SecurityContextHolder {
     // 获取用户身份类型 (1:学生 2:老师 3:管理员)
     public static IdentityType getIdentityType() { return get(SecurityConstants.HEADER_IDENTITY_TYPE, IdentityType.class); }
 
+    // 设置用户账号状态
+    public static void setUserStatus(Integer status) { set(SecurityConstants.HEADER_USER_STATUS, status); }
+
+    // 获取用户账号状态 (1:正常 -1:未认证 -2:封禁)
+    public static Integer getUserStatus() { return get(SecurityConstants.HEADER_USER_STATUS, Integer.class); }
+
     // 设置用户所在的Group与Role
     public static void setGroupRoleMap(String groupRoleMapJson) {
         Map<String, Integer> rawMap = JSONUtil.toBean(groupRoleMapJson, new TypeReference<Map<String, Integer>>() {}, false);

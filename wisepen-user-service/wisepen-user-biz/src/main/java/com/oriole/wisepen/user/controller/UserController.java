@@ -5,6 +5,7 @@ import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.security.annotation.CheckLogin;
+import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.user.api.domain.dto.req.UserInfoUpdateRequest;
 import com.oriole.wisepen.user.api.domain.dto.res.UserDetailInfoResponse;
 import com.oriole.wisepen.user.api.domain.dto.res.UserSearchUserResponse;
@@ -68,7 +69,7 @@ public class UserController {
                     - 响应：返回符合条件的用户展示列表；无可见用户时返回空列表。
                     """
     )
-    @CheckLogin
+    @CheckRole
     @GetMapping("/searchUser")
     public R<List<UserSearchUserResponse>> searchUser(
             @RequestParam("keyword") @NotBlank @Size(max = 128) String keyword
@@ -87,7 +88,7 @@ public class UserController {
                     - 响应：返回包含真实姓名的用户展示补全列表；无可见候选用户时返回空列表。
                     """
     )
-    @CheckLogin
+    @CheckRole
     @GetMapping("/listUserSearchSuggestions")
     public R<List<UserSearchUserResponse>> listUserSearchSuggestions(
             @RequestParam("keyword") @NotBlank @Size(min = 2, max = 128) String keyword,
@@ -107,7 +108,7 @@ public class UserController {
                     - 响应：成功时返回空结果。
                     """
     )
-    @CheckLogin
+    @CheckRole
     @PutMapping("/changeUserProfile")
     @Log(title = "更新用户资料", businessType = BusinessType.UPDATE)
     public R<Void> updateUserProfile(@RequestBody UserProfileUpdateRequest dto) {
@@ -126,7 +127,7 @@ public class UserController {
                     - 响应：成功时返回空结果。
                     """
     )
-    @CheckLogin
+    @CheckRole
     @PutMapping("/changeUserInfo")
     @Log(title = "更新用户信息", businessType = BusinessType.UPDATE)
     public R<Void> updateUserInfo(@RequestBody UserInfoUpdateRequest dto) {
@@ -141,7 +142,7 @@ public class UserController {
                     - 请求：email 为待验证的邮箱地址。
                     - 约束：当前用户必须已登录；邮箱需满足对应认证策略的业务校验。
                     - 处理：将 email 和当前 userId 交给教育邮箱认证策略发起验证；不立即改变用户认证状态。
-                    - 失败：未登录 -> PermissionError.NOT_LOGIN；邮箱不符合认证策略 -> UserError.VERIFICATION_EMAIL_INVALID；邮箱已被其他账号绑定 -> UserError.VERIFICATION_EMAIL_ALREADY_EXISTS；验证邮件发送失败 -> UserError.VERIFICATION_EMAIL_SEND_FAILED。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；邮箱不符合认证策略 -> UserError.VERIFICATION_EMAIL_INVALID；账号状态不允许邮箱认证 -> UserError.VERIFICATION_EMAIL_STATE_INVALID；邮箱已被其他账号绑定 -> UserError.VERIFICATION_EMAIL_ALREADY_EXISTS；验证邮件发送失败 -> UserError.VERIFICATION_EMAIL_SEND_FAILED。
                     - 响应：成功受理时返回空结果，后续结果通过邮箱回调检查接口完成。
                     """
     )
@@ -162,8 +163,8 @@ public class UserController {
                     - 用途：邮箱验证链接回调后校验一次性 token 并完成教育邮箱认证。
                     - 请求：token 为邮箱验证流程生成的一次性凭证。
                     - 约束：token 必须有效且未过期。
-                    - 处理：调用教育邮箱认证策略校验 token，并按策略更新用户认证相关信息；不依赖当前登录用户上下文。
-                    - 失败：验证 token 无效或过期 -> UserError.VERIFICATION_EMAIL_TOKEN_EXPIRED；邮箱已被其他账号绑定 -> UserError.VERIFICATION_EMAIL_ALREADY_EXISTS。
+                    - 处理：调用教育邮箱认证策略校验 token，并按策略更新用户邮箱、认证状态和学校名称；不依赖当前登录用户上下文，不改变学生身份。
+                    - 失败：验证 token 无效或过期 -> UserError.VERIFICATION_EMAIL_TOKEN_EXPIRED；邮箱不符合认证策略 -> UserError.VERIFICATION_EMAIL_INVALID；账号状态不允许邮箱认证 -> UserError.VERIFICATION_EMAIL_STATE_INVALID；邮箱已被其他账号绑定 -> UserError.VERIFICATION_EMAIL_ALREADY_EXISTS。
                     - 响应：成功时返回空结果。
                     """
     )

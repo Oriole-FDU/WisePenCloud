@@ -30,18 +30,17 @@ import com.oriole.wisepen.resource.event.TagTrashedEvent;
 import com.oriole.wisepen.resource.exception.ResourceError;
 import com.oriole.wisepen.resource.repository.*;
 import com.oriole.wisepen.resource.mq.IResourceEventPublisher;
+import com.oriole.wisepen.resource.service.*;
 import com.oriole.wisepen.resource.service.assembler.ResourceItemResponseAssembler;
-import com.oriole.wisepen.resource.service.IGroupResService;
-import com.oriole.wisepen.resource.service.IResourceService;
-import com.oriole.wisepen.resource.service.ISearchSyncService;
-import com.oriole.wisepen.resource.service.ITagService;
 import com.oriole.wisepen.user.api.domain.base.UserDisplayBase;
 import com.oriole.wisepen.user.api.enums.ResourceGroupDashboardMetricType;
 import com.oriole.wisepen.user.api.feign.RemoteUserService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -89,6 +88,10 @@ public class ResourceServiceImpl implements IResourceService {
     private final ApplicationEventPublisher applicationEventPublisher;
 
     private final RemoteUserService remoteUserService;
+
+    @Autowired
+    @Lazy
+    private IResourcePlacementService resourcePlacementService;
 
     @EventListener
     public void handleTagTrashedEvent(TagTrashedEvent event) {
@@ -139,6 +142,20 @@ public class ResourceServiceImpl implements IResourceService {
         }
     }
 
+    @Override
+    public void assertResourceOwner(List<String> resourceIds, String userId) {
+        List<ResourceItemEntity> entities = findValidResourceEntities(resourceIds);
+        List<String> deniedResourceIds = entities.stream()
+                .filter(entity -> !userId.equals(entity.getOwnerId()))
+                .map(ResourceItemEntity::getResourceId)
+                .toList();
+        if (!deniedResourceIds.isEmpty()) {
+            log.warn("resource permission denied. deniedResources={} deniedResourceIds={} userId={}",
+                    deniedResourceIds.size(), summarizeIds(deniedResourceIds), userId);
+            throw new ServiceException(ResourceError.RESOURCE_PERMISSION_DENIED);
+        }
+    }
+
     public ResourceItemEntity getResourceEntity(String resourceId) {
         ResourceItemEntity resource = resourceItemRepository.findById(resourceId)
                 .orElseThrow(() -> new ServiceException(ResourceError.RESOURCE_NOT_FOUND));
@@ -146,6 +163,24 @@ public class ResourceServiceImpl implements IResourceService {
             throw new ServiceException(ResourceError.RESOURCE_NOT_FOUND);
         }
         return resource;
+    }
+
+    private List<ResourceItemEntity> findValidResourceEntities(List<String> resourceIds) {
+        resourceIds = resourceIds.stream().filter(StringUtils::hasText).distinct().toList();
+        if (resourceIds.isEmpty()) {
+            throw new ServiceException(ResourceError.RESOURCE_NOT_FOUND);
+        }
+
+        List<ResourceItemEntity> entities = resourceItemRepository.findAllById(resourceIds);
+        Set<String> foundResourceIds = entities.stream()
+                .filter(entity -> entity.getDeletedAt() == null)
+                .map(ResourceItemEntity::getResourceId)
+                .collect(Collectors.toSet());
+        if (foundResourceIds.size() != resourceIds.size()
+                || !foundResourceIds.containsAll(resourceIds)) {
+            throw new ServiceException(ResourceError.RESOURCE_NOT_FOUND);
+        }
+        return entities;
     }
 
     @Override
@@ -217,79 +252,128 @@ public class ResourceServiceImpl implements IResourceService {
         return groupBinds;
     }
 
+    @Deprecated
+    private List<String> resolveTargetTagIds(List<String> currentTagIds, List<String> targetTagIds, ResourceTagUpdateMode mode) {
+        targetTagIds = targetTagIds == null ? Collections.emptyList() : targetTagIds;
+        List<String> resolvedTagIds = new ArrayList<>(currentTagIds == null ? Collections.emptyList() : currentTagIds);
+
+        if (mode == ResourceTagUpdateMode.ADD) resolvedTagIds.addAll(targetTagIds);
+        if (mode == ResourceTagUpdateMode.REMOVE) resolvedTagIds.removeAll(targetTagIds);
+        if (mode == ResourceTagUpdateMode.REPLACE) resolvedTagIds = targetTagIds;
+        return resolvedTagIds;
+    }
+
     @Override
-    public void updatePersonalResourceTags (String resourceId, String groupId, List<String> tagIds) {
-        ResourceItemEntity entity = getResourceEntity(resourceId);
+    @Deprecated
+    // 此方法已弃用，相关职责由 setPersonalResourcesPathTag movePersonalResourcesToTrash replacePersonalNormalTags 替代
+    public void updatePersonalResourceTags(List<String> resourceIds, String groupId, List<String> tagIds, ResourceTagUpdateMode mode) {
+        ResourceTagUpdateMode resolvedMode = mode == null ? ResourceTagUpdateMode.REPLACE : mode;
+        List<ResourceItemEntity> entities = findValidResourceEntities(resourceIds);
+        List<ResourceItemEntity> trashedEntities = new ArrayList<>();
 
-        boolean isTrashed = false;
+        for (ResourceItemEntity entity : entities) {
+            List<String> targetTagIds = resolveTargetTagIds(
+                    entity.getGroupBinds().stream()
+                            .filter(bind -> groupId.equals(bind.getGroupId()))
+                            .findFirst().map(GroupTagBind::getTagIds).orElse(Collections.emptyList()),
+                    tagIds, resolvedMode
+            );
 
-        if (tagIds == null || tagIds.isEmpty()) {
-            // 个人空间的资源不允许被清空标签
-            throw new ServiceException(ResourceError.CANNOT_BIND_RESOURCE_TO_MULTIPLE_PATH_NODES);
+            if (targetTagIds == null || targetTagIds.isEmpty()) {
+                // 个人空间的资源不允许被清空标签
+                throw new ServiceException(ResourceError.CANNOT_BIND_RESOURCE_TO_MULTIPLE_PATH_NODES);
+            }
+
+            // 查找并检查Tag
+            List<TagEntity> validTags = findAndValidateTags(groupId, targetTagIds);
+            List<TagEntity> pathTags =  validTags.stream().filter(tag -> Boolean.TRUE.equals(tag.getIsPath())).toList();
+            // 最多只能有一个 isPath 节点
+            if (pathTags.size() != 1) throw new ServiceException(ResourceError.CANNOT_BIND_RESOURCE_TO_MULTIPLE_PATH_NODES);
+            // 首位 (Index 0) 的节点必须是这个唯一的 isPath 节点
+            if (!targetTagIds.getFirst().equals(pathTags.getFirst().getTagId())) throw new ServiceException(ResourceError.CANNOT_PLACE_RESOURCE_PATH_TAG_AFTER_TAGS);
+
+            // 检查目标路径是否属于回收站
+            boolean isTrashed = tagService.isNodeInTrash(groupId, pathTags.getFirst().getTagId()) != ITagService.TagType.NOT_IN_TRASH;
+
+            if (isTrashed) {
+                // 移入回收站会卸载除了个人组的所有节点，如果此前有发布到市场，则还需移除市场索引
+                entity.getGroupBinds().stream()
+                        .filter(bind -> bind.getMarketSaleInfo() != null)
+                        .forEach(bind -> searchSyncService.deleteMarketResourceIndexesByResourceIdAndMarketGroupId(
+                                entity.getResourceId(), bind.getGroupId()));
+                entity.getGroupBinds().removeIf(bind -> !bind.getGroupId().startsWith(ResourceConstants.PERSONAL_GROUP_PREFIX));
+                entity.setOverrideGrantedActionsMask(null);
+                entity.setSpecifiedUsersGrantedActionsMask(null);
+                entity.setComputedGroupAcls(null);
+                trashedEntities.add(entity);
+            }
+            entity.setGroupBinds(updateResourceGroupBinds(entity.getGroupBinds(), groupId, targetTagIds));
         }
 
-        // 查找并检查Tag
-        List<TagEntity> validTags = findAndValidateTags(groupId, tagIds);
-        List<TagEntity> pathTags =  validTags.stream().filter(tag -> Boolean.TRUE.equals(tag.getIsPath())).toList();
-        // 最多只能有一个 isPath 节点
-        if (pathTags.size() != 1) throw new ServiceException(ResourceError.CANNOT_BIND_RESOURCE_TO_MULTIPLE_PATH_NODES);
-        // 首位 (Index 0) 的节点必须是这个唯一的 isPath 节点
-        if (!tagIds.getFirst().equals(pathTags.getFirst().getTagId())) throw new ServiceException(ResourceError.CANNOT_PLACE_RESOURCE_PATH_TAG_AFTER_TAGS);
-
-        // 检查目标路径是否属于回收站
-        if (tagService.isNodeInTrash(groupId, pathTags.getFirst().getTagId()) != ITagService.TagType.NOT_IN_TRASH) {
-            isTrashed = true;
-            // 移入回收站会卸载除了个人组的所有节点，如果此前有发布到市场，则还需移除市场索引
-            entity.getGroupBinds().stream()
-                    .filter(bind -> bind.getMarketSaleInfo() != null)
-                    .forEach(bind -> searchSyncService.deleteMarketResourceIndexesByResourceIdAndMarketGroupId(
-                            entity.getResourceId(), bind.getGroupId()));
-            entity.getGroupBinds().removeIf(bind -> !bind.getGroupId().startsWith(ResourceConstants.PERSONAL_GROUP_PREFIX));
-            entity.setOverrideGrantedActionsMask(null);
-            entity.setSpecifiedUsersGrantedActionsMask(null);
-            entity.setComputedGroupAcls(null);
-        }
-
-        entity.setGroupBinds(updateResourceGroupBinds(entity.getGroupBinds(), groupId, tagIds));
-        resourceItemRepository.save(entity);
-        log.info("resource tags changed. resourceId={} groupId={} tagCount={}",
-                entity.getResourceId(), groupId, tagIds.size());
-        if (isTrashed) {
+        resourceItemRepository.saveAll(entities);
+        log.info("resource tags changed. affectedResources={} affectedResourceIds={} groupId={} tagCount={}",
+                entities.size(),
+                summarizeIds(entities.stream().map(ResourceItemEntity::getResourceId).toList()),
+                groupId,
+                tagIds.size());
+        for (ResourceItemEntity entity : trashedEntities) {
             eventPublisher.publishAclRecalculateEvent(entity.getResourceId(), "STRIP_GROUP_PERMISSION");
         }
     }
 
     @Override
-    public void updateGroupResourceTags(String resourceId, String groupId, String userId, GroupRoleType groupRole, List<String> tagIds) {
-        ResourceItemEntity entity = getResourceEntity(resourceId);
-        updateGroupResourceTags(entity, groupId, userId, groupRole, tagIds);
+    @Deprecated
+    // 此方法已弃用，相关职责由 mountResourcesToGroup unmountGroupResources moveResourcesInGroup 替代
+    public void updateGroupResourceTags(List<String> resourceIds, String groupId, String userId, GroupRoleType groupRole, List<String> tagIds, ResourceTagUpdateMode mode) {
+        List<ResourceItemEntity> entities = findValidResourceEntities(resourceIds);
+        updateGroupResourceTagsByEntities(entities, groupId, userId, groupRole, tagIds, mode);
     }
 
-    public void updateGroupResourceTags(ResourceItemEntity entity, String groupId, String userId, GroupRoleType groupRole, List<String> tagIds) {
+    @Deprecated
+    // 此方法已弃用，相关职责由 mountResourcesToGroup unmountGroupResources moveResourcesInGroup 替代
+    private void updateGroupResourceTagsByEntities(List<ResourceItemEntity> entities, String groupId, String userId, GroupRoleType groupRole, List<String> tagIds, ResourceTagUpdateMode mode) {
+        ResourceTagUpdateMode resolvedMode = mode == null ? ResourceTagUpdateMode.REPLACE : mode;
         if (tagIds != null && !tagIds.isEmpty()) {
             // 查找并检查Tag
             // MARKET 组的 Tag 无法通过这种方法找到（在 MARKET_GROUP_PREFIX 前缀的 groupId 下）因此无法通过该方法绑定
             List<TagEntity> validTags = findAndValidateTags(groupId, tagIds);
 
-            // 小组 FOLDER 模式：同一小组内每个资源至多挂载一个标签
-            FileOrganizationLogic logic = groupResService.getFileOrgLogic(groupId);
-            if (FileOrganizationLogic.FOLDER == logic && tagIds.size() > 1)
-                throw new ServiceException(ResourceError.CANNOT_BIND_MULTIPLE_RESOURCE_TAGS_IN_FOLDER_MODE);
-
-            // 检查是否有权限挂载
-            if (groupRole == null || groupRole == GroupRoleType.NOT_MEMBER) {
-                throw new ServiceException(ResourceError.BIND_RESOURCE_TO_TAG_NODE_DENIED);
-            }
-            if (groupRole != GroupRoleType.ADMIN && groupRole != GroupRoleType.OWNER) {
-                checkGroupMemberTagMountPermission(userId, validTags);
+            if (resolvedMode != ResourceTagUpdateMode.REMOVE) { // 不是删除时需要检查挂载权限
+                // 检查是否有权限挂载
+                if (groupRole == null || groupRole == GroupRoleType.NOT_MEMBER) {
+                    throw new ServiceException(ResourceError.BIND_RESOURCE_TO_TAG_NODE_DENIED);
+                }
+                if (groupRole != GroupRoleType.ADMIN && groupRole != GroupRoleType.OWNER) {
+                    checkGroupMemberTagMountPermission(userId, validTags);
+                }
             }
         }
 
-        entity.setGroupBinds(updateResourceGroupBinds(entity.getGroupBinds(), groupId, tagIds));
-        resourceItemRepository.save(entity);
-        log.info("resource tags changed. resourceId={} groupId={} tagCount={}",
-                entity.getResourceId(), groupId, tagIds == null ? 0 : tagIds.size());
-        eventPublisher.publishAclRecalculateEvent(entity.getResourceId(), "RESOURCE_TAGS_CHANGED");
+        FileOrganizationLogic logic = resolvedMode != ResourceTagUpdateMode.REMOVE && tagIds != null && !tagIds.isEmpty()
+                ? groupResService.getFileOrgLogic(groupId)
+                : null;
+        for (ResourceItemEntity entity : entities) {
+            List<String> targetTagIds = resolveTargetTagIds(
+                    entity.getGroupBinds().stream()
+                            .filter(bind -> groupId.equals(bind.getGroupId()))
+                            .findFirst().map(GroupTagBind::getTagIds).orElse(Collections.emptyList()),
+                    tagIds, resolvedMode
+            );
+            // 小组 FOLDER 模式：同一小组内每个资源至多挂载一个标签
+            if (FileOrganizationLogic.FOLDER == logic && targetTagIds.size() > 1) {
+                throw new ServiceException(ResourceError.CANNOT_BIND_MULTIPLE_RESOURCE_TAGS_IN_FOLDER_MODE);
+            }
+            entity.setGroupBinds(updateResourceGroupBinds(entity.getGroupBinds(), groupId, targetTagIds));
+        }
+        resourceItemRepository.saveAll(entities);
+        log.info("resource tags changed. affectedResources={} affectedResourceIds={} groupId={} tagCount={}",
+                entities.size(),
+                summarizeIds(entities.stream().map(ResourceItemEntity::getResourceId).toList()),
+                groupId,
+                tagIds == null ? 0 : tagIds.size());
+        for (ResourceItemEntity entity : entities) {
+            eventPublisher.publishAclRecalculateEvent(entity.getResourceId(), "RESOURCE_TAGS_CHANGED");
+        }
     }
 
     public List<TagEntity> findAndValidateTags(String groupId, List<String> tagIds) {
@@ -492,20 +576,20 @@ public class ResourceServiceImpl implements IResourceService {
                         personalGroupId, "0", ResourceConstants.SHARED_TAG_NAME).orElseThrow(
                         () -> new ServiceException(ResourceError.TAG_NODE_NOT_FOUND)
                 ).getTagId();
-                this.updatePersonalResourceTags(entity.getResourceId(), personalGroupId, List.of(sharedTagId));
+                resourcePlacementService.setPersonalResourcesPathTag(List.of(entity.getResourceId()), dto.getOwnerId(), sharedTagId);
 
                 try {
                     // 确定用户有权限挂载到对应位置
                     GroupRoleType groupRole = dto.getOwnerGroupRoles().get(Long.valueOf(mountTargetTag.getGroupId()));
                     // 挂载标签
-                    updateGroupResourceTags(entity, mountTargetTag.getGroupId(), dto.getOwnerId(), groupRole, List.of(mountTargetTagID));
+                    resourcePlacementService.mountResourcesToGroup(List.of(entity.getResourceId()), mountTargetTag.getGroupId(), dto.getOwnerId(), groupRole, mountTargetTagID);
                 } catch (Exception ignored) {
                     // 如果没有权限或出现其他错误，静默失败
                     // TODO: 给用户发送站内信
                 }
             } else {
                 // 个人 Tag 直接更新
-                this.updatePersonalResourceTags(entity.getResourceId(), personalGroupId, List.of(mountTargetTagID));
+                resourcePlacementService.setPersonalResourcesPathTag(List.of(entity.getResourceId()), dto.getOwnerId(), mountTargetTagID);
             }
         } catch (Exception e) {
             // 创建资源失败，回滚

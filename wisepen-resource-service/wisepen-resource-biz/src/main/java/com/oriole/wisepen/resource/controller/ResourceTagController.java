@@ -5,7 +5,7 @@ import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.log.annotation.Log;
-import com.oriole.wisepen.common.security.annotation.CheckLogin;
+import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.resource.domain.base.TagSpaceBase;
 import com.oriole.wisepen.resource.domain.dto.req.TagCreateRequest;
 import com.oriole.wisepen.resource.domain.dto.req.TagDeleteRequest;
@@ -28,7 +28,7 @@ import static com.oriole.wisepen.resource.constant.ResourceConstants.PERSONAL_GR
 @RestController
 @RequestMapping("/resource/tag")
 @RequiredArgsConstructor
-@CheckLogin
+@CheckRole
 public class ResourceTagController {
 
     private final ITagService tagService;
@@ -96,18 +96,18 @@ public class ResourceTagController {
             summary = "移动标签",
             description = """
                     - 用途：调整个人或小组资源标签在树形结构中的父子层级。
-                    - 请求：targetTagId 指定被移动标签；newParentId 为空或 0 表示移动到根层级；groupId 确定标签空间。
-                    - 约束：小组空间写入要求当前用户是 OWNER 或 ADMIN；目标标签不能是系统根节点或回收站节点；不能移动到自身或自身子孙节点下；不能跨路径标签和普通标签类型移动；不能移动到回收站内部节点。
-                    - 处理：更新目标标签和全部子孙标签的 parentId 与 ancestors；移动到个人回收站节点时发布回收站事件以剥离相关资源小组权限，普通移动会触发受影响资源 ACL 重算；不修改资源文件内容。
-                    - 失败：未登录 -> PermissionError.NOT_LOGIN；小组写入权限不足 -> PermissionError.PERMISSION_DENIED；目标标签不存在 -> ResourceError.TAG_NODE_NOT_FOUND；父标签不存在 -> ResourceError.PARENT_TAG_NODE_NOT_FOUND；移动到自身 -> ResourceError.CANNOT_MOVE_TAG_NODE_TO_SELF；移动到子孙节点 -> ResourceError.CANNOT_MOVE_TAG_NODE_TO_DESCENDANT；跨路径/普通标签类型移动 -> ResourceError.CANNOT_MOVE_TAG_NODE_ACROSS_TAG_TYPE；同级重名 -> ResourceError.TAG_NODE_NAME_CONFLICT；系统标签被移动 -> ResourceError.CANNOT_MOVE_SYSTEM_TAG_PATH_NODE；回收站内标签被移动 -> ResourceError.CANNOT_OPERATE_TRASHED_TAG_PATH_NODE。
+                    - 请求：targetTagIds 指定一批被移动标签；newParentId 为空或 0 表示移动到根层级；groupId 确定标签空间。
+                    - 约束：小组空间写入要求当前用户是 OWNER 或 ADMIN；被移动标签不能在同一批次中互为祖先和子孙；目标标签不能是系统根节点或回收站节点；不能移动到自身或自身子孙节点下；不能跨路径标签和普通标签类型移动；不能移动到回收站内部节点。
+                    - 处理：去重后，批量更新目标标签和全部子孙标签的 parentId 与 ancestors；移动到个人回收站节点时发布回收站事件以剥离相关资源小组权限，普通移动会触发受影响资源 ACL 重算；不修改资源文件内容。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；小组写入权限不足 -> PermissionError.PERMISSION_DENIED；目标标签不存在 -> ResourceError.TAG_NODE_NOT_FOUND；批量目标包含祖先和子孙节点 -> ResourceError.CANNOT_OPERATE_ANCESTOR_DESCENDANT_TAG_NODES；父标签不存在 -> ResourceError.PARENT_TAG_NODE_NOT_FOUND；移动到自身 -> ResourceError.CANNOT_MOVE_TAG_NODE_TO_SELF；移动到子孙节点 -> ResourceError.CANNOT_MOVE_TAG_NODE_TO_DESCENDANT；跨路径/普通标签类型移动 -> ResourceError.CANNOT_MOVE_TAG_NODE_ACROSS_TAG_TYPE；同级重名 -> ResourceError.TAG_NODE_NAME_CONFLICT；系统标签被移动 -> ResourceError.CANNOT_MOVE_SYSTEM_TAG_PATH_NODE；回收站内标签被移动 -> ResourceError.CANNOT_OPERATE_TRASHED_TAG_PATH_NODE。
                     - 响应：成功时返回空结果。
                     """
     )
     @Log(title = "移动标签", businessType = BusinessType.UPDATE)
-    @PostMapping("/moveTag")
-    public R<Void> moveTag(@Validated @RequestBody TagMoveRequest tagMoveRequest) {
+    @PostMapping("/moveTags")
+    public R<Void> moveTags(@Validated @RequestBody TagMoveRequest tagMoveRequest) {
         checkPermission(tagMoveRequest, true);
-        tagService.moveTag(tagMoveRequest);
+        tagService.moveTags(tagMoveRequest);
         return R.ok();
     }
 
@@ -116,18 +116,18 @@ public class ResourceTagController {
             summary = "级联删除标签",
             description = """
                     - 用途：删除个人或小组资源空间中的指定标签及其所有子孙标签。
-                    - 请求：targetTagId 指定待删除标签；groupId 确定标签空间。
-                    - 约束：小组空间写入要求当前用户是 OWNER 或 ADMIN；系统根节点和回收站节点不能删除；路径标签在未强制删除且未进入回收站前不能直接删除。
-                    - 处理：删除目标标签和所有子孙标签，并发布标签删除事件；下游会根据标签类型清理资源绑定，路径标签删除可能导致相关资源进入后续软删除流程。
-                    - 失败：未登录 -> PermissionError.NOT_LOGIN；小组写入权限不足 -> PermissionError.PERMISSION_DENIED；标签不存在 -> ResourceError.TAG_NODE_NOT_FOUND；系统标签被删除 -> ResourceError.CANNOT_DELETE_SYSTEM_TAG_PATH_NODE；路径标签直接删除 -> ResourceError.CANNOT_DELETE_TAG_PATH_NODE_DIRECTLY。
+                    - 请求：targetTagIds 指定一批待删除标签；groupId 确定标签空间。
+                    - 约束：小组空间写入要求当前用户是 OWNER 或 ADMIN；待删除标签不能在同一批次中互为祖先和子孙；系统根节点和回收站节点不能删除；路径标签在未强制删除且未进入回收站前不能直接删除。
+                    - 处理：去重后，批量删除目标标签和所有子孙标签，并按路径标签和普通标签拆分发布删除事件；下游会根据标签类型清理资源绑定，路径标签删除可能导致相关资源进入后续软删除流程。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；小组写入权限不足 -> PermissionError.PERMISSION_DENIED；标签不存在 -> ResourceError.TAG_NODE_NOT_FOUND；批量目标包含祖先和子孙节点 -> ResourceError.CANNOT_OPERATE_ANCESTOR_DESCENDANT_TAG_NODES；系统标签被删除 -> ResourceError.CANNOT_DELETE_SYSTEM_TAG_PATH_NODE；路径标签直接删除 -> ResourceError.CANNOT_DELETE_TAG_PATH_NODE_DIRECTLY。
                     - 响应：成功时返回空结果。
                     """
     )
     @Log(title = "删除标签", businessType = BusinessType.DELETE)
-    @PostMapping("/removeTag")
-    public R<Void> deleteTag(@Validated @RequestBody TagDeleteRequest tagDeleteRequest) {
+    @PostMapping("/removeTags")
+    public R<Void> deleteTags(@Validated @RequestBody TagDeleteRequest tagDeleteRequest) {
         checkPermission(tagDeleteRequest, true);
-        tagService.deleteTag(tagDeleteRequest, false);
+        tagService.deleteTags(tagDeleteRequest, false);
         return R.ok();
     }
 

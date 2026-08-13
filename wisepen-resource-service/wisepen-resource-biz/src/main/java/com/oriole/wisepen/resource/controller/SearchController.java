@@ -6,7 +6,7 @@ import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.log.annotation.Log;
-import com.oriole.wisepen.common.security.annotation.CheckLogin;
+import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.resource.domain.dto.res.MarketSearchHitItemResponse;
 import com.oriole.wisepen.resource.domain.dto.res.SearchHitItemResponse;
 import com.oriole.wisepen.resource.enums.MarketSaleStatus;
@@ -26,7 +26,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/resource/search")
 @RequiredArgsConstructor
-@CheckLogin
+@CheckRole
 public class SearchController {
 
     private final ISearchQueryService searchQueryService;

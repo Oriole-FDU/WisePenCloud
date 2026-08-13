@@ -7,7 +7,7 @@ import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.common.log.annotation.Log;
-import com.oriole.wisepen.common.security.annotation.CheckLogin;
+import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.note.api.domain.dto.req.NoteSnapshotSaveRequest;
 import com.oriole.wisepen.note.api.domain.dto.req.NoteCreateRequest;
 import com.oriole.wisepen.note.api.domain.dto.req.NoteForkRequest;
@@ -46,7 +46,7 @@ import static com.oriole.wisepen.note.exception.NoteError.NOTE_PERMISSION_DENIED
 @RestController
 @RequestMapping("/note")
 @RequiredArgsConstructor
-@CheckLogin
+@CheckRole
 public class NoteController {
 
     private final INoteService noteService;

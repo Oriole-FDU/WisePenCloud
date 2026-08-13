@@ -2,11 +2,11 @@ package com.oriole.wisepen.user.service;
 
 import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.enums.IdentityType;
+import com.oriole.wisepen.common.core.domain.enums.UserStatus;
 import com.oriole.wisepen.user.api.domain.base.UserDisplayBase;
 import com.oriole.wisepen.user.api.domain.dto.req.*;
 import com.oriole.wisepen.user.api.domain.dto.res.UserDetailInfoResponse;
 import com.oriole.wisepen.user.api.domain.dto.res.UserSearchUserResponse;
-import com.oriole.wisepen.user.api.enums.Status;
 import com.oriole.wisepen.user.domain.entity.UserEntity;
 import com.oriole.wisepen.user.domain.entity.UserProfileEntity;
 
@@ -46,6 +46,6 @@ public interface IUserService {
     void resetPasswordAdmin(AuthPwdAdminResetRequest req);
     void updateUserInfoAdmin(UserInfoAdminUpdateRequest req);
     void updateProfileAdmin(UserProfileAdminUpdateRequest req);
-    PageR<UserEntity> getUserListAdmin(int page, int size, String keyword, Status status, IdentityType identityType);
+    PageR<UserEntity> getUserListAdmin(int page, int size, String keyword, UserStatus userStatus, IdentityType identityType);
     UserProfileEntity getUserDetailInfoAdmin(Long userId);
 }

@@ -22,7 +22,7 @@ public class HeaderInterceptor implements HandlerInterceptor {
     }
 
     @Override
-    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler){
         // 直接放行浏览器的 CORS 预检请求
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
             return true;
@@ -44,6 +44,7 @@ public class HeaderInterceptor implements HandlerInterceptor {
         // 从 Header 中获取 APISIX 透传的明文信息
         String userIdStr = request.getHeader(SecurityConstants.HEADER_USER_ID);
         String identityTypeStr = request.getHeader(SecurityConstants.HEADER_IDENTITY_TYPE);
+        String userStatusStr = request.getHeader(SecurityConstants.HEADER_USER_STATUS);
         String groupRoleMapJson = request.getHeader(SecurityConstants.HEADER_GROUP_ROLE_MAP);
 
         // 如果 Header 里有 UserID，说明网关已认证通过
@@ -52,7 +53,10 @@ public class HeaderInterceptor implements HandlerInterceptor {
             SecurityContextHolder.setUserAuthToken(userAuthTokenStr);
 
             if (StrUtil.isNotBlank(identityTypeStr)) {
-                SecurityContextHolder.setIdentityType(Integer.parseInt(identityTypeStr));
+                SecurityContextHolder.setIdentityType(parseIntegerHeader(identityTypeStr));
+            }
+            if (StrUtil.isNotBlank(userStatusStr)) {
+                SecurityContextHolder.setUserStatus(parseIntegerHeader(userStatusStr));
             }
             if (StrUtil.isNotBlank(groupRoleMapJson)) {
                 SecurityContextHolder.setGroupRoleMap(groupRoleMapJson);
@@ -72,5 +76,13 @@ public class HeaderInterceptor implements HandlerInterceptor {
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
         GrayContextHolder.clear();
         SecurityContextHolder.remove();
+    }
+
+    private Integer parseIntegerHeader(String headerValue) {
+        try {
+            return Integer.valueOf(headerValue);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }

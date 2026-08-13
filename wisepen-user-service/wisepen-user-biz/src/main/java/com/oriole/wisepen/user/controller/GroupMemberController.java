@@ -4,7 +4,7 @@ import com.oriole.wisepen.common.core.context.SecurityContextHolder;
 import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
-import com.oriole.wisepen.common.security.annotation.CheckLogin;
+import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupMemberKickRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupMemberRoleUpdateRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupMemberQuitRequest;
@@ -26,7 +26,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/group/member")
 @RequiredArgsConstructor
 @Validated
-@CheckLogin
+@CheckRole
 public class GroupMemberController {
 
 	private final IGroupMemberService groupMemberService;

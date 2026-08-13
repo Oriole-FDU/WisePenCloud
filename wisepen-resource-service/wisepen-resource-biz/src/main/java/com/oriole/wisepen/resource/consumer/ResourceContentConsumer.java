@@ -49,7 +49,7 @@ public class ResourceContentConsumer {
 
     @KafkaListener(
             topics = TOPIC_NOTE_SNAPSHOT,
-            groupId = "wisepen-note-snapshot-group",
+            groupId = "wisepen-note-snapshot-search-sync-group",
             properties = {
                     "value.deserializer=org.apache.kafka.common.serialization.StringDeserializer"
             }
@@ -60,12 +60,13 @@ public class ResourceContentConsumer {
             payloadType = NoteSnapshotMessage.class,
             message = @AsyncMessage(name = "NoteSnapshotMessage", title = "笔记快照事件")
     ))
-    @KafkaAsyncOperationBinding(groupId = "wisepen-note-snapshot-group")
+    @KafkaAsyncOperationBinding(groupId = "wisepen-note-snapshot-search-sync-group")
     public void onSnapshot(String payload) throws Exception {
         // 从非Java微服务（NodeJS）的发布者订阅，使用objectMapper显式转换
         NoteSnapshotMessage msg = objectMapper.readValue(payload, NoteSnapshotMessage.class);
-        log.info("note snapshot event received. topic={} resourceId={} contentLength={}",
-                TOPIC_NOTE_SNAPSHOT, msg.getResourceId(), msg.getPlainText()!=null ? msg.getPlainText().length() : 0);
+        log.info("note snapshot event received. topic={} consumerGroup={} resourceId={} contentLength={}",
+                TOPIC_NOTE_SNAPSHOT, "wisepen-note-snapshot-search-sync-group",
+                msg.getResourceId(), msg.getPlainText()!=null ? msg.getPlainText().length() : 0);
         try {
             if (VersionType.FULL == msg.getType()) {
                 searchSyncService.syncResourceContent(msg.getResourceId(), msg.getPlainText());

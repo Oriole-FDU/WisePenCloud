@@ -5,7 +5,7 @@ import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.log.annotation.Log;
-import com.oriole.wisepen.common.security.annotation.CheckLogin;
+import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.user.api.domain.dto.req.MessageReadRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.MessageRemoveRequest;
 import com.oriole.wisepen.user.api.domain.dto.res.MessageInfoResponse;
@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/user/message")
 @RequiredArgsConstructor
 @Validated
-@CheckLogin
+@CheckRole
 public class MessageController {
 
     private final IMessageService messageService;
@@ -71,20 +71,20 @@ public class MessageController {
     }
 
     @Operation(
-            summary = "标记消息已读",
+            summary = "批量标记消息已读",
             description = """
-                    - 用途：用户打开或确认某条站内消息后，将该消息从未读状态转为已读状态。
-                    - 请求：messageId 指定目标消息。
-                    - 约束：当前用户必须已登录；目标消息必须属于当前用户且未被删除。
-                    - 处理：必要时先同步当前用户可见的全员系统消息，再更新当前用户收件箱记录的 readTime；不修改消息主体或其他用户的收件箱状态。
-                    - 失败：目标消息不存在或已删除 -> UserError.MESSAGE_NOT_FOUND。
+                    - 用途：用户打开或确认一条或多条站内消息后，将其从未读状态转为已读状态。
+                    - 请求：messageIds 指定目标消息 ID 列表。
+                    - 约束：当前用户必须已登录；目标消息只会更新当前用户未删除的收件箱记录。
+                    - 处理：批量更新当前用户收件箱中指定未读消息的 readTime；不修改消息主体或其他用户的收件箱状态。
+                    - 失败：无明确业务失败点。
                     - 响应：成功时返回空结果。
                     """
     )
-    @Log(title = "标记消息已读", businessType = BusinessType.UPDATE)
+    @Log(title = "批量标记消息已读", businessType = BusinessType.UPDATE)
     @PostMapping("/readMessage")
     public R<Void> readMessage(@RequestBody @Valid MessageReadRequest req) {
-        messageService.readMessage(SecurityContextHolder.getUserId(), req.getMessageId());
+        messageService.readMessages(SecurityContextHolder.getUserId(), req.getMessageIds());
         return R.ok();
     }
 

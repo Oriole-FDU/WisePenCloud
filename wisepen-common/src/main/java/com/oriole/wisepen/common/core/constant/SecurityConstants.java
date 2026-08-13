@@ -10,6 +10,9 @@ public class SecurityConstants {
     /** 网关透传的用户身份 Header Key */
     public static final String HEADER_IDENTITY_TYPE = "X-Identity-Type";
 
+    /** 网关透传的用户账号状态 Header Key */
+    public static final String HEADER_USER_STATUS = "X-User-Status";
+
     /** 网关透传的组ID Header Key */
     public static final String HEADER_GROUP_ROLE_MAP = "X-Group-Role-Map";
 

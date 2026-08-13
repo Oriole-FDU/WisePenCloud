@@ -7,7 +7,7 @@ import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.core.domain.enums.IdentityType;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.common.log.annotation.Log;
-import com.oriole.wisepen.common.security.annotation.CheckLogin;
+import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.resource.domain.dto.ResourceCheckPermissionReqDTO;
 import com.oriole.wisepen.resource.domain.dto.ResourceCheckPermissionResDTO;
 import com.oriole.wisepen.resource.domain.dto.req.InlineCommentCreateRequest;
@@ -41,7 +41,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/resource/inlineComment")
 @RequiredArgsConstructor
-@CheckLogin
+@CheckRole
 @Validated
 public class ResourceInlineCommentController {
 

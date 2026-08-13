@@ -2,7 +2,7 @@ package com.oriole.wisepen.note.controller;
 
 import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.R;
-import com.oriole.wisepen.common.security.annotation.CheckLogin;
+import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.note.api.domain.dto.res.NoteOperationLogResponse;
 import com.oriole.wisepen.note.service.INoteOperationLogService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/note/log")
 @RequiredArgsConstructor
-@CheckLogin
+@CheckRole
 public class OpLogController {
 
     private final INoteOperationLogService noteOperationLogService;

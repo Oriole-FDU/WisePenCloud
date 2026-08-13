@@ -5,6 +5,7 @@ import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.core.domain.enums.IdentityType;
+import com.oriole.wisepen.common.core.domain.enums.UserStatus;
 import com.oriole.wisepen.user.api.constant.GroupDashboardMetricConstants;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -86,11 +87,12 @@ public class RedisCacheManager {
 		return  StrUtil.isNotBlank(userId) ? Long.parseLong(userId) : null;
 	}
 
-	public String setSession(Long userId, IdentityType identityType, Map<String, Integer> groupRoleMap) {
+	public String setSession(Long userId, IdentityType identityType, UserStatus userStatus, Map<String, Integer> groupRoleMap) {
 		// 构建 Session 上下文数据
 		Map<String, Object> sessionData = new HashMap<>();
 		sessionData.put("userId", userId);
 		sessionData.put("identityType", identityType.getCode());
+		sessionData.put("status", userStatus.getCode());
 		sessionData.put("groupRoleMap", groupRoleMap);
 
 		String sessionId = stringRedisTemplate.opsForValue().get(REDIS_SESSION_TO_USER_PREFIX + userId);
@@ -119,6 +121,19 @@ public class RedisCacheManager {
 		// 删除 session 和 user->session 映射
 		redisTemplate.delete(REDIS_SESSION_PREFIX + sessionId);
 		stringRedisTemplate.delete(REDIS_SESSION_TO_USER_PREFIX + userId);
+	}
+
+	public void updateUserStatusInSession(Long userId, UserStatus userStatus) {
+		String sessionId = stringRedisTemplate.opsForValue().get(REDIS_SESSION_TO_USER_PREFIX + userId);
+		if (StrUtil.isBlank(sessionId)) return;
+
+		@SuppressWarnings("unchecked")
+		Map<String, Object> sessionData = (Map<String, Object>) redisTemplate.opsForValue().get(REDIS_SESSION_PREFIX + sessionId);
+		if (sessionData == null) return;
+
+		sessionData.put("status", userStatus.getCode());
+		redisTemplate.opsForValue().set(REDIS_SESSION_PREFIX + sessionId, sessionData,
+				SESSION_TIMEOUT_DAYS, TimeUnit.DAYS);
 	}
 
 	public void updateGroupRoleMapInSession(Long userId, Long groupId, GroupRoleType groupRoleType) {

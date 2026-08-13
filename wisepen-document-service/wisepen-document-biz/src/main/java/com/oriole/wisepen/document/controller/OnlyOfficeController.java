@@ -4,7 +4,7 @@ import com.onlyoffice.model.documenteditor.Callback;
 import com.oriole.wisepen.common.core.context.SecurityContextHolder;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.exception.ServiceException;
-import com.oriole.wisepen.common.security.annotation.CheckLogin;
+import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.document.api.domain.dto.res.OnlyOfficeEditorConfigResponse;
 import com.oriole.wisepen.document.config.DocumentProperties;
 import com.oriole.wisepen.document.exception.DocumentError;
@@ -36,7 +36,7 @@ public class OnlyOfficeController {
     private final RemoteResourceService remoteResourceService;
     private final RemoteUserService remoteUserService;
 
-    @CheckLogin
+    @CheckRole
     @Operation(
             summary = "获取 ONLYOFFICE 编辑器配置",
             description = """

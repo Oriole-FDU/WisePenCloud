@@ -1,7 +1,6 @@
 package com.oriole.wisepen.user.api.config;
 
 import lombok.Data;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
@@ -12,8 +11,10 @@ import org.springframework.stereotype.Component;
 @Component
 @ConfigurationProperties(prefix = "wisepen.user")
 public class UserProperties {
-    /** 外网能访问到本服务的接口根路径，用于验证邮件 */
+    /** 用户浏览器可访问的前端或网关根地址，用于邮件中的验证和重置链接 */
     private String apiDomain;
+
+    private String authCookieDomain;
 
     private String defaultPassword;
 }

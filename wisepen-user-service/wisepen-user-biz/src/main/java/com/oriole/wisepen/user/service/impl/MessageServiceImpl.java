@@ -232,10 +232,10 @@ public class MessageServiceImpl implements IMessageService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void readMessage(Long userId, Long messageId) {
+    public void readMessages(Long userId, List<Long> messageIds) {
         LambdaUpdateWrapper<MessageRecipientEntity> wrapper = new LambdaUpdateWrapper<>();
         wrapper.eq(MessageRecipientEntity::getUserId, userId)
-                .eq(MessageRecipientEntity::getMessageId, messageId)
+                .in(MessageRecipientEntity::getMessageId, messageIds)
                 .isNull(MessageRecipientEntity::getDeleteTime)
                 .isNull(MessageRecipientEntity::getReadTime)
                 .set(MessageRecipientEntity::getReadTime, LocalDateTime.now());

@@ -33,6 +33,7 @@ public enum ResourceError implements IResult {
     CANNOT_MOVE_TAG_NODE_ACROSS_TAG_TYPE(5312, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.TAG_TREE, ErrorReason.NOT_ALLOWED),"不能跨节点类型(目录/标签)移动或挂载标签节点"),
     CANNOT_MOVE_TAG_NODE_TO_SELF(5321, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.TAG_TREE, ErrorReason.UNSUPPORTED), "不能将标签节点移动到自身之下"),
     CANNOT_MOVE_TAG_NODE_TO_DESCENDANT(5322, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.TAG_TREE, ErrorReason.UNSUPPORTED), "不能将标签节点移动到其子孙节点之下"),
+    CANNOT_OPERATE_ANCESTOR_DESCENDANT_TAG_NODES(5323, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.TAG_TREE, ErrorReason.UNSUPPORTED), "不能批量操作互为祖先和子孙的标签节点"),
 
     // 资源相关异常
     RESOURCE_NOT_FOUND(5411, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.RESOURCE, ErrorReason.NOT_FOUND),"资源不存在"),
@@ -46,6 +47,7 @@ public enum ResourceError implements IResult {
     CANNOT_BIND_MARKET_GROUP_TAG_DIRECTLY(5513, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.RESOURCE_TAG, ErrorReason.NOT_ALLOWED), "不能为资源直接绑定集市组标签"),
     CANNOT_BIND_MULTIPLE_RESOURCE_TAGS_IN_FOLDER_MODE(5521, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.RESOURCE_TAG, ErrorReason.ALREADY_EXISTS),"该资源已绑定标签，文件夹模式下不能重复绑定"),
     BIND_RESOURCE_TO_TAG_NODE_DENIED(5531, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.RESOURCE_TAG, ErrorReason.PERMISSION_DENIED),"无权挂载资源到该标签下"),
+    RESOURCE_TAG_TYPE_INVALID(5541, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.RESOURCE_TAG, ErrorReason.INVALID),"为资源的指定标签其类型非法"),
 
     // 小组资源管理模式异常
     CANNOT_CHANGE_FILE_ORG_LOGIC_FROM_TAG_TO_FOLDER(5611, new ResultKey(BusinessDomain.RESOURCE, ResourceSubject.FILE_ORG_LOGIC, ErrorReason.UNSUPPORTED), "小组资源管理模式不允许从TAG改为FOLDER"),

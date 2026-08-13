@@ -21,7 +21,7 @@ import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.common.log.annotation.Log;
-import com.oriole.wisepen.common.security.annotation.CheckLogin;
+import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.file.storage.api.domain.dto.StsTokenDTO;
 import com.oriole.wisepen.file.storage.api.enums.StorageSceneEnum;
 import com.oriole.wisepen.file.storage.api.feign.RemoteStorageService;
@@ -31,7 +31,6 @@ import com.oriole.wisepen.resource.domain.dto.ResourceInfoGetReqDTO;
 import com.oriole.wisepen.resource.domain.dto.res.ResourceItemResponse;
 import com.oriole.wisepen.resource.enums.ResourceAccessRole;
 import com.oriole.wisepen.resource.enums.ResourceAction;
-import com.oriole.wisepen.resource.enums.ResourceType;
 import com.oriole.wisepen.resource.feign.RemoteResourceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -52,7 +51,7 @@ import static com.oriole.wisepen.ai.asset.constant.AIAssetConstants.ASSET_STS_TO
 @RestController
 @RequestMapping("/skill")
 @RequiredArgsConstructor
-@CheckLogin
+@CheckRole
 public class SkillController {
 
     private final SkillServiceImpl skillService;
@@ -66,7 +65,7 @@ public class SkillController {
                     - 用途：为当前用户创建一个可管理和发布的技能资产。
                     - 请求：title 为资源展示标题；name、description 和 sourceType 为技能资产元信息，sourceType 为空时按 MANUAL 处理；mountTargetTagId 可选，用于指定资源所属路径标签。
                     - 约束：当前用户必须已登录；title 必须是可用于展示的资源标题。
-                    - 处理：调用资源服务注册 SKILL 类型资源，以当前用户作为所有者挂载到指定路径或个人根目录；创建技能主档并初始化首个草稿版本 1；不上传技能文件，也不发布版本。
+                    - 处理：调用资源服务注册 SKILL 类型资源，以当前用户作为所有者挂载到指定路径或个人根目录，并使用 description 初始化资源预览文本；创建技能主档并初始化首个草稿版本 1；不上传技能文件，也不发布版本。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN；资源注册失败或技能主档落库失败 -> AIResourceError.AI_RESOURCE_REGISTER_FAILED。
                     - 响应：返回技能资产资源 ID。
                     """
@@ -86,7 +85,7 @@ public class SkillController {
                     - 用途：将当前用户拥有 FORK 动作的技能资产复制为自己的新技能资源。
                     - 请求：resourceId 指定源技能资源；forkedResourceVersion 可选，作为权限检查 targetVersion 并指定要复制的已发布版本；forkedResourceName 指定新 Skill 资源名。
                     - 约束：当前用户必须拥有源资源 FORK 动作；Market 来源授权必须传当前上架 offerVersion；源资源类型必须是 SKILL；源版本必须存在且已发布，核心 SKILL.md 必须可用。
-                    - 处理：先调用资源服务实时校验 FORK 权限；注册新的 SKILL 资源，复制源主档信息和源已发布版本文件到目标 PUBLISHED version=1，并创建 DRAFT version=2。
+                    - 处理：先调用资源服务实时校验 FORK 权限；注册新的 SKILL 资源并继承源技能描述作为资源预览文本，复制源主档信息和源已发布版本文件到目标 PUBLISHED version=1，并创建 DRAFT version=2。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN；源资源不是技能或技能不存在 -> AIResourceError.AI_RESOURCE_NOT_FOUND；无 FORK 权限 -> AIResourceError.AI_RESOURCE_PERMISSION_DENIED；版本不存在 -> AIResourceError.AI_RESOURCE_VERSION_NOT_FOUND；核心文件缺失 -> AIResourceError.AI_RESOURCE_CORE_ASSET_NOT_FOUND；存在未就绪资产 -> AIResourceError.AI_RESOURCE_ASSET_NOT_READY；资源注册失败 -> AIResourceError.AI_RESOURCE_REGISTER_FAILED；复制失败 -> AIResourceError.AI_RESOURCE_FORK_FAILED。
                     - 响应：返回新技能资源 ID。
                     """
@@ -110,7 +109,7 @@ public class SkillController {
                     - 用途：维护技能资产的名称和描述信息。
                     - 请求：resourceId 指定技能资产；name 和 description 为空时不更新对应字段。
                     - 约束：当前用户必须是资源所有者；目标技能资产必须存在。
-                    - 处理：按非空字段更新技能主档元信息；不修改资源标题、草稿文件、版本号或发布状态。
+                    - 处理：按非空字段更新技能主档元信息；当 description 字段传入时同步更新资源预览文本；不修改资源标题、草稿文件、版本号或发布状态。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN；当前用户不是资源所有者 -> AIResourceError.AI_RESOURCE_PERMISSION_DENIED；技能不存在 -> AIResourceError.AI_RESOURCE_NOT_FOUND。
                     - 响应：成功时返回空结果。
                     """
