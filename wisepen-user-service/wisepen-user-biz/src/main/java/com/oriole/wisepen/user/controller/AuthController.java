@@ -4,6 +4,7 @@ import cn.hutool.core.util.StrUtil;
 import com.oriole.wisepen.common.core.context.SecurityContextHolder;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.security.annotation.CheckLogin;
+import com.oriole.wisepen.user.api.config.UserProperties;
 import com.oriole.wisepen.user.api.domain.dto.req.AuthLoginRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.AuthRegisterRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.AuthPwdResetRequest;
@@ -28,6 +29,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final IUserService userService;
+    private final UserProperties userProperties;
 
     @Operation(
             summary = "用户登录",
@@ -79,6 +81,9 @@ public class AuthController {
     private Cookie buildAuthCookie (String value, Integer maxAge) {
         Cookie cookie = new Cookie(AUTHORIZATION_TOKEN, value);
         cookie.setPath("/");
+        if (StrUtil.isNotBlank(userProperties.getAuthCookieDomain())) {
+            cookie.setDomain(userProperties.getAuthCookieDomain());
+        }
         cookie.setHttpOnly(true); // 严禁前端 JS 读取，防 XSS
         // cookie.setSecure(true); // HTTPS 务必开启此项
         cookie.setMaxAge(maxAge); // 7天
