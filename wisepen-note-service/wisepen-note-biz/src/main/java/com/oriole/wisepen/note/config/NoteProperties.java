@@ -8,9 +8,6 @@ import org.springframework.stereotype.Component;
 @Component
 @ConfigurationProperties(prefix = "wisepen.note")
 public class NoteProperties {
-    /** 版本检查点间隔，默认每 10 个版本一个 FULL 检查点 */
-    private Integer checkpointInterval = 10;
-
     /** 操作日志颗粒度：FINE / NORMAL / COARSE */
     private String oplogGranularity = "NORMAL";
 

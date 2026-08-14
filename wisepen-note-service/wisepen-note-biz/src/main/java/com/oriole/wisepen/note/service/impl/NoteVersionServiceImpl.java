@@ -46,18 +46,41 @@ public class NoteVersionServiceImpl implements INoteVersionService {
             throw new ServiceException(NoteError.CANNOT_SUPPORT_NOTE_RESOURCE_TYPE);
         }
 
-        NoteVersionEntity noteVersionEntity = NoteVersionEntity.builder()
-                .type(msg.getType())
-                .data(new Binary(Base64.getDecoder().decode(msg.getData())))
-                .createdBy(authors)
-                .build();
-        BeanUtils.copyProperties(msg, noteVersionEntity, "type","data");
+        Binary snapshotData = new Binary(Base64.getDecoder().decode(msg.getData()));
+        Optional<NoteVersionEntity> existingVersion = noteVersionRepository
+                .findByResourceIdAndVersion(msg.getResourceId(), msg.getVersion());
+
+        NoteVersionEntity noteVersionEntity;
+        boolean createdNewVersion = existingVersion.isEmpty();
+        if (existingVersion.isPresent()) {
+            noteVersionEntity = existingVersion.get();
+            if (VersionType.DELTA == msg.getType() && VersionType.FULL == noteVersionEntity.getType()) {
+                log.info("note snapshot skipped. resourceId={} version={} incomingType={} existingType={}",
+                        msg.getResourceId(), msg.getVersion(), msg.getType(), noteVersionEntity.getType());
+                return;
+            }
+            // 关闭房间时 Sidecar 会用同版本 FULL 压实最新 DELTA；这里更新已有记录而不是再次插入
+            noteVersionEntity.setType(msg.getType());
+            noteVersionEntity.setData(snapshotData);
+            if (authors != null && !authors.isEmpty()) {
+                noteVersionEntity.setCreatedBy(authors);
+            }
+        } else {
+            noteVersionEntity = NoteVersionEntity.builder()
+                    .type(msg.getType())
+                    .data(snapshotData)
+                    .createdBy(authors)
+                    .build();
+            BeanUtils.copyProperties(msg, noteVersionEntity, "type","data");
+        }
         noteVersionRepository.save(noteVersionEntity);
 
-        // 更新最后修改时间
-        noteInfo.setUpdateTime(LocalDateTime.now());
-        noteInfo.setVersion(noteVersionEntity.getVersion());
-        if (authors != null && !authors.isEmpty()) {
+        // 只有真正创建新版本时才推进笔记版本号和最后修改时间；同版本 FULL 替换 DELTA 不代表内容发生了新变更
+        if (createdNewVersion) {
+            noteInfo.setUpdateTime(LocalDateTime.now());
+            noteInfo.setVersion(noteVersionEntity.getVersion());
+        }
+        if (createdNewVersion && authors != null && !authors.isEmpty()) {
             // 将现有的作者和当前的作者合并，利用 CollUtil.distinct 自动去重
             List<Long> existing = noteInfo.getAuthors() == null ? CollUtil.newArrayList() : noteInfo.getAuthors();
             existing.addAll(authors);
@@ -109,8 +132,11 @@ public class NoteVersionServiceImpl implements INoteVersionService {
 
     @Override
     public NoteSearchTextResponse getSearchText(String resourceId, Integer targetVersion) {
-        NoteVersionEntity versionEntity = noteVersionRepository.findFirstByResourceIdAndTypeAndVersionLessThanEqualOrderByVersionDesc(resourceId, VersionType.FULL, targetVersion)
-                .orElseThrow(() -> new ServiceException(NoteError.NOTE_NOT_FOUND));
+        NoteVersionEntity versionEntity = targetVersion == null
+                ? noteVersionRepository.findFirstByResourceIdAndTypeOrderByVersionDesc(resourceId, VersionType.FULL)
+                    .orElseThrow(() -> new ServiceException(NoteError.NOTE_NOT_FOUND))
+                : noteVersionRepository.findFirstByResourceIdAndTypeAndVersionLessThanEqualOrderByVersionDesc(resourceId, VersionType.FULL, targetVersion)
+                    .orElseThrow(() -> new ServiceException(NoteError.NOTE_NOT_FOUND));
         NoteContentEntity contentEntity = noteContentRepository.findById(resourceId)
                 .orElseThrow(() -> new ServiceException(NoteError.NOTE_NOT_FOUND));
         String searchText = contentEntity.getRawText();
