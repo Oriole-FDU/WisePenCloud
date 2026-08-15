@@ -7,6 +7,7 @@ import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.core.domain.enums.IdentityType;
 import com.oriole.wisepen.common.core.domain.enums.UserStatus;
 import com.oriole.wisepen.user.api.constant.GroupDashboardMetricConstants;
+import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -27,6 +28,9 @@ public class RedisCacheManager {
 
 	private final RedisTemplate<String, Object> redisTemplate;
 	private final StringRedisTemplate stringRedisTemplate;
+
+	@Resource(name = "stringRedisTemplateDB1")
+	private StringRedisTemplate stringRedisTemplateDB1;
 
 	private static final String REDIS_PWD_RESET_TOKEN_PREFIX = "wisepen:user:auth:reset:";
 	private static final String REDIS_SESSION_PREFIX = "wisepen:user:auth:session:";
@@ -159,27 +163,27 @@ public class RedisCacheManager {
 				SESSION_TIMEOUT_DAYS, TimeUnit.DAYS);
 	}
 
-	// 封印/解封 群组Chat
+	// 封印/解封 群组Chat (DB1)
 	public void blockGroupChat(Long groupId) {
-		stringRedisTemplate.opsForValue().set(REDIS_GROUP_CHAT_BLOCK_PREFIX + groupId, "1");
+		stringRedisTemplateDB1.opsForValue().set(REDIS_GROUP_CHAT_BLOCK_PREFIX + groupId, "1");
 	}
 	public void unblockGroupChat(Long groupId) {
-		stringRedisTemplate.delete(REDIS_GROUP_CHAT_BLOCK_PREFIX + groupId);
+		stringRedisTemplateDB1.delete(REDIS_GROUP_CHAT_BLOCK_PREFIX + groupId);
 	}
 
-	// 封印/解封 组成员Chat
+	// 封印/解封 组成员Chat (DB1)
 	public void blockGroupMemberChat(Long groupId, Long userId) {
-		stringRedisTemplate.opsForValue().set(REDIS_GROUP_MEMBER_CHAT_BLOCK_PREFIX + groupId + ":" + userId, "1");
+		stringRedisTemplateDB1.opsForValue().set(REDIS_GROUP_MEMBER_CHAT_BLOCK_PREFIX + groupId + ":" + userId, "1");
 	}
 	public void unblockGroupMemberChat(Long groupId, Long userId) {
-		stringRedisTemplate.delete(REDIS_GROUP_MEMBER_CHAT_BLOCK_PREFIX + groupId + ":" + userId);
+		stringRedisTemplateDB1.delete(REDIS_GROUP_MEMBER_CHAT_BLOCK_PREFIX + groupId + ":" + userId);
 	}
 
-	// 封印/解封 个人Chat
+	// 封印/解封 个人Chat (DB1)
 	public void blockUserChat(Long groupId) {
-		stringRedisTemplate.opsForValue().set(REDIS_GROUP_USER_BLOCK_PREFIX + groupId, "1");
+		stringRedisTemplateDB1.opsForValue().set(REDIS_GROUP_USER_BLOCK_PREFIX + groupId, "1");
 	}
 	public void unblockUserChat(Long groupId) {
-		stringRedisTemplate.delete(REDIS_GROUP_USER_BLOCK_PREFIX + groupId);
+		stringRedisTemplateDB1.delete(REDIS_GROUP_USER_BLOCK_PREFIX + groupId);
 	}
 }
