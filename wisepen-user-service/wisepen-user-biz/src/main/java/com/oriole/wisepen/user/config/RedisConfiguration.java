@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisPassword;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
@@ -14,10 +15,35 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.util.StringUtils;
 
 @Configuration
-public class RedisDB1Configuration {
+public class RedisConfiguration {
 
-    @Bean("redis1Factory")
-    public RedisConnectionFactory redis1Factory(RedisProperties redisProperties) {
+    @Primary
+    @Bean("redisConnectionFactoryForDB0")
+    public RedisConnectionFactory redisConnectionFactoryForDB0(RedisProperties redisProperties) {
+        return new LettuceConnectionFactory(createStandaloneConfiguration(redisProperties, 0));
+    }
+
+    @Bean("redisConnectionFactoryForDB1")
+    public RedisConnectionFactory redisConnectionFactoryForDB1(RedisProperties redisProperties) {
+        return new LettuceConnectionFactory(createStandaloneConfiguration(redisProperties, 1));
+    }
+
+    @Primary
+    @Bean("stringRedisTemplateDB0")
+    public StringRedisTemplate stringRedisTemplateForDB0(
+            @Qualifier("redisConnectionFactoryForDB0") RedisConnectionFactory redisConnectionFactory) {
+        return new StringRedisTemplate(redisConnectionFactory);
+    }
+
+    @Bean("stringRedisTemplateDB1")
+    public StringRedisTemplate stringRedisTemplateForDB1(
+            @Qualifier("redisConnectionFactoryForDB1") RedisConnectionFactory redis1Factory) {
+        return new StringRedisTemplate(redis1Factory);
+    }
+
+    private RedisStandaloneConfiguration createStandaloneConfiguration(
+            RedisProperties redisProperties,
+            int database) {
         RedisStandaloneConfiguration config;
 
         if (StringUtils.hasText(redisProperties.getUrl())) {
@@ -47,13 +73,7 @@ public class RedisDB1Configuration {
             }
         }
 
-        config.setDatabase(1);
-        return new LettuceConnectionFactory(config);
-    }
-
-    @Bean("stringRedisTemplateDB1")
-    public StringRedisTemplate stringRedisTemplateDB1(
-            @Qualifier("redis1Factory") RedisConnectionFactory redis1Factory) {
-        return new StringRedisTemplate(redis1Factory);
+        config.setDatabase(database);
+        return config;
     }
 }
