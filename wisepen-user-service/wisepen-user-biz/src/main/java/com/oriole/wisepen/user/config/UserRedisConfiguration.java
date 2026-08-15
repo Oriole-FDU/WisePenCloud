@@ -15,7 +15,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.util.StringUtils;
 
 @Configuration
-public class RedisConfiguration {
+public class UserRedisConfiguration {
 
     @Primary
     @Bean("redisConnectionFactoryForDB0")
