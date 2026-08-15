@@ -76,7 +76,7 @@ public class WalletServiceImpl implements IWalletService {
             // 仅记录交易
             WalletTransactionRecordEntity record = WalletTransactionRecordEntity.builder()
                     .traceId(IdUtil.randomUUID())
-                    .payerId(groupId).payerType(WalletPayerType.USER)
+                    .payerId(userId).payerType(WalletPayerType.USER)
                     .count(message.getUsageTokens()) // 记录值是 UsageTokens
                     .walletTransactionType(WalletTransactionType.ONLY_RECORD_META) // 零交易
                     .walletBusinessType(WalletBusinessType.TOKEN)
