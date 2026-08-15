@@ -64,13 +64,27 @@ public class WalletServiceImpl implements IWalletService {
         Long userId = message.getUserId();
         Long groupId = message.getGroupId();
 
-        Integer tokenBill = message.getUsageTokens() * message.getBillingRatio();
-        String billMeta = "%s (%s | %d Tokens x%s )".formatted(
+        Integer tokenBill = message.getBillableTokens();
+        // AI 服务已按实际 Provider 归属计算可扣费用量；用户自带 Provider 和免费官方模型只记用量，不进入钱包扣费
+        String billMeta = "%s (%d Tokens x%s = %d Billable Tokens)".formatted(
                 message.getModelName(),
-                message.getModelType().getValue(),
                 message.getUsageTokens(),
-                message.getBillingRatio()
+                message.getBillingRatio(),
+                tokenBill
         );
+        if (tokenBill <= 0) {
+            // 仅记录交易
+            WalletTransactionRecordEntity record = WalletTransactionRecordEntity.builder()
+                    .traceId(IdUtil.randomUUID())
+                    .payerId(groupId).payerType(WalletPayerType.USER)
+                    .count(message.getUsageTokens()) // 记录值是 UsageTokens
+                    .walletTransactionType(WalletTransactionType.ONLY_RECORD_META) // 零交易
+                    .walletBusinessType(WalletBusinessType.TOKEN)
+                    .operatorId(userId)
+                    .meta(billMeta).build();
+            walletTransactionRecordMapper.insert(record);
+            return;
+        }
 
         if (groupId != null) {
             // 组账单优先从组扣除
@@ -207,7 +221,7 @@ public class WalletServiceImpl implements IWalletService {
 
     @Override
     // 更新组成员 Token 用量
-    public Integer updateGroupMemberTokenUsed(Long groupId, Long userId, String traceId, Integer tokenBill, String BillMeta) {
+    public Integer updateGroupMemberTokenUsed(Long groupId, Long userId, String traceId, Integer tokenBill, String billMeta) {
         // 查询组成员最新额度消耗情况
         LambdaQueryWrapper<GroupMemberEntity> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(GroupMemberEntity::getGroupId, groupId)
@@ -244,7 +258,7 @@ public class WalletServiceImpl implements IWalletService {
                 .walletTransactionType(WalletTransactionType.SPEND)
                 .walletBusinessType(WalletBusinessType.TOKEN)
                 .operatorId(userId)
-                .meta(BillMeta).build();
+                .meta(billMeta).build();
         walletTransactionRecordMapper.insert(record);
         return overageTokenBill;
     }
