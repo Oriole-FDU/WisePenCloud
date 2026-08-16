@@ -28,6 +28,8 @@ import org.springframework.stereotype.Component;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Component
@@ -93,7 +95,7 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
         UserProfileEntity userProfileEntity = new UserProfileEntity();
         UserEntity userEntity = new UserEntity();
 
-        String campusNo = profile.get("学号");
+        String campusNo = getProfileValue(profile, "学号", "工号");
         long existed = userMapper.selectCount(Wrappers.<UserEntity>lambdaQuery()
                 .eq(UserEntity::getCampusNo, campusNo)
                 .eq(UserEntity::getUserStatus, UserStatus.NORMAL)
@@ -106,12 +108,12 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
 
         // 设置学号、真实姓名、手机号、邮箱
         userEntity.setCampusNo(campusNo);
-        userEntity.setRealName(profile.get("姓名"));
-        String mobile = profile.get("手机号码");
+        userEntity.setRealName(getProfileValue(profile, "姓名"));
+        String mobile = getProfileValue(profile, "手机号码", "联系电话");
         if (StrUtil.isNotBlank(mobile)) {
             userEntity.setMobile(mobile);
         }
-        String email = profile.get("电子信箱");
+        String email = getProfileValue(profile, "电子信箱", "电子邮件", "复旦邮箱");
         if (StrUtil.isNotBlank(email)) {
             userEntity.setEmail(email);
         }
@@ -119,19 +121,25 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
         userEntity.setVerificationMode(UserVerificationMode.FDU_UIS_SYS);
 
         // 设置性别、院系、专业、年级、培养层次等信息
-        String sexStr = profile.get("性别");
+        String sexStr = getProfileValue(profile, "性别");
         userProfileEntity.setSex(
                 StrUtil.isBlank(sexStr) ? GenderType.UNKNOWN :
-                "男".equals(sexStr) ? GenderType.MALE :
-                "女".equals(sexStr) ?  GenderType.FEMALE :
-                GenderType.UNKNOWN
+                        "男".equals(sexStr) ? GenderType.MALE :
+                        "女".equals(sexStr) ? GenderType.FEMALE :
+                        GenderType.UNKNOWN
         );
         userProfileEntity.setUniversity("复旦大学"); // 复旦大学UIS认证固定值
-        userProfileEntity.setCollege(profile.get("院系"));
-        userProfileEntity.setMajor(profile.get("专业"));
-        String gradeStr = profile.get("年级");
-        userProfileEntity.setEnrollmentYear(StrUtil.isBlank(gradeStr)? null : Integer.parseInt(gradeStr));
-        String degreeStr = profile.get("培养层次");
+        userProfileEntity.setCollege(getProfileValue(profile, "院系", "所属院系"));
+        userProfileEntity.setMajor(getProfileValue(profile, "专业"));
+        userProfileEntity.setClassName(getProfileValue(profile, "班级"));
+        String gradeStr = getProfileValue(profile, "年级", "入学时间");
+        if (StrUtil.isNotBlank(gradeStr)) {
+            Matcher matcher = Pattern.compile("(\\d{4})").matcher(gradeStr);
+            if (matcher.find()) {
+                userProfileEntity.setEnrollmentYear(Integer.parseInt(matcher.group(1)));
+            }
+        }
+        String degreeStr = getProfileValue(profile, "培养层次", "学生类别");
         userProfileEntity.setDegreeLevel(
                 StrUtil.isBlank(degreeStr) ? DegreeLevel.UNKNOWN :
                         degreeStr.contains("博士") ? DegreeLevel.DOCTOR :
@@ -148,6 +156,16 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
         redisCacheManager.updateUserStatusInSession(userId, UserStatus.NORMAL);
         log.info("fudan uis verify succeeded. userId={} campusNo={}", userId, campusNo);
         return VerificationResultDTO.success();
+    }
+
+    private String getProfileValue(Map<String, String> profile, String... keys) {
+        for (String key : keys) {
+            String value = profile.get(key);
+            if (StrUtil.isNotBlank(value)) {
+                return value.trim();
+            }
+        }
+        return null;
     }
 
 }
