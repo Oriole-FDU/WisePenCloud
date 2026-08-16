@@ -32,6 +32,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 @Slf4j
@@ -40,6 +41,7 @@ import java.util.regex.Pattern;
 public class EmailVerificationStrategy implements UserVerificationStrategy {
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@([A-Za-z0-9-]+\\.)+[A-Za-z]{2,}$");
+    private static final Set<String> FUDAN_EMAIL_DOMAINS = Set.of("fudan.edu.cn", "fudan.edu", "m.fudan.edu.cn");
 
     private final RedisCacheManager redisCacheManager;
     private final RemoteMailService remoteMailService;
@@ -63,6 +65,7 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
             log.warn("email verification skipped. email={} userId={} reason=\"invalid email format\"", email, userId);
             throw new ServiceException(UserError.VERIFICATION_EMAIL_INVALID);
         }
+        rejectFudanEmail(email, userId);
 
         educationEmailSchoolResolver.findByEmail(email)
                 .orElseThrow(() -> {
@@ -115,6 +118,7 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
         }
         Long userId = verifyInfo.getLeft();
         String email = verifyInfo.getRight();
+        rejectFudanEmail(email, userId);
 
         EducationEmailSchool school = educationEmailSchoolResolver.findByEmail(email)
                 .orElseThrow(() -> new ServiceException(UserError.VERIFICATION_EMAIL_INVALID));
@@ -166,5 +170,27 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
             log.warn("email verification skipped. email={} userId={} reason=\"user state invalid\"", email, userId);
             throw new ServiceException(UserError.VERIFICATION_EMAIL_STATE_INVALID);
         }
+    }
+
+    private void rejectFudanEmail(String email, Long userId) {
+        String emailDomain = extractEmailDomain(email);
+        boolean isFudanEmail = FUDAN_EMAIL_DOMAINS.stream()
+                .anyMatch(domain -> emailDomain.equals(domain) || emailDomain.endsWith("." + domain));
+        if (isFudanEmail) {
+            log.warn("email verification rejected. email={} userId={} emailDomain={} reason=\"fudan email domain\"",
+                    email, userId, emailDomain);
+            throw new ServiceException(UserError.VERIFICATION_EMAIL_FUDAN_NOT_ALLOWED);
+        }
+    }
+
+    private static String extractEmailDomain(String email) {
+        if (StrUtil.isBlank(email)) {
+            return "";
+        }
+        int atIndex = email.lastIndexOf('@');
+        if (atIndex < 0 || atIndex == email.length() - 1) {
+            return "";
+        }
+        return email.substring(atIndex + 1).trim().toLowerCase(Locale.ROOT);
     }
 }
