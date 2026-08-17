@@ -17,19 +17,21 @@ import com.oriole.wisepen.resource.domain.entity.MarketOrderEntity;
 import com.oriole.wisepen.resource.domain.entity.ResourceItemEntity;
 import com.oriole.wisepen.resource.enums.MarketSaleStatus;
 import com.oriole.wisepen.resource.enums.ResourceAction;
+import com.oriole.wisepen.resource.event.MarketResourceIndexDeleteByVersionEvent;
+import com.oriole.wisepen.resource.event.MarketResourceIndexUpsertEvent;
 import com.oriole.wisepen.resource.exception.ResourceError;
 import com.oriole.wisepen.resource.mq.IResourceEventPublisher;
 import com.oriole.wisepen.resource.repository.MarketOrderRepository;
 import com.oriole.wisepen.resource.repository.ResourceItemRepository;
 import com.oriole.wisepen.resource.service.IMarketService;
 import com.oriole.wisepen.resource.service.IResourceService;
-import com.oriole.wisepen.resource.service.ISearchSyncService;
 import com.oriole.wisepen.user.api.domain.base.GroupDisplayBase;
 import com.oriole.wisepen.user.api.domain.dto.req.WalletSettleCoinTradeRequest;
 import com.oriole.wisepen.user.api.feign.RemoteUserService;
 import com.oriole.wisepen.user.api.feign.RemoteWalletService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -53,7 +55,7 @@ public class MarketServiceImpl implements IMarketService {
     private final IResourceEventPublisher resourceEventPublisher;
     private final RemoteUserService remoteUserService;
     private final RemoteWalletService remoteWalletService;
-    private final ISearchSyncService searchSyncService;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
 
     @Override
@@ -142,10 +144,12 @@ public class MarketServiceImpl implements IMarketService {
         }
 
         if (oldOfferVersion != null && !Objects.equals(oldOfferVersion, marketSaleInfo.getOfferVersion())) { // 变更版本时删除旧版本索引
-            searchSyncService.deleteMarketResourceIndex(resource.getResourceId(), marketGroupId, oldOfferVersion);
+            applicationEventPublisher.publishEvent(new MarketResourceIndexDeleteByVersionEvent(
+                    resource.getResourceId(), marketGroupId, oldOfferVersion));
         }
-        // 同步版本索引
-        searchSyncService.syncMarketResourceIndex(resource, marketGroupId);
+        // 发布版本索引事件
+        applicationEventPublisher.publishEvent(new MarketResourceIndexUpsertEvent(
+                resource.getResourceId(), marketGroupId));
 
         log.info("market sale info submitted. resourceId={} marketGroupId={} offerVersion={}",
                 resource.getResourceId(), marketGroupId, request.getOfferVersion());
@@ -170,7 +174,8 @@ public class MarketServiceImpl implements IMarketService {
 
         resourceItemRepository.save(resource);
         resourceEventPublisher.publishAclRecalculateEvent(resource.getResourceId(), "MARKET_SALE_INFO_OFF_SHELF");
-        searchSyncService.syncMarketResourceIndex(resource, marketGroupId);
+        applicationEventPublisher.publishEvent(new MarketResourceIndexUpsertEvent(
+                resource.getResourceId(), marketGroupId));
         log.info("market sale info off-shelved. resourceId={} marketGroupId={}", resource.getResourceId(), marketGroupId);
     }
 
@@ -214,7 +219,8 @@ public class MarketServiceImpl implements IMarketService {
             // 如果改变前为发布状态（说明是新下架），则触发 ACL 重算
             resourceEventPublisher.publishAclRecalculateEvent(resource.getResourceId(), "MARKET_SALE_INFO_OFF_SHELF");
         }
-        searchSyncService.syncMarketResourceIndex(resource, marketGroupId);
+        applicationEventPublisher.publishEvent(new MarketResourceIndexUpsertEvent(
+                resource.getResourceId(), marketGroupId));
 
         log.info("market sale info audited. resourceId={} operatorId={} marketGroupId={} status={} offerVersion={}",
                 resource.getResourceId(), operatorId, marketGroupId, request.getStatus(), marketSaleInfo.getOfferVersion());

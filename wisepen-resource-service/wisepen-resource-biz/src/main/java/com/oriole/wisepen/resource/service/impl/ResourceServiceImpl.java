@@ -23,7 +23,12 @@ import com.oriole.wisepen.resource.domain.entity.ResourceItemEntity;
 import com.oriole.wisepen.resource.domain.entity.ResourceUserInteractionRecordEntity;
 import com.oriole.wisepen.resource.domain.entity.TagEntity;
 import com.oriole.wisepen.resource.enums.*;
+import com.oriole.wisepen.resource.event.MarketResourceIndexDeleteByResourceAndGroupEvent;
+import com.oriole.wisepen.resource.event.MarketResourceIndexDeleteByResourceEvent;
+import com.oriole.wisepen.resource.event.MarketResourceIndexUpsertEvent;
 import com.oriole.wisepen.resource.event.ResourceGroupDashboardMetricEvent;
+import com.oriole.wisepen.resource.event.ResourceIndexDeleteEvent;
+import com.oriole.wisepen.resource.event.ResourceMetadataIndexUpsertEvent;
 import com.oriole.wisepen.resource.event.TagChangedEvent;
 import com.oriole.wisepen.resource.event.TagDeletedEvent;
 import com.oriole.wisepen.resource.event.TagTrashedEvent;
@@ -82,7 +87,6 @@ public class ResourceServiceImpl implements IResourceService {
 
     private final IGroupResService groupResService;
     private final ITagService tagService;
-    private final ISearchSyncService searchSyncService;
 
     private final ResourceItemResponseAssembler resourceItemResponseAssembler;
     private final ApplicationEventPublisher applicationEventPublisher;
@@ -220,7 +224,8 @@ public class ResourceServiceImpl implements IResourceService {
         String oldName = entity.getResourceName();
         entity.setResourceName(req.getNewName());
         resourceItemRepository.save(entity);
-        searchSyncService.syncResourceMetadata(entity, EnumSet.of(UpsertField.RESOURCE_NAME));
+        applicationEventPublisher.publishEvent(new ResourceMetadataIndexUpsertEvent(
+                entity.getResourceId(), EnumSet.of(UpsertField.RESOURCE_NAME)));
 
         log.info("resource renamed. resourceId={} oldName={} newName={}",
                 entity.getResourceId(), oldName, req.getNewName());
@@ -299,8 +304,8 @@ public class ResourceServiceImpl implements IResourceService {
                 // 移入回收站会卸载除了个人组的所有节点，如果此前有发布到市场，则还需移除市场索引
                 entity.getGroupBinds().stream()
                         .filter(bind -> bind.getMarketSaleInfo() != null)
-                        .forEach(bind -> searchSyncService.deleteMarketResourceIndexesByResourceIdAndMarketGroupId(
-                                entity.getResourceId(), bind.getGroupId()));
+                        .forEach(bind -> applicationEventPublisher.publishEvent(new MarketResourceIndexDeleteByResourceAndGroupEvent(
+                                entity.getResourceId(), bind.getGroupId())));
                 entity.getGroupBinds().removeIf(bind -> !bind.getGroupId().startsWith(ResourceConstants.PERSONAL_GROUP_PREFIX));
                 entity.setOverrideGrantedActionsMask(null);
                 entity.setSpecifiedUsersGrantedActionsMask(null);
@@ -600,8 +605,10 @@ public class ResourceServiceImpl implements IResourceService {
         // resourceInteractionInfo 已内嵌在 ResourceItemEntity 中，无需单独初始化
         Long actorUserId = Long.valueOf(dto.getOwnerId());
         listResourceCountableGroupIds(entity.getGroupBinds(), dto.getOwnerGroupRoles()).forEach(groupId -> applicationEventPublisher.publishEvent(new ResourceGroupDashboardMetricEvent(groupId, entity.getResourceId(), actorUserId, ResourceGroupDashboardMetricType.RESOURCE_ADDED, 1)));
-        // 同步初始化资源搜索记录
-        searchSyncService.syncResourceMetadata(entity, EnumSet.of(UpsertField.RESOURCE_TYPE, UpsertField.RESOURCE_NAME, UpsertField.ACL));
+        // 发布资源搜索索引初始化事件
+        applicationEventPublisher.publishEvent(new ResourceMetadataIndexUpsertEvent(
+                entity.getResourceId(),
+                EnumSet.of(UpsertField.RESOURCE_TYPE, UpsertField.RESOURCE_NAME, UpsertField.ACL)));
 
         log.info("resource created. resourceId={} ownerId={} resourceType={} mountTargetTagId={}",
                 entity.getResourceId(), dto.getOwnerId(), dto.getResourceType(), dto.getMountTargetTagId());
@@ -620,9 +627,11 @@ public class ResourceServiceImpl implements IResourceService {
         for (ResourceItemEntity entity : entities) {
             entity.setDeletedAt(LocalDateTime.now());
             mongoTemplate.save(entity, RESOURCE_TRASH_COLLECTION); // 插入到回收集合（用于审计）中
-            // 软删除时删除搜索索引，以避免可以被搜索到
-            searchSyncService.deleteResourceIndex(entity.getResourceId());
-            searchSyncService.deleteMarketResourceIndexesByResourceId(entity.getResourceId());
+            // 软删除时发布搜索索引删除事件，以避免可以被搜索到
+            applicationEventPublisher.publishEvent(new ResourceIndexDeleteEvent(
+                    entity.getResourceId()));
+            applicationEventPublisher.publishEvent(new MarketResourceIndexDeleteByResourceEvent(
+                    entity.getResourceId()));
 
         }
         resourceItemRepository.deleteAllById(resourceIds);// 从业务表中物理擦除
@@ -727,9 +736,11 @@ public class ResourceServiceImpl implements IResourceService {
                 // 插入到回收集合（用于审计）中
                 entity.setDeletedAt(LocalDateTime.now());
                 mongoTemplate.save(entity, RESOURCE_TRASH_COLLECTION);
-                // 软删除时删除搜索索引，以避免可以被搜索到
-                searchSyncService.deleteResourceIndex(entity.getResourceId());
-                searchSyncService.deleteMarketResourceIndexesByResourceId(entity.getResourceId());
+                // 软删除时发布搜索索引删除事件，以避免可以被搜索到
+                applicationEventPublisher.publishEvent(new ResourceIndexDeleteEvent(
+                        entity.getResourceId()));
+                applicationEventPublisher.publishEvent(new MarketResourceIndexDeleteByResourceEvent(
+                        entity.getResourceId()));
             }
             // 从业务表中物理擦除
             resourceItemRepository.deleteAll(affectedBinds);
@@ -741,6 +752,7 @@ public class ResourceServiceImpl implements IResourceService {
         } else {
             List<String> recalcResourceIds = new ArrayList<>();
             for (ResourceItemEntity entity : affectedBinds) {
+                List<String> marketIndexUpsertGroupIds = new ArrayList<>();
                 if (entity.getGroupBinds() != null) {
                     Iterator<GroupTagBind> iterator = entity.getGroupBinds().iterator();
                     while (iterator.hasNext()) {
@@ -758,13 +770,16 @@ public class ResourceServiceImpl implements IResourceService {
                                 iterator.remove();
                             } else { // 集市组保留绑定，但走下架流程
                                 entity.offShelfMarketSaleInfo(groupBind.getGroupId());
-                                // 同步集市组搜索
-                                searchSyncService.syncMarketResourceIndex(entity, groupBind.getGroupId());
+                                marketIndexUpsertGroupIds.add(groupBind.getGroupId());
                             }
                         }
                     }
                 }
                 resourceItemRepository.save(entity);
+                for (String marketGroupId : marketIndexUpsertGroupIds) {
+                    applicationEventPublisher.publishEvent(new MarketResourceIndexUpsertEvent(
+                            entity.getResourceId(), marketGroupId));
+                }
                 if (isPersonalTag) {
                     continue; // 个人Tag变更不需要重新计算Acl
                 }
@@ -788,8 +803,8 @@ public class ResourceServiceImpl implements IResourceService {
                 // 移入回收站会卸载除了个人组的所有节点，如果此前有发布到市场，则还需移除市场索引
                 entity.getGroupBinds().stream()
                         .filter(bind -> bind.getMarketSaleInfo() != null)
-                        .forEach(bind -> searchSyncService.deleteMarketResourceIndexesByResourceIdAndMarketGroupId(
-                                entity.getResourceId(), bind.getGroupId()));
+                        .forEach(bind -> applicationEventPublisher.publishEvent(new MarketResourceIndexDeleteByResourceAndGroupEvent(
+                                entity.getResourceId(), bind.getGroupId())));
                 entity.getGroupBinds().removeIf(bind -> !bind.getGroupId().startsWith(ResourceConstants.PERSONAL_GROUP_PREFIX));
                 entity.setOverrideGrantedActionsMask(null);
                 entity.setSpecifiedUsersGrantedActionsMask(null);
