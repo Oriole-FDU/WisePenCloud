@@ -95,7 +95,7 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
         UserProfileEntity userProfileEntity = new UserProfileEntity();
         UserEntity userEntity = new UserEntity();
 
-        String campusNo = getProfileValue(profile, "学号", "工号");
+        String campusNo = getProfileValue(profile, "学号", "职工号");
         long existed = userMapper.selectCount(Wrappers.<UserEntity>lambdaQuery()
                 .eq(UserEntity::getCampusNo, campusNo)
                 .eq(UserEntity::getUserStatus, UserStatus.NORMAL)
@@ -129,7 +129,7 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
                         GenderType.UNKNOWN
         );
         userProfileEntity.setUniversity("复旦大学"); // 复旦大学UIS认证固定值
-        userProfileEntity.setCollege(getProfileValue(profile, "院系", "所属院系"));
+        userProfileEntity.setCollege(getProfileValue(profile, "院系", "所属院系", "院系部门"));
         userProfileEntity.setMajor(getProfileValue(profile, "专业"));
         userProfileEntity.setClassName(getProfileValue(profile, "班级"));
         String gradeStr = getProfileValue(profile, "年级", "入学时间");
@@ -139,7 +139,7 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
                 userProfileEntity.setEnrollmentYear(Integer.parseInt(matcher.group(1)));
             }
         }
-        String degreeStr = getProfileValue(profile, "培养层次", "学生类别");
+        String degreeStr = getProfileValue(profile, "培养层次", "学生类别", "学历");
         userProfileEntity.setDegreeLevel(
                 StrUtil.isBlank(degreeStr) ? DegreeLevel.UNKNOWN :
                         degreeStr.contains("博士") ? DegreeLevel.DOCTOR :
