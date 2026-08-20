@@ -1,7 +1,6 @@
 package com.oriole.wisepen.document.service.impl;
 
 import com.oriole.wisepen.common.core.exception.ServiceException;
-import com.oriole.wisepen.document.api.domain.base.DocumentUploadMeta;
 import com.oriole.wisepen.document.api.enums.DocumentStatusEnum;
 import com.oriole.wisepen.document.api.enums.DocumentDownloadType;
 import com.oriole.wisepen.document.config.DocumentProperties;
@@ -14,12 +13,16 @@ import com.oriole.wisepen.document.service.IDocumentService;
 import com.oriole.wisepen.document.service.IDocumentPreviewService;
 import com.oriole.wisepen.document.util.WatermarkAppendixBuilder;
 import com.oriole.wisepen.file.storage.api.feign.RemoteStorageService;
+import com.oriole.wisepen.resource.domain.dto.ResourceItemInfoResDTO;
+import com.oriole.wisepen.resource.enums.ResourceType;
+import com.oriole.wisepen.resource.feign.RemoteResourceService;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -28,7 +31,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
-import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -38,8 +40,12 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static com.oriole.wisepen.document.exception.DocumentError.DOCUMENT_NOT_FOUND;
+import static org.apache.poi.xdgf.util.Util.sanitizeFilename;
 
 /**
  * 文档预览服务实现：O(1) 预埋 + Range Request 劫持模式。
@@ -77,13 +83,15 @@ public class DocumentPreviewServiceImpl implements IDocumentPreviewService {
     private final RemoteStorageService remoteStorageService;
     private final DocumentProperties documentProperties;
 
+    private final RemoteResourceService remoteResourceService;
+
     @Override
     public void handlePreviewRequest(HttpServletRequest request,
                                      HttpServletResponse response,
                                      String resourceId,
                                      Integer targetVersion,
                                      String userId) {
-        handleWatermarkPdfRequest(request, response, resourceId, targetVersion, userId, false);
+        handleWatermarkPdfRequest(request, response, resourceId, targetVersion, userId, null, false);
     }
 
     @Override
@@ -93,11 +101,26 @@ public class DocumentPreviewServiceImpl implements IDocumentPreviewService {
                                       Integer targetVersion,
                                       String userId,
                                       DocumentDownloadType downloadType) {
+
+        List<ResourceItemInfoResDTO> resourceInfos = remoteResourceService.listResourceBaseInfo(List.of(resourceId)).getData();
+        ResourceItemInfoResDTO resourceInfo = (resourceInfos == null ? List.<ResourceItemInfoResDTO>of() : resourceInfos)
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new ServiceException(DOCUMENT_NOT_FOUND));
+
+        String resourceName = resourceInfo.getResourceName();
+        ResourceType resourceType = resourceInfo.getResourceType();
+        String filename = StringUtils.hasText(resourceName) ? resourceName.trim() : "document";
+
         if (DocumentDownloadType.ORIGINAL == downloadType) {
-            handleOriginalDownloadRequest(response, resourceId, targetVersion);
-            return;
+            String extension = resourceType == null ? null : resourceType.getExtension();
+            if (StringUtils.hasText(extension)) filename = filename + "." + extension;
+
+            handleOriginalDownloadRequest(response, resourceId, targetVersion, filename);
+        } else {
+            filename = filename + "-watermark.pdf";
+            handleWatermarkPdfRequest(request, response, resourceId, targetVersion, userId, filename, true);
         }
-        handleWatermarkPdfRequest(request, response, resourceId, targetVersion, userId, true);
     }
 
     private void handleWatermarkPdfRequest(HttpServletRequest request,
@@ -105,6 +128,7 @@ public class DocumentPreviewServiceImpl implements IDocumentPreviewService {
                                            String resourceId,
                                            Integer targetVersion,
                                            String userId,
+                                           String downloadFilename,
                                            boolean attachment) {
         DocumentInfoEntity infoEntity = documentService.getDocumentInfo(resourceId);
         targetVersion = targetVersion != null ? targetVersion : infoEntity.getVersion();
@@ -125,18 +149,19 @@ public class DocumentPreviewServiceImpl implements IDocumentPreviewService {
         long totalSize = originalSize + meta.getAppendixSize();
 
         String ossUrl;
+
+        String contentDisposition = attachment ? ContentDisposition.attachment()
+                .filename(sanitizeFilename(downloadFilename), StandardCharsets.UTF_8)
+                .build().toString() : null;
         try {
             ossUrl = remoteStorageService.getDownloadUrl(
-                    versionEntity.getPreviewObjectKey(),
-                    documentProperties.getDownloadUrlDurationSeconds()
+                    versionEntity.getPreviewObjectKey(), documentProperties.getDownloadUrlDurationSeconds(), contentDisposition
             ).getData();
         } catch (Exception e) {
-            log.warn("document download url apply failed. resourceId={} objectKey={}",
-                    resourceId, versionEntity.getPreviewObjectKey(), e);
-            if (attachment) {
-                throw new ServiceException(DocumentError.DOCUMENT_DOWNLOAD_URL_APPLY_FAILED, e.getMessage());
-            }
-            throw new ServiceException(DocumentError.DOCUMENT_PREVIEW_FAILED);
+            log.warn("document {} url apply failed. resourceId={} objectKey={}",
+                    attachment ? "download" : "preview", resourceId, versionEntity.getPreviewObjectKey(), e);
+            throw new ServiceException(attachment ? DocumentError.DOCUMENT_DOWNLOAD_URL_APPLY_FAILED :
+                    DocumentError.DOCUMENT_PREVIEW_FAILED);
         }
 
         // 在时间戳确定之前生成附录，保证同一请求内明/暗水印时间一致
@@ -146,7 +171,7 @@ public class DocumentPreviewServiceImpl implements IDocumentPreviewService {
         response.setHeader("Accept-Ranges", "bytes");
         response.setHeader("Cache-Control", "no-cache");
         if (attachment) {
-            setAttachmentContentDispositionHeader(response, buildWatermarkFilename(versionEntity));
+            response.setHeader("Content-Disposition", contentDisposition);
         }
 
         if (versionEntity.getUpdateTime() != null) {
@@ -175,25 +200,22 @@ public class DocumentPreviewServiceImpl implements IDocumentPreviewService {
                         ossUrl, meta, userId, previewTime, response);
             }
         } catch (IOException e) {
-            if (attachment) {
-                log.error("document download response write failed. resourceId={}", resourceId, e);
-                throw new ServiceException(DocumentError.DOCUMENT_DOWNLOAD_FAILED);
-            }
-            log.error("document preview response write failed. resourceId={}", resourceId, e);
-            throw new ServiceException(DocumentError.DOCUMENT_PREVIEW_FAILED);
+            log.error("document {} response write failed. resourceId={}",
+                    attachment ? "download" : "preview", resourceId, e);
+            throw new ServiceException(attachment ? DocumentError.DOCUMENT_DOWNLOAD_FAILED :
+                    DocumentError.DOCUMENT_PREVIEW_FAILED);
         } catch (Exception e) {
-            if (attachment) {
-                log.error("document download request handle failed. resourceId={}", resourceId, e);
-                throw new ServiceException(DocumentError.DOCUMENT_DOWNLOAD_FAILED);
-            }
-            log.error("document preview request handle failed. resourceId={}", resourceId, e);
-            throw new ServiceException(DocumentError.DOCUMENT_PREVIEW_FAILED);
+            log.error("document {} request handle failed. resourceId={}",
+                    attachment ? "download" : "preview", resourceId, e);
+            throw new ServiceException(attachment ? DocumentError.DOCUMENT_DOWNLOAD_FAILED :
+                    DocumentError.DOCUMENT_PREVIEW_FAILED);
         }
     }
 
     private void handleOriginalDownloadRequest(HttpServletResponse response,
                                                String resourceId,
-                                               Integer targetVersion) {
+                                               Integer targetVersion,
+                                               String downloadFilename) {
         DocumentInfoEntity infoEntity = documentService.getDocumentInfo(resourceId);
         targetVersion = targetVersion != null ? targetVersion : infoEntity.getVersion();
         if (Integer.valueOf(0).equals(targetVersion)) {
@@ -201,15 +223,18 @@ public class DocumentPreviewServiceImpl implements IDocumentPreviewService {
         }
 
         DocumentVersionEntity versionEntity = documentService.getDocumentVersion(resourceId, targetVersion);
-        if (versionEntity.getDocumentStatus() == null || versionEntity.getDocumentStatus().getStatus() != DocumentStatusEnum.READY) {
+        if (versionEntity.getDocumentStatus() == null
+                || versionEntity.getDocumentStatus().getStatus() != DocumentStatusEnum.READY) {
             throw new ServiceException(DocumentError.DOCUMENT_PREVIEW_NOT_READY);
         }
-
         String ossUrl;
+        String contentDisposition = ContentDisposition.attachment()
+                .filename(sanitizeFilename(downloadFilename), StandardCharsets.UTF_8).build().toString();
         try {
             ossUrl = remoteStorageService.getDownloadUrl(
                     versionEntity.getSourceObjectKey(),
-                    documentProperties.getDownloadUrlDurationSeconds()
+                    documentProperties.getDownloadUrlDurationSeconds(),
+                    contentDisposition
             ).getData();
         } catch (Exception e) {
             log.warn("document download url apply failed. resourceId={} objectKey={}",
@@ -217,19 +242,11 @@ public class DocumentPreviewServiceImpl implements IDocumentPreviewService {
             throw new ServiceException(DocumentError.DOCUMENT_DOWNLOAD_URL_APPLY_FAILED, e.getMessage());
         }
 
-        response.setContentType("application/octet-stream");
-        response.setHeader("Cache-Control", "no-cache");
-        setAttachmentContentDispositionHeader(response, buildOriginalFilename(versionEntity));
-
-        try {
-            pipeOss(ossUrl, response.getOutputStream());
-        } catch (IOException e) {
-            log.error("document download response write failed. resourceId={}", resourceId, e);
-            throw new ServiceException(DocumentError.DOCUMENT_DOWNLOAD_FAILED);
-        } catch (Exception e) {
-            log.error("document download request handle failed. resourceId={}", resourceId, e);
-            throw new ServiceException(DocumentError.DOCUMENT_DOWNLOAD_FAILED);
-        }
+        // 原始文件不需要经过文档服务，鉴权后将浏览器重定向到 OSS 限时签名地址，
+        // 由对象存储直接承担文件下载流量。
+        response.setHeader("Cache-Control", "no-store");
+        response.setHeader("Location", ossUrl);
+        response.setStatus(HttpStatus.FOUND.value());
     }
 
     private void handleRangeRequest(String rangeHeader,
@@ -307,75 +324,4 @@ public class DocumentPreviewServiceImpl implements IDocumentPreviewService {
             }
         }
     }
-
-    private void pipeOss(String ossUrl, OutputStream out) throws Exception {
-        HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(ossUrl))
-                .GET()
-                .build();
-
-        HttpResponse<InputStream> resp = HTTP_CLIENT.send(req,
-                HttpResponse.BodyHandlers.ofInputStream());
-
-        if (resp.statusCode() / 100 != 2) {
-            throw new IllegalStateException("OSS 下载请求失败: status=" + resp.statusCode());
-        }
-
-        byte[] buf = new byte[PIPE_BUF];
-        try (InputStream in = resp.body()) {
-            int n;
-            while ((n = in.read(buf)) != -1) {
-                out.write(buf, 0, n);
-            }
-        }
-    }
-
-    private void setAttachmentContentDispositionHeader(HttpServletResponse response, String filename) {
-        String attachmentFilename = StringUtils.hasText(filename) ? filename : "document";
-        attachmentFilename = attachmentFilename.replace("\r", "").replace("\n", "").trim();
-        attachmentFilename = attachmentFilename.replace("/", "_").replace("\\", "_");
-        if (!StringUtils.hasText(attachmentFilename)) {
-            attachmentFilename = "document";
-        }
-
-        String encodedFilename = URLEncoder.encode(attachmentFilename, StandardCharsets.UTF_8).replace("+", "%20");
-        String asciiFallback = attachmentFilename
-                .replace("\"", "'")
-                .replaceAll("[^\\x20-\\x7E]", "_");
-        response.setHeader("Content-Disposition",
-                "attachment; filename=\"" + asciiFallback + "\"; filename*=UTF-8''" + encodedFilename);
-    }
-
-    private String buildOriginalFilename(DocumentVersionEntity versionEntity) {
-        DocumentUploadMeta uploadMeta = versionEntity.getUploadMeta();
-        String documentName = uploadMeta != null ? uploadMeta.getDocumentName() : null;
-        String extension = uploadMeta != null && uploadMeta.getFileType() != null ? uploadMeta.getFileType().getExtension() : null;
-        String resolvedName = StringUtils.hasText(documentName) ? documentName : "document";
-        if (!StringUtils.hasText(extension)) {
-            return resolvedName;
-        }
-        String suffix = "." + extension;
-        return resolvedName.toLowerCase().endsWith(suffix.toLowerCase()) ? resolvedName : resolvedName + suffix;
-    }
-
-    private String buildWatermarkFilename(DocumentVersionEntity versionEntity) {
-        DocumentUploadMeta uploadMeta = versionEntity.getUploadMeta();
-        String documentName = uploadMeta != null ? uploadMeta.getDocumentName() : null;
-        String baseName;
-        if (StringUtils.hasText(documentName)) {
-            String result;
-            int slashIndex = Math.max(documentName.lastIndexOf('/'), documentName.lastIndexOf('\\'));
-            int dotIndex = documentName.lastIndexOf('.');
-            if (dotIndex > slashIndex) {
-                result = documentName.substring(0, dotIndex);
-            } else {
-                result = documentName;
-            }
-            baseName = result;
-        } else {
-            baseName = "document";
-        }
-        return baseName + "-watermark.pdf";
-    }
-
 }

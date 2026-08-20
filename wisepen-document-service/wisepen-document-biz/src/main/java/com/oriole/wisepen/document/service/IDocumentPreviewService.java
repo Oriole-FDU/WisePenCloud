@@ -1,6 +1,7 @@
 package com.oriole.wisepen.document.service;
 
 import com.oriole.wisepen.document.api.enums.DocumentDownloadType;
+import com.oriole.wisepen.resource.enums.ResourceType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 

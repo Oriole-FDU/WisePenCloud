@@ -101,7 +101,7 @@ public class DocumentConversionAndParseConsumer {
         documentService.updateStatus(msg.getDocumentId(), new DocumentStatus(DocumentStatusEnum.CONVERTING_AND_PARSING));
 
         // 获取内网下载 URL，将源文件下载到本地临时目录
-        String downloadUrl = remoteStorageService.getDownloadUrl(msg.getSourceObjectKey(), null).getData();
+        String downloadUrl = remoteStorageService.getDownloadUrl(msg.getSourceObjectKey(), null, null).getData();
         String ext = msg.getFileType().getExtension();
         File sourceFile = downloadSourceFile(downloadUrl, msg.getDocumentId(), ext);
 

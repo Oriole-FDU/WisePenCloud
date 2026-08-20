@@ -36,7 +36,8 @@ public interface RemoteStorageService {
      */
     @GetMapping("/getDownloadUrl")
     R<String> getDownloadUrl(@RequestParam("objectKey") String objectKey,
-                             @RequestParam(value = "duration", required = false) Long duration);
+                             @RequestParam(value = "duration", required = false) Long duration,
+                             @RequestParam(value = "contentDisposition", required = false) String contentDisposition);
 
     /**
      * 颁发 STS 临时凭证（用于前端批量访问特定目录下的图片）
