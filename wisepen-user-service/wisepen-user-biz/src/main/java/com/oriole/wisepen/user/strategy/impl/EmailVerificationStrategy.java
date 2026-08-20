@@ -143,12 +143,16 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
         userEntity.setUserStatus(UserStatus.NORMAL);
         userEntity.setVerificationMode(UserVerificationMode.EDU_EMAIL);
 
-        userMapper.updateById(userEntity);
+        if (userMapper.updateById(userEntity) != 1) {
+            throw new ServiceException(UserError.VERIFICATION_EMAIL_UPDATE_FAILED);
+        }
 
         UserProfileEntity userProfileEntity = new UserProfileEntity();
         userProfileEntity.setUserId(userId);
         userProfileEntity.setUniversity(school.getNameZh());
-        userProfileMapper.updateById(userProfileEntity);
+        if (userProfileMapper.updateById(userProfileEntity) != 1) {
+            throw new ServiceException(UserError.VERIFICATION_EMAIL_UPDATE_FAILED);
+        }
 
         redisCacheManager.updateUserStatusInSession(userId, UserStatus.NORMAL);
         log.info("email verification succeeded. userId={} emailDomain={} university={}",
@@ -163,10 +167,9 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
 
     private void validateEmailVerificationState(UserEntity userEntity, Long userId, String email) {
         if (userEntity == null
-                || userEntity.getUserStatus() == UserStatus.BANNED // 被封禁的账号不能认证
-                || !IdentityType.STUDENT.equals(userEntity.getIdentityType()) // 仅学生可通过邮箱认证
-                || (userEntity.getVerificationMode() != null
-                && userEntity.getVerificationMode() != UserVerificationMode.EDU_EMAIL)) {
+                || userEntity.getUserStatus() != UserStatus.UNIDENTIFIED
+                || !IdentityType.STUDENT.equals(userEntity.getIdentityType())
+                || userEntity.getVerificationMode() != null) {
             log.warn("email verification skipped. email={} userId={} reason=\"user state invalid\"", email, userId);
             throw new ServiceException(UserError.VERIFICATION_EMAIL_STATE_INVALID);
         }
