@@ -25,6 +25,6 @@ public class InternalMediaController implements RemoteMediaService {
     @Override
     public R<MediaInfoResponse> getMediaInfo(
             @RequestParam("resourceId") @NotBlank(message = MediaValidationMsg.RESOURCE_ID_EMPTY) String resourceId) {
-        return R.ok(mediaService.getMediaInfo(resourceId));
+        return R.ok(mediaService.getMediaInfo(resourceId, null));
     }
 }

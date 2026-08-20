@@ -37,4 +37,7 @@ public class MediaUploadInitRequest implements Serializable {
     @NotNull(message = MediaValidationMsg.FILE_SIZE_NULL)
     @Positive(message = MediaValidationMsg.FILE_SIZE_POSITIVE)
     private Long expectedSize;
+
+    /** 可选：首次上传完成后挂载到的目标标签。 */
+    private String mountTargetTagId;
 }

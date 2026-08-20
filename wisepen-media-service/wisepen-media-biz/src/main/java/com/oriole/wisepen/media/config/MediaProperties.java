@@ -13,11 +13,6 @@ import org.springframework.stereotype.Component;
 public class MediaProperties {
 
     /**
-     * 是否允许在暗水印 provider 不可用时返回仅明水印预览。默认 false，避免静默降级到源文件。
-     */
-    private boolean allowForensicUnavailablePreview = false;
-
-    /**
      * 播放/预览会话默认过期时间。
      */
     private long sessionTtlMinutes = 30L;

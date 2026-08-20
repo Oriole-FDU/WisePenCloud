@@ -1,6 +1,7 @@
 package com.oriole.wisepen.media.domain.entity;
 
 import com.oriole.wisepen.media.api.domain.base.MediaStatus;
+import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.resource.enums.ResourceType;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -16,6 +17,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @SuperBuilder
@@ -54,6 +56,12 @@ public class MediaInfoEntity implements Persistable<String> {
 
     /** 图片预览图或视频封面图在 OSS 中的 ObjectKey */
     private String previewObjectKey;
+
+    /** 首次上传时的目标挂载标签。 */
+    private String mountTargetTagId;
+
+    /** 首次上传者的小组角色快照。 */
+    private Map<Long, GroupRoleType> uploaderGroupRoles;
 
     private Long durationMs;
 

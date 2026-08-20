@@ -5,7 +5,7 @@ import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.common.log.annotation.Log;
-import com.oriole.wisepen.common.security.annotation.CheckLogin;
+import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.media.api.constant.MediaValidationMsg;
 import com.oriole.wisepen.media.api.domain.base.MediaStatus;
 import com.oriole.wisepen.media.api.domain.dto.req.MediaPlaybackSessionCreateRequest;
@@ -18,8 +18,10 @@ import com.oriole.wisepen.media.exception.MediaError;
 import com.oriole.wisepen.media.service.IMediaPlaybackService;
 import com.oriole.wisepen.media.service.IMediaService;
 import com.oriole.wisepen.media.service.IMediaWatermarkPlaybackService;
+import com.oriole.wisepen.resource.domain.dto.ResourceInfoGetReqDTO;
 import com.oriole.wisepen.resource.domain.dto.ResourceCheckPermissionReqDTO;
 import com.oriole.wisepen.resource.domain.dto.ResourceCheckPermissionResDTO;
+import com.oriole.wisepen.resource.domain.dto.res.ResourceItemResponse;
 import com.oriole.wisepen.resource.enums.ResourceAction;
 import com.oriole.wisepen.resource.feign.RemoteResourceService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -43,7 +45,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/media")
 @RequiredArgsConstructor
-@CheckLogin
+@CheckRole
 @Validated
 public class MediaController {
 
@@ -56,9 +58,9 @@ public class MediaController {
             summary = "初始化媒体上传",
             description = """
                     - 用途：为当前用户创建图片、视频或音频上传任务，并申请对象存储直传凭证。
-                    - 请求：filename 为展示名；extension 为文件扩展名；md5 用于秒传判定；expectedSize 为预期大小。
+                    - 请求：filename 为展示名；extension 为文件扩展名；md5 用于秒传判定；expectedSize 为预期大小；mountTargetTagId 可选，用于指定资源所属路径标签。
                     - 约束：当前用户必须已登录；扩展名必须属于媒体服务支持的图片、视频或音频类型；一次上传生成一个新的媒体资源。
-                    - 处理：创建待处理媒体记录，向存储服务申请上传 URL；上传完成或秒传后异步进入媒体处理与资源注册。
+                    - 处理：创建待处理媒体记录并记录当前小组角色与挂载标签，向存储服务申请上传 URL；上传完成或秒传后异步进入媒体处理与资源注册。
                     - 失败：文件类型不支持 -> MediaError.CANNOT_SUPPORT_FILE_TYPE；存储服务申请上传凭证失败 -> MediaError.MEDIA_UPLOAD_URL_APPLY_FAILED。
                     - 响应：返回 mediaId、objectKey、上传凭证信息和是否秒传。
                     """
@@ -66,7 +68,7 @@ public class MediaController {
     @Log(title = "初始化媒体上传", businessType = BusinessType.INSERT)
     @PostMapping("/uploadMedia")
     public R<MediaUploadInitResponse> uploadMedia(@Valid @RequestBody MediaUploadInitRequest request) {
-        return R.ok(mediaService.initUploadMedia(request, SecurityContextHolder.getUserId()));
+        return R.ok(mediaService.initUploadMedia(request, SecurityContextHolder.getUserId(), SecurityContextHolder.getGroupRoleMap()));
     }
 
     @Operation(
@@ -96,6 +98,7 @@ public class MediaController {
                     - 响应：返回刷新后的媒体状态。
                     """
     )
+    @Log(title = "刷新媒体状态", businessType = BusinessType.UPDATE)
     @PostMapping("/syncMediaStatus")
     public R<MediaStatus> syncMediaStatus(@RequestParam @NotBlank(message = MediaValidationMsg.MEDIA_ID_EMPTY) String mediaId) {
         mediaService.assertMediaUploader(mediaId, SecurityContextHolder.getUserId());
@@ -162,12 +165,13 @@ public class MediaController {
             description = """
                     - 用途：为后续取证水印播放链路创建图片预览或视频 HLS 播放会话。
                     - 请求：resourceId 指定媒体资源。
-                    - 约束：当前用户必须拥有 VIEW 动作；媒体必须已经处理完成；图片和视频暗水印 Provider 不可用时默认拒绝返回源文件；音频不需要水印。
+                    - 约束：当前用户必须拥有 VIEW 动作；媒体必须已经处理完成；图片和视频暗水印 Provider 不可用时直接拒绝返回源文件；音频不需要水印。
                     - 处理：先通过资源服务校验 VIEW 权限；图片和视频创建带 wmId 的水印会话并交由水印 Provider 生成交付地址；音频直接申请源文件短时播放 URL，不创建水印会话。
                     - 失败：无查看权限 -> MediaError.MEDIA_PERMISSION_DENIED；媒体未就绪 -> MediaError.MEDIA_PREVIEW_NOT_READY；图片或视频暗水印能力不可用 -> MediaError.MEDIA_FORENSIC_UNAVAILABLE。
                     - 响应：图片和视频返回会话 ID、交付模式、明水印文本、预览 URL 或 HLS manifest URL；音频返回 AUDIO_SOURCE 交付模式和 playbackUrl。
                     """
     )
+    @Log(title = "创建水印播放会话", businessType = BusinessType.INSERT)
     @PostMapping("/createWatermarkPlaybackSession")
     public R<MediaPlaybackSessionResponse> createWatermarkPlaybackSession(
             @Valid @RequestBody MediaPlaybackSessionCreateRequest request) {
@@ -233,16 +237,20 @@ public class MediaController {
                     - 用途：获取媒体资源详情和媒体处理信息，用于媒体详情页展示。
                     - 请求：resourceId 指定媒体资源。
                     - 约束：当前用户必须通过资源服务的资源详情权限校验；目标媒体信息必须存在。
-                    - 处理：通过资源服务获取资源详情并校验访问权限，再读取媒体处理信息。
-                    - 失败：资源无访问权限 -> ResourceError.RESOURCE_PERMISSION_DENIED；媒体不存在 -> MediaError.MEDIA_NOT_FOUND。
-                    - 响应：返回媒体处理信息；资源详情由资源服务负责裁决。
+                    - 处理：通过资源服务获取资源详情和当前用户可执行动作，再读取媒体处理信息并补充封面图 URL；不刷新媒体状态，不触发处理或重试。
+                    - 失败：资源不存在 -> ResourceError.RESOURCE_NOT_FOUND；资源无查看权限 -> ResourceError.RESOURCE_PERMISSION_DENIED；媒体不存在 -> MediaError.MEDIA_NOT_FOUND。
+                    - 响应：返回资源详情、媒体处理信息和封面图 URL。
                     """
     )
     @GetMapping("/getMediaInfo")
     public R<MediaInfoResponse> getMediaInfo(
             @RequestParam @NotBlank(message = MediaValidationMsg.RESOURCE_ID_EMPTY) String resourceId) {
-        assertResourceAction(resourceId, ResourceAction.VIEW);
-        return R.ok(mediaService.getMediaInfo(resourceId));
+        ResourceItemResponse resourceInfo = remoteResourceService.getResourceInfo(ResourceInfoGetReqDTO.builder()
+                .resourceId(resourceId)
+                .userId(SecurityContextHolder.getUserId())
+                .groupRoles(SecurityContextHolder.getGroupRoleMap())
+                .build()).getData();
+        return R.ok(mediaService.getMediaInfo(resourceId, resourceInfo));
     }
 
     private void assertResourceAction(String resourceId, ResourceAction action) {

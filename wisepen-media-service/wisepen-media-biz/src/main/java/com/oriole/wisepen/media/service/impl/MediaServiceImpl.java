@@ -5,6 +5,7 @@ import cn.hutool.core.bean.copier.CopyOptions;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import com.oriole.wisepen.common.core.exception.ServiceException;
+import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.file.storage.api.domain.dto.StorageRecordDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitRespDTO;
@@ -26,6 +27,7 @@ import com.oriole.wisepen.media.repository.MediaInfoRepository;
 import com.oriole.wisepen.media.repository.MediaWatermarkSessionRepository;
 import com.oriole.wisepen.media.service.IMediaProcessService;
 import com.oriole.wisepen.media.service.IMediaService;
+import com.oriole.wisepen.resource.domain.dto.res.ResourceItemResponse;
 import com.oriole.wisepen.resource.enums.ResourceType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +37,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Map;
 
 import static com.oriole.wisepen.common.core.util.LogIdUtils.summarizeIds;
 
@@ -52,7 +55,8 @@ public class MediaServiceImpl implements IMediaService {
     private final IMediaProcessService mediaProcessService;
 
     @Override
-    public MediaUploadInitResponse initUploadMedia(MediaUploadInitRequest request, Long uploaderId) {
+    public MediaUploadInitResponse initUploadMedia(MediaUploadInitRequest request, Long uploaderId,
+                                                   Map<Long, GroupRoleType> uploaderGroupRoles) {
         ResourceType resourceType = MediaConstants.resolveResourceType(request.getExtension());
         if (resourceType == null) {
             throw new ServiceException(MediaError.CANNOT_SUPPORT_FILE_TYPE);
@@ -82,6 +86,8 @@ public class MediaServiceImpl implements IMediaService {
                 .originalFilename(request.getFilename())
                 .sourceExtension(request.getExtension())
                 .sourceObjectKey(uploadInitResp.getObjectKey())
+                .mountTargetTagId(request.getMountTargetTagId())
+                .uploaderGroupRoles(uploaderGroupRoles)
                 .size(request.getExpectedSize())
                 .mediaStatus(new MediaStatus(Boolean.TRUE.equals(uploadInitResp.getFlashUploaded())
                         ? MediaStatusEnum.UPLOADED : MediaStatusEnum.UPLOADING))
@@ -111,6 +117,7 @@ public class MediaServiceImpl implements IMediaService {
                 uploaderId,
                 List.of(MediaStatusEnum.UPLOADING,
                         MediaStatusEnum.UPLOADED,
+                        MediaStatusEnum.REGISTERING_RES,
                         MediaStatusEnum.TRANSFER_TIMEOUT,
                         MediaStatusEnum.REGISTERING_RES_TIMEOUT,
                         MediaStatusEnum.PROBING,
@@ -118,7 +125,13 @@ public class MediaServiceImpl implements IMediaService {
                         MediaStatusEnum.FORENSIC_PREPROCESSING,
                         MediaStatusEnum.FAILED)
         );
-        return entities.stream().map(entity -> BeanUtil.copyProperties(entity, MediaInfoResponse.class)).toList();
+        return entities.stream().map(entity -> {
+            MediaInfoResponse response = BeanUtil.copyProperties(entity, MediaInfoResponse.class);
+            if (StrUtil.isNotBlank(entity.getPreviewObjectKey())) {
+                response.setCoverUrl(remoteStorageService.getDownloadUrl(entity.getPreviewObjectKey(), null).getData());
+            }
+            return response;
+        }).toList();
     }
 
     @Override
@@ -229,9 +242,18 @@ public class MediaServiceImpl implements IMediaService {
     }
 
     @Override
-    public MediaInfoResponse getMediaInfo(String resourceId) {
-        return BeanUtil.copyProperties(mediaInfoRepository.findByResourceId(resourceId)
-                .orElseThrow(() -> new ServiceException(MediaError.MEDIA_NOT_FOUND)), MediaInfoResponse.class);
+    public MediaInfoResponse getMediaInfo(String resourceId, ResourceItemResponse resourceInfo) {
+        MediaInfoEntity entity = mediaInfoRepository.findByResourceId(resourceId)
+                .orElseThrow(() -> new ServiceException(MediaError.MEDIA_NOT_FOUND));
+        MediaInfoResponse response = BeanUtil.copyProperties(entity, MediaInfoResponse.class);
+        if (StrUtil.isNotBlank(entity.getPreviewObjectKey())) {
+            response.setCoverUrl(remoteStorageService.getDownloadUrl(entity.getPreviewObjectKey(), null).getData());
+        }
+        if (resourceInfo != null) {
+            resourceInfo.setPreview(response.getCoverUrl());
+            response.setResourceInfo(resourceInfo);
+        }
+        return response;
     }
 
     @Override

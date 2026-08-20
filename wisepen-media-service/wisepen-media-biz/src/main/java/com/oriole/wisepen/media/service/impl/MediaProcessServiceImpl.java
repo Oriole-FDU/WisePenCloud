@@ -27,6 +27,7 @@ import com.oriole.wisepen.resource.feign.RemoteResourceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.File;
 import java.io.IOException;
@@ -500,6 +501,7 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
     }
 
     @Override
+    @Transactional
     public void finalizeToReady(String mediaId) {
         // finalize 可被正常处理和注册补偿重试共同调用，因此保持幂等
         MediaInfoEntity entity = mediaInfoRepository.findById(mediaId)
@@ -523,6 +525,8 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
                         .resourceName(entity.getOriginalFilename())
                         .resourceType(entity.getResourceType())
                         .ownerId(String.valueOf(entity.getOwnerId()))
+                        .ownerGroupRoles(entity.getUploaderGroupRoles())
+                        .mountTargetTagId(entity.getMountTargetTagId())
                         .preview(result)
                         .size(entity.getSize())
                         .build()).getData();

@@ -88,8 +88,8 @@ public class MediaWatermarkPlaybackServiceImpl implements IMediaWatermarkPlaybac
 
         // 会话先落库再调用 provider，确保后续泄露检测可以用 wmId 反查 viewer/resource/session。
         MediaPlaybackGrant grant = mediaWatermarkProvider.createPlaybackGrant(mediaInfo, session);
-        // VIEW 权限不等于允许看源文件；暗水印不可用时默认 fail closed，除非产品显式开启降级预览。
-        if (grant.getForensicStatus() == ForensicStatus.UNAVAILABLE && !mediaProperties.isAllowForensicUnavailablePreview()) {
+        // VIEW 权限不等于允许看源文件；暗水印不可用时直接 fail closed。
+        if (grant.getForensicStatus() == ForensicStatus.UNAVAILABLE) {
             BeanUtil.copyProperties(MediaWatermarkSessionEntity.builder()
                     .status(WatermarkSessionStatus.FAILED)
                     .forensicStatus(ForensicStatus.UNAVAILABLE)
