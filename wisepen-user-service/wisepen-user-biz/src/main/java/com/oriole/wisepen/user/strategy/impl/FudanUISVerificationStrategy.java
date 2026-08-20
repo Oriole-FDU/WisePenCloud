@@ -127,7 +127,7 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
         }
 
         boolean teacherProfile = StrUtil.isNotBlank(getProfileValue(profile, "职工号", "参加工作年月"));
-        if (teacherProfile) {
+        if (teacherProfile) { // 若存在职工号 或 参加工作年月，则为老师身份
             userEntity.setIdentityType(IdentityType.TEACHER);
         }
 
@@ -153,15 +153,19 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
         );
         userProfileEntity.setUniversity("复旦大学"); // 复旦大学UIS认证固定值
         userProfileEntity.setCollege(getProfileValue(profile, "院系", "所属院系", "院系部门"));
-        userProfileEntity.setMajor(getProfileValue(profile, "专业"));
-        userProfileEntity.setClassName(getProfileValue(profile, "班级"));
-        String gradeStr = getProfileValue(profile, "年级", "入学时间");
-        if (StrUtil.isNotBlank(gradeStr)) {
-            Matcher matcher = Pattern.compile("(\\d{4})").matcher(gradeStr);
-            if (matcher.find()) {
-                userProfileEntity.setEnrollmentYear(Integer.parseInt(matcher.group(1)));
+
+        if (!teacherProfile) { // 专业、班级、年级仅限学生身份可认证
+            userProfileEntity.setMajor(getProfileValue(profile, "专业"));
+            userProfileEntity.setClassName(getProfileValue(profile, "班级"));
+            String gradeStr = getProfileValue(profile, "年级", "入学时间");
+            if (StrUtil.isNotBlank(gradeStr)) {
+                Matcher matcher = Pattern.compile("(\\d{4})").matcher(gradeStr);
+                if (matcher.find()) {
+                    userProfileEntity.setEnrollmentYear(Integer.parseInt(matcher.group(1)));
+                }
             }
         }
+
         String degreeStr = getProfileValue(profile, "培养层次", "学生类别", "学历");
         userProfileEntity.setDegreeLevel(
                 StrUtil.isBlank(degreeStr) ? DegreeLevel.UNKNOWN :
@@ -170,6 +174,11 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
                         degreeStr.contains("本科") ? DegreeLevel.UNDERGRADUATE :
                         DegreeLevel.UNKNOWN
         );
+
+        if (teacherProfile) { // 专业、班级、年级仅限老师身份可认证
+            String academicTitleStr = getProfileValue(profile, "专技职务");
+            userProfileEntity.setAcademicTitle(academicTitleStr);
+        }
 
         userEntity.setUserId(userId);
         if (userMapper.updateById(userEntity) != 1) {
@@ -192,7 +201,6 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
     private void validateFudanUISVerificationState(UserEntity userEntity, Long userId) {
         if (userEntity == null
                 || userEntity.getUserStatus() != UserStatus.UNIDENTIFIED
-                || !IdentityType.STUDENT.equals(userEntity.getIdentityType())
                 || userEntity.getVerificationMode() != null) {
             log.warn("fudan uis verification skipped. userId={} reason=\"user state invalid\"", userId);
             throw new ServiceException(UserError.VERIFICATION_FUDAN_UIS_STATE_INVALID);

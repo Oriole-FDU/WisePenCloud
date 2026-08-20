@@ -41,7 +41,8 @@ import java.util.regex.Pattern;
 public class EmailVerificationStrategy implements UserVerificationStrategy {
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@([A-Za-z0-9-]+\\.)+[A-Za-z]{2,}$");
-    private static final Set<String> FUDAN_EMAIL_DOMAINS = Set.of("fudan.edu.cn", "fudan.edu", "m.fudan.edu.cn");
+    private static final Set<String> PARTNER_UNIVERSITIES_EMAIL_DOMAINS = Set.of("fudan.edu.cn", "shmu.edu.cn", "m.fudan.edu.cn");
+
 
     private final RedisCacheManager redisCacheManager;
     private final RemoteMailService remoteMailService;
@@ -65,7 +66,7 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
             log.warn("email verification skipped. email={} userId={} reason=\"invalid email format\"", email, userId);
             throw new ServiceException(UserError.VERIFICATION_EMAIL_INVALID);
         }
-        rejectFudanEmail(email, userId);
+        rejectPartnerUniversitiesEmail(email, userId);
 
         educationEmailSchoolResolver.findByEmail(email)
                 .orElseThrow(() -> {
@@ -118,7 +119,7 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
         }
         Long userId = verifyInfo.getLeft();
         String email = verifyInfo.getRight();
-        rejectFudanEmail(email, userId);
+        rejectPartnerUniversitiesEmail(email, userId);
 
         EducationEmailSchool school = educationEmailSchoolResolver.findByEmail(email)
                 .orElseThrow(() -> new ServiceException(UserError.VERIFICATION_EMAIL_INVALID));
@@ -167,22 +168,21 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
 
     private void validateEmailVerificationState(UserEntity userEntity, Long userId, String email) {
         if (userEntity == null
-                || userEntity.getUserStatus() != UserStatus.UNIDENTIFIED
-                || !IdentityType.STUDENT.equals(userEntity.getIdentityType())
+                || userEntity.getUserStatus() != UserStatus.UNIDENTIFIED // 被封禁的账号不能认证
                 || userEntity.getVerificationMode() != null) {
             log.warn("email verification skipped. email={} userId={} reason=\"user state invalid\"", email, userId);
             throw new ServiceException(UserError.VERIFICATION_EMAIL_STATE_INVALID);
         }
     }
 
-    private void rejectFudanEmail(String email, Long userId) {
+    private void rejectPartnerUniversitiesEmail(String email, Long userId) {
         String emailDomain = extractEmailDomain(email);
-        boolean isFudanEmail = FUDAN_EMAIL_DOMAINS.stream()
+        boolean isPartnerUniversitiesEmail = PARTNER_UNIVERSITIES_EMAIL_DOMAINS.stream()
                 .anyMatch(domain -> emailDomain.equals(domain) || emailDomain.endsWith("." + domain));
-        if (isFudanEmail) {
-            log.warn("email verification rejected. email={} userId={} emailDomain={} reason=\"fudan email domain\"",
+        if (isPartnerUniversitiesEmail) {
+            log.warn("email verification rejected. email={} userId={} emailDomain={} reason=\"partner universities  email domain\"",
                     email, userId, emailDomain);
-            throw new ServiceException(UserError.VERIFICATION_EMAIL_FUDAN_NOT_ALLOWED);
+            throw new ServiceException(UserError.VERIFICATION_EMAIL_NOT_ALLOWED);
         }
     }
 

@@ -142,7 +142,7 @@ public class UserController {
                     - 请求：email 为待验证的邮箱地址。
                     - 约束：当前用户必须已登录且仍处于未完成身份认证状态；邮箱需满足对应认证策略的业务校验。
                     - 处理：将 email 和当前 userId 交给教育邮箱认证策略发起验证；不立即改变用户认证状态。
-                    - 失败：未登录 -> PermissionError.NOT_LOGIN；邮箱不符合认证策略 -> UserError.VERIFICATION_EMAIL_INVALID；复旦邮箱不能通过教育邮箱认证 -> UserError.VERIFICATION_EMAIL_FUDAN_NOT_ALLOWED；账号状态不允许邮箱认证 -> UserError.VERIFICATION_EMAIL_STATE_INVALID；邮箱已被其他账号绑定 -> UserError.VERIFICATION_EMAIL_ALREADY_EXISTS；验证邮件发送失败 -> UserError.VERIFICATION_EMAIL_SEND_FAILED。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；邮箱不符合认证策略 -> UserError.VERIFICATION_EMAIL_INVALID；合作高校不能通过教育邮箱认证 -> UserError.VERIFICATION_EMAIL_NOT_ALLOWED；账号状态不允许邮箱认证 -> UserError.VERIFICATION_EMAIL_STATE_INVALID；邮箱已被其他账号绑定 -> UserError.VERIFICATION_EMAIL_ALREADY_EXISTS；验证邮件发送失败 -> UserError.VERIFICATION_EMAIL_SEND_FAILED。
                     - 响应：成功受理时返回空结果，后续结果通过邮箱回调检查接口完成。
                     """
     )
@@ -164,7 +164,7 @@ public class UserController {
                     - 请求：token 为邮箱验证流程生成的一次性凭证。
                     - 约束：token 必须有效且未过期；对应用户仍必须处于未完成身份认证状态。
                     - 处理：调用教育邮箱认证策略校验 token，并按策略更新用户邮箱、认证状态和学校名称；不依赖当前登录用户上下文，不改变学生身份。
-                    - 失败：验证 token 无效或过期 -> UserError.VERIFICATION_EMAIL_TOKEN_EXPIRED；邮箱不符合认证策略 -> UserError.VERIFICATION_EMAIL_INVALID；复旦邮箱不能通过教育邮箱认证 -> UserError.VERIFICATION_EMAIL_FUDAN_NOT_ALLOWED；账号状态不允许邮箱认证 -> UserError.VERIFICATION_EMAIL_STATE_INVALID；邮箱已被其他账号绑定 -> UserError.VERIFICATION_EMAIL_ALREADY_EXISTS。
+                    - 失败：验证 token 无效或过期 -> UserError.VERIFICATION_EMAIL_TOKEN_EXPIRED；邮箱不符合认证策略 -> UserError.VERIFICATION_EMAIL_INVALID；合作高校不能通过教育邮箱认证 -> UserError.VERIFICATION_EMAIL_NOT_ALLOWED；账号状态不允许邮箱认证 -> UserError.VERIFICATION_EMAIL_STATE_INVALID；邮箱已被其他账号绑定 -> UserError.VERIFICATION_EMAIL_ALREADY_EXISTS。
                     - 响应：成功时返回空结果。
                     """
     )
