@@ -202,11 +202,11 @@ public class StorageServiceImpl implements IStorageService {
     }
 
     @Override
-    public String getDownloadUrl(String objectKey, Long durationSeconds) {
+    public String getDownloadUrl(String objectKey, Long durationSeconds, String contentDisposition) {
         StorageRecordEntity record = getStorageRecordWithCompensateStatus(objectKey);
 
         StorageProvider provider = storageManager.getProvider(record.getConfigId());
-        return provider.generateDownloadUrl(objectKey, durationSeconds);
+        return provider.generateDownloadUrl(objectKey, durationSeconds, contentDisposition);
     }
 
     @Override

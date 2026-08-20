@@ -66,6 +66,11 @@ public class DocumentProperties {
     private long onlyofficeSourceUrlDurationSeconds = 3_600L;
 
     /**
+     * 文档下载时后端读取对象存储文件的预签名 URL 有效期
+     */
+    private long downloadUrlDurationSeconds = 900L;
+
+    /**
      * ONLYOFFICE 编辑会话过期时间
      */
     private long onlyofficeEditSessionTtlSeconds = 86_400L;
