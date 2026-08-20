@@ -28,13 +28,14 @@ public interface StorageProvider {
     UploadUrlBase generateUploadTicket(String objectKey, long durationSeconds, String apiDomain, Boolean isNeedCallback);
 
     /**
-     * 生成私有文件下载链接（预签名 GET URL）
+     * 生成带自定义响应头的私有文件下载链接。
      *
-     * @param objectKey       目标文件全路径
-     * @param durationSeconds 链接有效时长（秒）
+     * @param objectKey                  目标文件全路径
+     * @param durationSeconds            下载链接有效时长（秒）
+     * @param contentDisposition 下载响应的 Content-Disposition，可为空
      * @return 下载直链
      */
-    String generateDownloadUrl(String objectKey, long durationSeconds);
+    String generateDownloadUrl(String objectKey, long durationSeconds, String contentDisposition);
 
     /**
      * 生成 STS Token
