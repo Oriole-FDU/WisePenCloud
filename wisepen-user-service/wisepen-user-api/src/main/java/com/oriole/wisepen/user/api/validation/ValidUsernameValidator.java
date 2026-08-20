@@ -23,12 +23,12 @@ public class ValidUsernameValidator implements ConstraintValidator<ValidUsername
             return true;
         }
 
-        // 1. 如果符合“11位数字”或“XH格式”，我们认为这是“已存在”的非法格式（模拟学号/手机号占用）
+        // 1. 如果符合“11位数字”或“XH格式”，我们认为这是非法格式
         if (ELEVEN_DIGIT_PATTERN.matcher(value).matches() || XH_PATTERN.matcher(value).matches()) {
             // 禁用默认的 message
             context.disableDefaultConstraintViolation();
             // 设置新的自定义 message
-            context.buildConstraintViolationWithTemplate(UserValidationMsg.USERNAME_EXISTED)
+            context.buildConstraintViolationWithTemplate(UserValidationMsg.USERNAME_INVALID_SPECIAL_FORMAT)
                     .addConstraintViolation();
             return false;
         }

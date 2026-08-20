@@ -31,6 +31,9 @@ spring:
     active: dev # 激活开发环境配置
 
 wisepen:
+  user:
+    api-domain: ${WISEPEN_USER_API_DOMAIN:}
+    auth-cookie-domain: ${WISEPEN_USER_AUTH_COOKIE_DOMAIN:}
   openapi:
     title: 用户服务 API
     version: 1.0.0

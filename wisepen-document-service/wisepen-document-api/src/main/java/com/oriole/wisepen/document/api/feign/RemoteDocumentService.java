@@ -11,5 +11,5 @@ public interface RemoteDocumentService {
 
     @GetMapping("/internal/document/getDocumentSearchText")
     R<DocumentSearchTextResponse> getDocumentSearchText(@RequestParam("resourceId") String resourceId,
-                                                        @RequestParam("version") Integer version);
+                                                        @RequestParam(value = "version", required = false) Integer version);
 }

@@ -8,7 +8,7 @@ import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.common.log.annotation.Log;
-import com.oriole.wisepen.common.security.annotation.CheckLogin;
+import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.document.api.constant.DocumentConstants;
 import com.oriole.wisepen.document.api.domain.base.DocumentVersionBase;
 import com.oriole.wisepen.document.api.domain.base.DocumentStatus;
@@ -56,7 +56,7 @@ import static com.oriole.wisepen.document.exception.DocumentError.DOCUMENT_PERMI
 @RestController
 @RequestMapping("/document")
 @RequiredArgsConstructor
-@CheckLogin
+@CheckRole
 public class DocumentController {
 
     private final IDocumentService documentService;

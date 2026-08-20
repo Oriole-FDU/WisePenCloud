@@ -284,9 +284,12 @@ public class TagServiceImpl implements ITagService {
     }
 
     @Override
-    public void moveTag(TagMoveRequest tagMoveRequest) {
+    public void moveTags(TagMoveRequest tagMoveRequest) {
         String groupID = tagMoveRequest.getGroupId();
-        String targetId = tagMoveRequest.getTargetTagId();
+        List<String> targetIds = tagMoveRequest.getTargetTagIds().stream()
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toCollection(LinkedHashSet::new))
+                .stream().collect(Collectors.toList());
         String newParentId = tagMoveRequest.getNewParentId() == null ? "0" : tagMoveRequest.getNewParentId();
 
         // 严禁向回收站内部节点移动Tag
@@ -295,35 +298,52 @@ public class TagServiceImpl implements ITagService {
             throw new ServiceException(ResourceError.CANNOT_OPERATE_TRASHED_TAG_PATH_NODE);
         }
 
-        // 目标父节点不能是自己
-        if (newParentId.equals(targetId)) {
-            throw new ServiceException(ResourceError.CANNOT_MOVE_TAG_NODE_TO_SELF);
+        // 批量目标存在性校验
+        List<TagEntity> targetNodes = tagRepository.findByGroupIdAndTagIdIn(groupID, targetIds);
+        if (targetNodes.size() != targetIds.size()) {
+            throw new ServiceException(ResourceError.TAG_NODE_NOT_FOUND);
         }
 
-        // 获取当前节点
-        TagEntity targetNode = tagRepository.findByGroupIdAndTagId(groupID, targetId)
-                .orElseThrow(() -> new ServiceException(ResourceError.TAG_NODE_NOT_FOUND));
-
-        String oldParentId = targetNode.getParentId();
-
-        // 如果父节点没变直接返回
-        if (newParentId.equals(targetNode.getParentId())) {
+        // 如果父节点都没变直接返回
+        if (targetNodes.stream().allMatch(targetNode -> newParentId.equals(targetNode.getParentId()))) {
             return;
         }
 
-        // 系统级保留节点禁止移动位置
-        if (isSystemPathTagName(targetNode.getTagName())) {
-            throw new ServiceException(ResourceError.CANNOT_MOVE_SYSTEM_TAG_PATH_NODE);
+        Set<String> targetIdSet = new LinkedHashSet<>(targetIds);
+        for (TagEntity targetNode : targetNodes) {
+            // 同一批次不允许同时出现祖先和子孙节点
+            if (targetNode.getAncestors() != null && targetNode.getAncestors().stream().anyMatch(targetIdSet::contains)) {
+                throw new ServiceException(ResourceError.CANNOT_OPERATE_ANCESTOR_DESCENDANT_TAG_NODES);
+            }
+
+            // 目标父节点不能是本批次任一移动节点
+            if (newParentId.equals(targetNode.getTagId())) {
+                throw new ServiceException(ResourceError.CANNOT_MOVE_TAG_NODE_TO_SELF);
+            }
+
+            // 系统级保留节点禁止移动位置
+            if (isSystemPathTagName(targetNode.getTagName())) {
+                throw new ServiceException(ResourceError.CANNOT_MOVE_SYSTEM_TAG_PATH_NODE);
+            }
         }
 
         // 移动到新位置前，校验目标目录下是否有同名节点
-        tagRepository.findByGroupIdAndParentIdAndTagName(groupID, newParentId, targetNode.getTagName())
-                .ifPresent(t -> {
-                    // 回收站例外，允许有同名节点
-                    if (isNodeInTrash(groupID, newParentId) !=  TagType.TRASH) {
-                        throw new ServiceException(ResourceError.TAG_NODE_NAME_CONFLICT);
-                    }
-                });
+        // 回收站例外，允许有同名节点
+        if (isNodeInTrash(groupID, newParentId) != TagType.TRASH) {
+            List<String> movingNames = targetNodes.stream().map(TagEntity::getTagName).toList();
+            if (movingNames.size() != new LinkedHashSet<>(movingNames).size()) {
+                throw new ServiceException(ResourceError.TAG_NODE_NAME_CONFLICT); // 待移动节点本身重名
+            }
+            Query nameConflictQuery = Query.query(Criteria.where("groupId").is(groupID)
+                    .and("parentId").is(newParentId)
+                    .and("tagName").in(movingNames));
+            List<TagEntity> conflictingNodes = mongoTemplate.find(nameConflictQuery, TagEntity.class);
+            boolean hasExternalConflict = conflictingNodes.stream()
+                    .anyMatch(conflictingNode -> !targetIdSet.contains(conflictingNode.getTagId())); // 目标节点下有节点与待移动节点重名
+            if (hasExternalConflict) {
+                throw new ServiceException(ResourceError.TAG_NODE_NAME_CONFLICT);
+            }
+        }
 
         // 获取目标父节点 & 防环形依赖校验
         // 绝对不能把一个节点拖拽到它自己的子孙节点下面，否则会形成死循环树
@@ -332,14 +352,16 @@ public class TagServiceImpl implements ITagService {
             TagEntity newParentNode = tagRepository.findByGroupIdAndTagId(groupID, newParentId)
                     .orElseThrow(() -> new ServiceException(ResourceError.PARENT_TAG_NODE_NOT_FOUND));
 
-            // 跨类型移动校验，防止将 Normal Tag 拖入 FOLDER Tag 或将 FOLDER Tag 拖入 Normal Tag
-            if (!Objects.equals(targetNode.getIsPath(), newParentNode.getIsPath())) {
-                throw new ServiceException(ResourceError.CANNOT_MOVE_TAG_NODE_ACROSS_TAG_TYPE);
-            }
+            for (TagEntity targetNode : targetNodes) { // 批量检查
+                // 跨类型移动校验，防止将 Normal Tag 拖入 FOLDER Tag 或将 FOLDER Tag 拖入 Normal Tag
+                if (!Objects.equals(targetNode.getIsPath(), newParentNode.getIsPath())) {
+                    throw new ServiceException(ResourceError.CANNOT_MOVE_TAG_NODE_ACROSS_TAG_TYPE);
+                }
 
-            // 目标父节点不能是自己的子孙节点
-            if (newParentNode.getAncestors() != null && newParentNode.getAncestors().contains(targetId)) {
-                throw new ServiceException(ResourceError.CANNOT_MOVE_TAG_NODE_TO_DESCENDANT);
+                // 目标父节点不能是自己的子孙节点
+                if (newParentNode.getAncestors() != null && newParentNode.getAncestors().contains(targetNode.getTagId())) {
+                    throw new ServiceException(ResourceError.CANNOT_MOVE_TAG_NODE_TO_DESCENDANT);
+                }
             }
 
             if (newParentNode.getAncestors() != null) {
@@ -348,28 +370,31 @@ public class TagServiceImpl implements ITagService {
             newParentAncestors.add(newParentId); // 新父节点的 ancestors + 新父节点自身
         }
 
-        // 更新当前被拖拽的节点
-        targetNode.setParentId(newParentId);
-        targetNode.setAncestors(newParentAncestors);
-
-        // 用于批量保存的列表
+        // 在批量移动标签时找出所有被移动节点的子孙节点，准备一批要保存的实体
+        Query descendantsQuery = Query.query(Criteria.where("groupId").is(groupID)
+                .and("ancestors").in(targetIds));
+        List<TagEntity> descendants = mongoTemplate.find(descendantsQuery, TagEntity.class);
         List<TagEntity> entitiesToUpdate = new ArrayList<>();
-        entitiesToUpdate.add(targetNode);
 
-        // 查询当前节点的所有子孙节点
-        List<TagEntity> descendants = tagRepository.findByGroupIdAndAncestorsContaining(groupID, targetId);
+        for (TagEntity targetNode : targetNodes) {
+            targetNode.setParentId(newParentId);
+            targetNode.setAncestors(new ArrayList<>(newParentAncestors));
+            entitiesToUpdate.add(targetNode);
+        }
 
         // 遍历并重算所有子孙节点的 ancestors
         for (TagEntity descendant : descendants) {
             List<String> oldDescendantAncestors = descendant.getAncestors();
 
-            // 新的祖先路径 = targetNode 的新祖先 + targetNode 本身 + (该子节点原来在 targetNode 下面的路径)
-            List<String> newDescendantAncestors = new ArrayList<>(newParentAncestors);
-            newDescendantAncestors.add(targetId);
+            String matchedRootId = oldDescendantAncestors.stream().filter(targetIdSet::contains).findFirst().orElseThrow();
 
-            // 截取 targetNode 之后的部分
-            int targetIndex = oldDescendantAncestors.indexOf(targetId);
-            if (targetIndex != -1 && targetIndex + 1 < oldDescendantAncestors.size()) {
+            // 新的祖先路径 = 移动根节点的新祖先 + 移动根节点本身 + 原子树内部路径
+            List<String> newDescendantAncestors = new ArrayList<>(newParentAncestors);
+            newDescendantAncestors.add(matchedRootId);
+
+            // 截取移动根节点之后的部分
+            int targetIndex = oldDescendantAncestors.indexOf(matchedRootId);
+            if (targetIndex + 1 < oldDescendantAncestors.size()) {
                 newDescendantAncestors.addAll(
                         oldDescendantAncestors.subList(targetIndex + 1, oldDescendantAncestors.size())
                 );
@@ -382,58 +407,101 @@ public class TagServiceImpl implements ITagService {
         // 批量更新到 MongoDB
         tagRepository.saveAll(entitiesToUpdate);
 
+        List<String> affectedTagIds = descendants.stream().map(TagEntity::getTagId).collect(Collectors.toList());
+        affectedTagIds.addAll(targetIds);
+
         // 如果是被移入回收站，触发Tag下所有资源的共享小组剥夺
         if (isNodeInTrash(groupID, newParentId) == TagType.TRASH) {
-            log.info("tag moved to trash. groupId={} tagId={} oldParentId={} newParentId={} descendantCount={}",
-                    groupID, targetId, oldParentId, newParentId, descendants.size());
-
-            List<String> affectedTagIds = descendants.stream().map(TagEntity::getTagId).collect(Collectors.toList());
-            affectedTagIds.add(targetId);
+            log.info("tags moved to trash. groupId={} count={} tagIds={} newParentId={} descendantCount={}",
+                    groupID, targetIds.size(), summarizeIds(targetIds), newParentId, descendants.size());
             // 发布移入回收站事件
             eventPublisher.publishEvent(new TagTrashedEvent(affectedTagIds));
         } else {
-            log.info("tag moved. groupId={} tagId={} oldParentId={} newParentId={} descendantCount={}",
-                    groupID, targetId, oldParentId, newParentId, descendants.size());
+            log.info("tags moved. groupId={} count={} tagIds={} newParentId={} descendantCount={}",
+                    groupID, targetIds.size(), summarizeIds(targetIds), newParentId, descendants.size());
             // 正常的移动，通知所有挂在它以及它子孙节点上的资源重新计算权限
-            afterTagNodeChanged(groupID, targetId, groupID.startsWith(ResourceConstants.PERSONAL_GROUP_PREFIX));
+            eventPublisher.publishEvent(new TagChangedEvent(affectedTagIds, groupID.startsWith(ResourceConstants.PERSONAL_GROUP_PREFIX)));
         }
     }
 
     @Override
-    public void deleteTag(TagDeleteRequest tagDeleteRequest, Boolean forceDelete) {
+    public void deleteTags(TagDeleteRequest tagDeleteRequest, Boolean forceDelete) {
         String groupID = tagDeleteRequest.getGroupId();
-        String targetId = tagDeleteRequest.getTargetTagId();
+        List<String> targetIds = tagDeleteRequest.getTargetTagIds().stream()
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toCollection(LinkedHashSet::new))
+                .stream().collect(Collectors.toList());
 
-        TagEntity targetNode = tagRepository.findByGroupIdAndTagId(groupID, targetId)
-                .orElseThrow(() -> new ServiceException(ResourceError.TAG_NODE_NOT_FOUND));
-
-        // 系统级保留节点禁止删除
-        if (isSystemPathTagName(targetNode.getTagName())) {
-            throw new ServiceException(ResourceError.CANNOT_DELETE_SYSTEM_TAG_PATH_NODE);
+        List<TagEntity> targetNodes = tagRepository.findByGroupIdAndTagIdIn(groupID, targetIds);
+        if (targetNodes.size() != targetIds.size()) {
+            throw new ServiceException(ResourceError.TAG_NODE_NOT_FOUND);
         }
 
-        // 删除 FOLDER Tag
-        if (Boolean.TRUE.equals(targetNode.getIsPath())  &&
-                !Boolean.TRUE.equals(forceDelete) && // 未开启强制删除
-                isNodeInTrash(groupID, targetId) != TagType.IN_TRASH // 不在回收站
-        ) {
-            throw new ServiceException(ResourceError.CANNOT_DELETE_TAG_PATH_NODE_DIRECTLY);
+        Set<String> targetIdSet = new LinkedHashSet<>(targetIds);
+        for (TagEntity targetNode : targetNodes) {
+            // 同一批次不允许同时出现祖先和子孙节点
+            if (targetNode.getAncestors() != null && targetNode.getAncestors().stream().anyMatch(targetIdSet::contains)) {
+                throw new ServiceException(ResourceError.CANNOT_OPERATE_ANCESTOR_DESCENDANT_TAG_NODES);
+            }
+
+            // 系统级保留节点禁止删除
+            if (isSystemPathTagName(targetNode.getTagName())) {
+                throw new ServiceException(ResourceError.CANNOT_DELETE_SYSTEM_TAG_PATH_NODE);
+            }
+
+            // 删除 FOLDER Tag
+            if (Boolean.TRUE.equals(targetNode.getIsPath())  &&
+                    !Boolean.TRUE.equals(forceDelete) && // 未开启强制删除
+                    isNodeInTrash(groupID, targetNode.getTagId()) != TagType.IN_TRASH // 不在回收站
+            ) {
+                throw new ServiceException(ResourceError.CANNOT_DELETE_TAG_PATH_NODE_DIRECTLY);
+            }
         }
 
         // 查出即将被删除的 Tag 及其所有子孙节点的 ID 列表
-        List<TagEntity> descendants = tagRepository.findByGroupIdAndAncestorsContaining(groupID, targetId);
-        List<String> deletedTagIds = descendants.stream().map(TagEntity::getTagId).collect(Collectors.toList());
-        deletedTagIds.add(targetId); // 加上当前要删的节点自身
+        Query deleteQuery = Query.query(new Criteria().andOperator(
+                Criteria.where("groupId").is(groupID),
+                new Criteria().orOperator(
+                        Criteria.where("_id").in(targetIds), // 本次直接要删的目标节点
+                        Criteria.where("ancestors").in(targetIds) // 这些目标节点下面的所有子孙节点
+                )
+        ));
+        List<TagEntity> deletedTags = mongoTemplate.find(deleteQuery, TagEntity.class);
+        if (deletedTags.isEmpty()) return;
 
-        // 删除自身
-        tagRepository.delete(targetNode);
-        // 依靠 ancestors 数组，一键删除所有子孙节点
-        tagRepository.deleteByGroupIdAndAncestorsContaining(groupID, targetId);
+        // 找出本次直接删除目标里的路径节点
+        Set<String> pathRootIds = targetNodes.stream()
+                .filter(root -> Boolean.TRUE.equals(root.getIsPath()))
+                .map(TagEntity::getTagId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        List<String> pathDeletedTagIds = new ArrayList<>();
+        List<String> normalDeletedTagIds = new ArrayList<>();
+
+        for (TagEntity deletedTag : deletedTags) {
+            boolean belongsToPathRoot = pathRootIds.contains(deletedTag.getTagId())
+                    || (deletedTag.getAncestors() != null && deletedTag.getAncestors().stream().anyMatch(pathRootIds::contains));
+            if (belongsToPathRoot) { // 区分路径节点和普通节点
+                pathDeletedTagIds.add(deletedTag.getTagId());
+            } else {
+                normalDeletedTagIds.add(deletedTag.getTagId());
+            }
+        }
+
+        // 删除自身和所有子孙节点
+        mongoTemplate.remove(deleteQuery, TagEntity.class);
 
         // 发布彻底删除事件
-        log.info("tag deleted. groupId={} tagId={} cascadeCount={} isPath={}",
-                groupID, targetId, deletedTagIds.size(), targetNode.getIsPath());
-        eventPublisher.publishEvent(new TagDeletedEvent(deletedTagIds, groupID.startsWith(ResourceConstants.PERSONAL_GROUP_PREFIX), targetNode.getIsPath()));
+        log.info("tags deleted. groupId={} rootCount={} tagIds={} cascadeCount={}",
+                groupID, targetIds.size(), summarizeIds(targetIds), deletedTags.size());
+        boolean isPersonalTag = groupID.startsWith(ResourceConstants.PERSONAL_GROUP_PREFIX);
+        // 路径节点和普通节点分别发送事件
+        if (!pathDeletedTagIds.isEmpty()) {
+            eventPublisher.publishEvent(new TagDeletedEvent(pathDeletedTagIds, isPersonalTag, true));
+        }
+        if (!normalDeletedTagIds.isEmpty()) {
+            eventPublisher.publishEvent(new TagDeletedEvent(normalDeletedTagIds, isPersonalTag, false));
+        }
     }
 
     // 判断目标父节点是否为回收站，或处于回收站的子孙层级中

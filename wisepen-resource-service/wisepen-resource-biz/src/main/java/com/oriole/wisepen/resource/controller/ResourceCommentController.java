@@ -7,7 +7,7 @@ import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.core.domain.enums.IdentityType;
 import com.oriole.wisepen.common.log.annotation.Log;
-import com.oriole.wisepen.common.security.annotation.CheckLogin;
+import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.resource.domain.dto.req.CommentCreateRequest;
 import com.oriole.wisepen.resource.domain.dto.req.CommentReplyCreateRequest;
 import com.oriole.wisepen.resource.domain.dto.req.CommentDeleteRequest;
@@ -30,7 +30,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/resource/comment")
 @RequiredArgsConstructor
-@CheckLogin
+@CheckRole
 @Validated
 public class ResourceCommentController {
 

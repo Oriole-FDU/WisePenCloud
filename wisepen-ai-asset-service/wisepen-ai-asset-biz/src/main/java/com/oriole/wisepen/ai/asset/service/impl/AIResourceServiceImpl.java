@@ -16,6 +16,7 @@ import com.oriole.wisepen.ai.asset.service.IVersionService;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.resource.domain.dto.ResourceCreateReqDTO;
+import com.oriole.wisepen.resource.domain.dto.ResourceUpdateReqDTO;
 import com.oriole.wisepen.resource.enums.ResourceType;
 import com.oriole.wisepen.resource.feign.RemoteResourceService;
 import lombok.RequiredArgsConstructor;
@@ -40,19 +41,20 @@ public abstract class AIResourceServiceImpl<AT extends AIResourceBaseEntity<AT>,
 
     @Override
     public String createAIResource(AIResourceCreateRequest req, String userId, Map<Long, GroupRoleType> groupRoles) {
+        String name = req.getName() == null ? "" : req.getName();
+        String description = req.getDescription() == null ? "" : req.getDescription();
         String resourceId = remoteResourceService.createResource(ResourceCreateReqDTO.builder()
                 .resourceName(req.getTitle())
                 .resourceType(getResourceType())
                 .ownerId(userId)
                 .ownerGroupRoles(groupRoles)
                 .mountTargetTagId(req.getMountTargetTagId())
+                .preview(description)
                 .build()).getData();
         if (!StringUtils.hasText(resourceId)) {
             throw new ServiceException(AIResourceError.AI_RESOURCE_REGISTER_FAILED);
         }
 
-        String name = req.getName() == null ? "" : req.getName();
-        String description = req.getDescription() == null ? "" : req.getDescription();
         AIResourceSourceType sourceType = req.getSourceType() == null ? AIResourceSourceType.MANUAL : req.getSourceType();
         AT entity = buildNewResource(resourceId, name, description, sourceType);
         aiResourceBaseRepository.save(entity);
@@ -77,6 +79,7 @@ public abstract class AIResourceServiceImpl<AT extends AIResourceBaseEntity<AT>,
                         .resourceName(req.getForkedResourceName())
                         .resourceType(getResourceType())
                         .ownerId(forkedResourceOwnerId)
+                        .preview(sourceEntity.getDescription())
                         .build()).getData();
             } catch (Exception e) {
                 throw new ServiceException(AIResourceError.AI_RESOURCE_REGISTER_FAILED, e.getMessage());
@@ -128,6 +131,12 @@ public abstract class AIResourceServiceImpl<AT extends AIResourceBaseEntity<AT>,
         if (req.getDescription() != null) entity.setDescription(req.getDescription());
 
         aiResourceBaseRepository.save(entity);
+        if (req.getDescription() != null) {
+            remoteResourceService.updateAttributes(ResourceUpdateReqDTO.builder()
+                    .resourceId(req.getResourceId())
+                    .preview(req.getDescription())
+                    .build());
+        }
     }
 
     @Override

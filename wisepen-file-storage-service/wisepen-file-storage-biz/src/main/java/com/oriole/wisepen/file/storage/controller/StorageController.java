@@ -3,7 +3,7 @@ package com.oriole.wisepen.file.storage.controller;
 import cn.hutool.core.io.FileUtil;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.exception.ServiceException;
-import com.oriole.wisepen.common.security.annotation.CheckLogin;
+import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.file.storage.api.domain.dto.StorageRecordDTO;
 import com.oriole.wisepen.file.storage.api.enums.StorageSceneEnum;
 import com.oriole.wisepen.file.storage.exception.FileStorageError;
@@ -23,7 +23,7 @@ import static com.oriole.wisepen.file.storage.api.enums.StorageSceneEnum.*;
 @RestController
 @RequestMapping("/storage/")
 @RequiredArgsConstructor
-@CheckLogin
+@CheckRole
 public class StorageController {
 
     private final IStorageService storageService;

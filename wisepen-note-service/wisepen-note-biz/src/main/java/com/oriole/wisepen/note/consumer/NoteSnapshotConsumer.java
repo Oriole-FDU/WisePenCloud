@@ -1,6 +1,5 @@
 package com.oriole.wisepen.note.consumer;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.oriole.wisepen.note.api.domain.mq.NoteSnapshotMessage;
 import com.oriole.wisepen.note.service.INoteVersionService;
@@ -28,7 +27,7 @@ public class NoteSnapshotConsumer {
 
     @KafkaListener(
             topics = TOPIC_NOTE_SNAPSHOT,
-            groupId = "wisepen-note-snapshot-group",
+            groupId = "wisepen-note-snapshot-persistence-group",
             properties = {
                     "value.deserializer=org.apache.kafka.common.serialization.StringDeserializer"
             }
@@ -39,12 +38,12 @@ public class NoteSnapshotConsumer {
             payloadType = NoteSnapshotMessage.class,
             message = @AsyncMessage(name = "NoteSnapshotMessage", title = "笔记快照事件")
     ))
-    @KafkaAsyncOperationBinding(groupId = "wisepen-note-snapshot-group")
+    @KafkaAsyncOperationBinding(groupId = "wisepen-note-snapshot-persistence-group")
     public void onSnapshot(String payload) throws Exception {
         // 从非Java微服务（NodeJS）的发布者订阅，使用objectMapper显式转换
         NoteSnapshotMessage msg = objectMapper.readValue(payload, NoteSnapshotMessage.class);
-        log.info("note snapshot event received. topic={} resourceId={} version={} type={}",
-                TOPIC_NOTE_SNAPSHOT, msg.getResourceId(), msg.getVersion(), msg.getType());
+        log.info("note snapshot event received. topic={} consumerGroup={} resourceId={} version={} type={}",
+                TOPIC_NOTE_SNAPSHOT, "wisepen-note-snapshot-persistence-group", msg.getResourceId(), msg.getVersion(), msg.getType());
         try {
             List<Long> currentRoundAuthors = msg.getUpdatedBy() != null ? msg.getUpdatedBy().stream().map(Long::valueOf).toList() : null;
             noteVersionService.createVersion(msg, currentRoundAuthors, ResourceType.NOTE);

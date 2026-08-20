@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f3fbfb;
+            color: #1e293b;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .page {
+            width: 100%;
+            padding: 32px 16px;
+            background-color: #f3fbfb;
+        }
+
+        .container {
+            max-width: 640px;
+            margin: 0 auto;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background-color: #ffffff;
+            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+        }
+
+        .header {
+            padding: 28px 32px 24px;
+            border-bottom: 1px solid #bbe8ea;
+            background-color: #fafefe;
+        }
+
+        .brand {
+            display: table;
+            margin: 0 0 18px;
+            color: #11777b;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0;
+        }
+
+        .logo {
+            display: inline-block;
+            width: 28px;
+            height: 28px;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+
+        .brandName {
+            display: inline-block;
+            vertical-align: middle;
+        }
+
+        .title {
+            margin: 0;
+            color: #0f172a;
+            font-size: 24px;
+            font-weight: 700;
+            line-height: 1.3;
+        }
+
+        .subtitle {
+            margin: 8px 0 0;
+            color: #64748b;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .content {
+            padding: 28px 32px 32px;
+        }
+
+        .content > p {
+            margin: 0 0 16px;
+            font-size: 14px;
+        }
+
+        .infoBox {
+            margin: 20px 0 24px;
+            padding: 16px;
+            border: 1px solid #a5dbdd;
+            border-radius: 8px;
+            background-color: #e1f7f8;
+        }
+
+        .infoText {
+            margin: 0 !important;
+            color: #1c3f40;
+            font-size: 14px;
+        }
+
+        .actionWrap {
+            margin: 24px 0;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 11px 20px;
+            border-radius: 8px;
+            background-color: #248286;
+            color: #ffffff !important;
+            font-size: 14px;
+            font-weight: 700;
+            line-height: 20px;
+            text-decoration: none;
+        }
+
+        .fallbackLabel {
+            margin-bottom: 8px !important;
+            color: #64748b;
+            font-size: 13px !important;
+        }
+
+        .resetLink {
+            margin: 0 0 20px !important;
+            padding: 12px;
+            border-radius: 6px;
+            background-color: #f3fbfb;
+            color: #11777b;
+            font-size: 13px !important;
+            line-height: 1.5;
+            word-break: break-all;
+        }
+
+        .footer {
+            padding: 18px 32px 24px;
+            border-top: 1px solid #bbe8ea;
+            background-color: #f3fbfb;
+            color: #64748b;
+            font-size: 12px;
+            line-height: 1.7;
+        }
+
+        @media screen and (max-width: 520px) {
+            .page {
+                padding: 16px 8px;
+            }
+
+            .header,
+            .content,
+            .footer {
+                padding-left: 20px;
+                padding-right: 20px;
+            }
+
+            .title {
+                font-size: 22px;
+            }
+
+            .btn {
+                display: block;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+    <div class="container">
+        <div class="header">
+            <p class="brand">
+                <svg class="logo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="WisePen Aqua">
+                    <g fill="none" stroke-linecap="round" stroke-width="8">
+                        <path d="M17 37c6 34 26 42 33 17 7-27 28-23 33 10" stroke="#8ACACD" />
+                        <path d="M17 63C23 28 43 21 50 46c7 27 28 23 33-11" stroke="#248286" />
+                    </g>
+                </svg>
+                <span class="brandName">WisePen</span>
+            </p >
+            <h1 class="title">学术邮箱认证</h1>
+            <p class="subtitle">请完成 WisePen 学术邮箱认证，以确认您的学术身份并继续使用相关功能。</p >
+        </div>
+
+        <div class="content">
+            <p>尊敬的 WisePen 用户：</p >
+            <p>您好！我们收到了针对账号 <strong th:text="${username}"></strong> 的学术邮箱认证请求。请确认该操作由您本人发起。如果您没有申请学术邮箱认证，请忽略本邮件，您的账号不会因此受到影响。</p >
+
+            <p>请注意，合作高校学生不建议通过此方式完成身份认证。该方式仅用于验证邮箱归属，无法确认您的完整个人身份信息，可能影响部分相关功能的正常使用。以复旦大学为例，如您是该校学生，请通过复旦大学 UIS 系统完成认证。若您是高校教师并希望认证教师身份，请联系我们的团队：wisepen-service@oriole.cn。</p >
+            <p>如需继续完成认证，请点击下方按钮：</p >
+
+            <div class="actionWrap">
+                <a class="btn" th:href="${verify_link}">认证学术邮箱</a >
+            </div>
+
+            <p class="fallbackLabel">如果按钮无法正常打开，请复制以下链接，并粘贴到浏览器地址栏访问：</p >
+            <p class="resetLink" th:text="${verify_link}"></p >
+
+            <div class="infoBox">
+                <p class="infoText">出于账号安全考虑，本次认证链接将在 <strong>15 分钟</strong> 后失效。链接过期后，您可以重新发起学术邮箱认证。</p >
+            </div>
+        </div>
+
+        <div class="footer">
+            此致<br/>
+            WisePen 系统团队<br/>
+            <span th:text="${current_date}"></span>
+        </div>
+    </div>
+</div>
+</body>
+</html>

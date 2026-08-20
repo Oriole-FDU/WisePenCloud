@@ -12,5 +12,14 @@ import java.lang.annotation.*;
 @Documented
 public @interface CheckRole {
 
-    IdentityType[] value();
+    IdentityType[] value() default {
+            IdentityType.STUDENT,
+            IdentityType.TEACHER,
+            IdentityType.ADMIN
+    };
+
+    /**
+     * 是否允许未完成身份认证的账号访问。
+     */
+    boolean allowUnidentified() default false;
 }

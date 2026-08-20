@@ -3,6 +3,7 @@ package com.oriole.wisepen.resource.constant;
 public interface ResourceValidationMsg {
     // 基础资源属性校验
     String RESOURCE_ID_NOT_BLANK = "资源ID不能为空";
+    String RESOURCE_IDS_NOT_EMPTY = "资源ID列表不能为空";
     String RESOURCE_NAME_NOT_BLANK = "资源名称不能为空";
     String RESOURCE_NEW_NAME_NOT_BLANK = "资源新名称不能为空";
     String RESOURCE_TYPE_NOT_NULL = "资源类型不能为空";
@@ -13,6 +14,8 @@ public interface ResourceValidationMsg {
     // 拓扑与组织关系校验
     String GROUP_ID_NOT_BLANK = "组ID不能为空";
     String TAG_IDS_NOT_NULL = "标签列表不能为null";
+    String TAG_IDS_NOT_EMPTY = "标签列表不能为空";
+    String RESOURCE_SOURCE_TAG_MAP_NOT_EMPTY = "资源与来源标签映射不能为空";
 
     String TAG_ID_NOT_BLANK = "目标标签ID不能为空";
     String TAG_NAME_NOT_BLANK = "标签名称不能为空";
@@ -41,5 +44,5 @@ public interface ResourceValidationMsg {
     // 收藏相关校验
     String COLLECTION_ID_NOT_BLANK = "收藏集合ID不能为空";
     String COLLECTION_NAME_NOT_BLANK = "收藏集合名称不能为空";
-    String FAVORITE_STATUS_NOT_NULL = "favorite status must not be null";
+    String FAVORITE_STATUS_NOT_NULL = "收藏状态不能为空";
 }

@@ -28,12 +28,16 @@ public enum UserError implements IResult {
     // 用户验证相关异常
     CANNOT_OPERATE_BEFORE_AUTH_VERIFICATION(3311, new ResultKey(BusinessDomain.USER, UserSubject.AUTH_VERIFICATION, ErrorReason.STATE_INVALID),"未完成身份验证的账号，不能进行该操作"),
     VERIFICATION_EMAIL_INVALID(3312, new ResultKey(BusinessDomain.USER, UserSubject.AUTH_VERIFICATION, ErrorReason.INVALID),"教育邮箱格式无效"),
+    VERIFICATION_EMAIL_STATE_INVALID(3313, new ResultKey(BusinessDomain.USER, UserSubject.AUTH_VERIFICATION, ErrorReason.STATE_INVALID),"当前账号不能进行教育邮箱认证"),
+    VERIFICATION_EMAIL_NOT_ALLOWED(3314, new ResultKey(BusinessDomain.USER, UserSubject.AUTH_VERIFICATION, ErrorReason.NOT_ALLOWED),"合作学校请使用其他认证方式认证"),
     VERIFICATION_EMAIL_ALREADY_EXISTS(3321, new ResultKey(BusinessDomain.USER, UserSubject.AUTH_VERIFICATION, ErrorReason.ALREADY_EXISTS),"身份验证邮箱已被其他账号绑定"),
     VERIFICATION_CAMPUS_NO_ALREADY_EXISTS(3322, new ResultKey(BusinessDomain.USER, UserSubject.AUTH_VERIFICATION, ErrorReason.ALREADY_EXISTS), "身份验证学号已被其他账号绑定"),
     VERIFICATION_EMAIL_TOKEN_EXPIRED(3331, new ResultKey(BusinessDomain.USER, UserSubject.AUTH_VERIFICATION, ErrorReason.EXPIRED), "身份验证链接已过期"),
     VERIFICATION_EMAIL_SEND_FAILED(3341, new ResultKey(BusinessDomain.USER, UserSubject.AUTH_VERIFICATION, ErrorReason.FAILED),"身份验证邮件发送失败"),
-    VERIFICATION_FUDAN_UIS_REQUEST_FAILED(3342, new ResultKey(BusinessDomain.USER, UserSubject.AUTH_VERIFICATION, ErrorReason.FAILED),"复旦 UIS 认证请求发送失败"),
-    VERIFICATION_FUDAN_UIS_FAILED(3343, new ResultKey(BusinessDomain.USER, UserSubject.AUTH_VERIFICATION, ErrorReason.FAILED),"复旦 UIS 认证失败"),
+    VERIFICATION_EMAIL_UPDATE_FAILED(3346, new ResultKey(BusinessDomain.USER, UserSubject.AUTH_VERIFICATION, ErrorReason.FAILED),"身份验证信息更新失败"),
+    VERIFICATION_FUDAN_UIS_REQUEST_FAILED(3343, new ResultKey(BusinessDomain.USER, UserSubject.AUTH_VERIFICATION, ErrorReason.FAILED),"复旦 UIS 认证请求发送失败"),
+    VERIFICATION_FUDAN_UIS_FAILED(3344, new ResultKey(BusinessDomain.USER, UserSubject.AUTH_VERIFICATION, ErrorReason.FAILED),"复旦 UIS 认证失败"),
+    VERIFICATION_FUDAN_UIS_STATE_INVALID(3345, new ResultKey(BusinessDomain.USER, UserSubject.AUTH_VERIFICATION, ErrorReason.STATE_INVALID),"当前账号不能进行复旦 UIS 认证"),
 
     // 小组相关异常
     GROUP_NOT_EXIST(3411, new ResultKey(BusinessDomain.USER, UserSubject.GROUP, ErrorReason.NOT_FOUND),"小组不存在"),

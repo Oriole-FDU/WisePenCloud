@@ -6,7 +6,7 @@ import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.core.domain.enums.GroupType;
 import com.oriole.wisepen.common.core.domain.enums.IdentityType;
-import com.oriole.wisepen.common.security.annotation.CheckLogin;
+import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.common.security.exception.PermissionError;
 import com.oriole.wisepen.common.security.exception.PermissionException;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupCreateRequest;
@@ -29,7 +29,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/group")
 @RequiredArgsConstructor
 @Validated
-@CheckLogin
+@CheckRole
 public class GroupController {
 
 	private final IGroupService groupService;
@@ -137,9 +137,9 @@ public class GroupController {
 			summary = "分页查询小组列表",
 			description = """
 					- 用途：查询当前用户加入、管理或全部所属的小组列表。
-					- 请求：groupRoleFilter 指定查询全部小组、成员小组或管理小组；page 和 size 控制分页。
+					- 请求：groupRoleFilter 指定查询全部小组、成员小组或管理小组；groupType 可选地筛选小组类型；page 和 size 控制分页。
 					- 约束：当前用户必须已登录。
-					- 处理：按当前用户在小组中的角色过滤成员关系，分页读取小组记录并补充小组 OWNER 展示信息。
+					- 处理：按当前用户在小组中的角色过滤成员关系，再按可选类型分页读取小组记录并补充小组 OWNER 展示信息。
 					- 失败：未登录 -> PermissionError.NOT_LOGIN。
 					- 响应：返回分页小组列表和总数。
 					"""
@@ -147,10 +147,11 @@ public class GroupController {
 	@GetMapping("/list")
 	public R<PageR<GroupItemInfoResponse>> listGroups(
 			@RequestParam GroupRoleFilter groupRoleFilter,
+			@RequestParam(value = "groupType", required = false) GroupType groupType,
 			@RequestParam(value = "page", defaultValue = "1") int page,
 			@RequestParam(value = "size", defaultValue = "20") int size
 	) {
-		return R.ok(groupService.getGroupList(SecurityContextHolder.getUserId(), groupRoleFilter, page, size));
+		return R.ok(groupService.getGroupList(SecurityContextHolder.getUserId(), groupRoleFilter, groupType, page, size));
 	}
 
 	@Operation(

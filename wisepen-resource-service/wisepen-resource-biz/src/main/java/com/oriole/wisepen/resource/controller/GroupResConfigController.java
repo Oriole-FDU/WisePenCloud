@@ -5,7 +5,7 @@ import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.log.annotation.Log;
-import com.oriole.wisepen.common.security.annotation.CheckLogin;
+import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.resource.domain.dto.req.GroupResConfigUpdateRequest;
 import com.oriole.wisepen.resource.domain.dto.res.GroupResConfigResponse;
 import com.oriole.wisepen.resource.service.IGroupResService;
@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/resource/groupConfig")
 @RequiredArgsConstructor
-@CheckLogin
+@CheckRole
 public class GroupResConfigController {
 
     private final IGroupResService groupResService;

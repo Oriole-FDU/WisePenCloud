@@ -101,12 +101,13 @@ public class ResourceGcTask {
                     .and("updateTime").lt(threshold));
             List<TagEntity> expiredFolders = mongoTemplate.find(expiredFolderQuery, TagEntity.class);
 
-            for (TagEntity folder : expiredFolders) {
+            if (!expiredFolders.isEmpty()) {
                 TagDeleteRequest req = new TagDeleteRequest();
                 req.setGroupId(groupId);
-                req.setTargetTagId(folder.getTagId());
-                tagService.deleteTag(req, true); // 强制删除该 FOLDER
-                purgedFolderIds.add(folder.getTagId());
+                List<String> folderIds = expiredFolders.stream().map(TagEntity::getTagId).collect(Collectors.toList());
+                req.setTargetTagIds(folderIds);
+                tagService.deleteTags(req, true); // 强制批量删除过期 FOLDER
+                purgedFolderIds.addAll(folderIds);
             }
 
             // 处理直接孤立在 .Trash 根目录下的过期散落文件

@@ -35,6 +35,7 @@ public class WisepenOpenApiAutoConfiguration {
 //    private static final String SCHEME_FROM_SOURCE = "FromSource";
     private static final String SCHEME_USER_ID = "UserID";
     private static final String SCHEME_IDENTITY_TYPE = "IdentityType";
+    private static final String SCHEME_USER_STATUS = "UserStatus";
     private static final String SCHEME_GROUP_ROLE_MAP = "GroupRoleMap";
 //    private static final String SCHEME_DEVELOPER = "Developer";
 
@@ -55,11 +56,15 @@ public class WisepenOpenApiAutoConfiguration {
             // 大多数接口都需要 FromSource 用于证明请求来自可信网关（在使用代理时被暂时移除）
             // securityRequirement.addList(SCHEME_FROM_SOURCE);
 
-            // 判断当前接口是否需要用户上下文
-            // 如果 Controller 方法或 Controller 类上标注了 @CheckLogin \ @CheckRole 就说明这个接口需要识别当前用户身份
-            if (requiresUserContext(handlerMethod)) {
+            // 判断当前接口是否需要登录上下文
+            if (requiresLoginContext(handlerMethod)) {
                 securityRequirement.addList(SCHEME_USER_ID);
+            }
+
+            // 判断当前接口是否需要用户身份上下文
+            if (requiresRoleContext(handlerMethod)) {
                 securityRequirement.addList(SCHEME_IDENTITY_TYPE);
+                securityRequirement.addList(SCHEME_USER_STATUS);
                 securityRequirement.addList(SCHEME_GROUP_ROLE_MAP);
             }
 
@@ -104,11 +109,15 @@ public class WisepenOpenApiAutoConfiguration {
         */
         components.addSecuritySchemes(SCHEME_USER_ID, headerScheme(
                 SecurityConstants.HEADER_USER_ID,
-                "当前用户 ID。直连微服务测试 @CheckLogin 接口时手工模拟 APISIX 注入。"
+                "当前用户 ID。直连微服务测试 @CheckLogin / @CheckRole 接口时手工模拟 APISIX 注入。"
         ));
         components.addSecuritySchemes(SCHEME_IDENTITY_TYPE, headerScheme(
                 SecurityConstants.HEADER_IDENTITY_TYPE,
                 "当前用户身份类型：1=学生，2=教师，3=管理员。"
+        ));
+        components.addSecuritySchemes(SCHEME_USER_STATUS, headerScheme(
+                SecurityConstants.HEADER_USER_STATUS,
+                "当前用户账号状态：1=正常，-1=未完成身份认证，-2=封禁。"
         ));
         components.addSecuritySchemes(SCHEME_GROUP_ROLE_MAP, headerScheme(
                 SecurityConstants.HEADER_GROUP_ROLE_MAP,
@@ -125,9 +134,14 @@ public class WisepenOpenApiAutoConfiguration {
                 .description(description);
     }
 
-    // 判断当前接口是否需要用户上下文
-    private boolean requiresUserContext(HandlerMethod handlerMethod) {
+    // 判断当前接口是否需要登录上下文
+    private boolean requiresLoginContext(HandlerMethod handlerMethod) {
         return hasAnnotation(handlerMethod, CheckLogin.class) || hasAnnotation(handlerMethod, CheckRole.class);
+    }
+
+    // 判断当前接口是否需要身份上下文
+    private boolean requiresRoleContext(HandlerMethod handlerMethod) {
+        return hasAnnotation(handlerMethod, CheckRole.class);
     }
 
     // 判断指定注解是否存在于 Controller 方法或 Controller 类上
