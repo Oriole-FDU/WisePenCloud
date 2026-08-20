@@ -14,7 +14,8 @@ public enum WalletTransactionType {
     TRANSFER_OUT(4, "TRANSFER_OUT"),
     INCOME(5, "INCOME"),
     EXCHANGE(6, "EXCHANGE"),
-    REVERSE(7, "REVERSE");
+    REVERSE(7, "REVERSE"),
+    ONLY_RECORD_META(0, "ONLY_RECORD_META"); // 零交易，用于记录
 
     private final int code;
 

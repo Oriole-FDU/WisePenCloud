@@ -199,16 +199,23 @@ public class ResourceCommentServiceImpl implements IResourceCommentService {
     }
 
     // 远程批量请求评论者信息
-    private Map<Long, UserDisplayBase> fetchCommentAuthorsInfo(List<ResourceCommentEntity> entities) {
-        List<Long> ownerIds = entities.stream()
+    private Map<Long, UserDisplayBase> fetchCommentUserInfo(List<ResourceCommentEntity> entities) {
+        List<Long> userIds = new ArrayList<>();
+        List<Long> authorIds = entities.stream()
                 .map(ResourceCommentEntity::getAuthorId)
                 .filter(StringUtils::hasText)
                 .map(Long::valueOf).distinct().toList();
+        userIds.addAll(authorIds);
+        List<Long> replyToUserIds = entities.stream()
+                .map(ResourceCommentEntity::getReplyToUserId)
+                .filter(StringUtils::hasText)
+                .map(Long::valueOf).distinct().toList();
+        userIds.addAll(replyToUserIds);
         try {
-            Map<Long, UserDisplayBase> fetched = remoteUserService.getUserDisplayInfo(ownerIds).getData();
+            Map<Long, UserDisplayBase> fetched = remoteUserService.getUserDisplayInfo(userIds).getData();
             return fetched == null ? Collections.emptyMap() : fetched;
         } catch (Exception e) {
-            log.warn("comment author info batch degraded. ownerCount={}", ownerIds.size(), e);
+            log.warn("comment author info batch degraded. ownerCount={}", userIds.size(), e);
             return Collections.emptyMap();
         }
     }
@@ -220,7 +227,7 @@ public class ResourceCommentServiceImpl implements IResourceCommentService {
         Page<ResourceCommentEntity> resourceCommentEntities = customCommentRepository.listCommentsByResourceId(resourceId, sortBy, pageable);
 
         // 批量查询作者信息
-        Map<Long, UserDisplayBase> userMap = fetchCommentAuthorsInfo(resourceCommentEntities.toList());
+        Map<Long, UserDisplayBase> userMap = fetchCommentUserInfo(resourceCommentEntities.toList());
 
         List<ResourceCommentItemResponse> responses = resourceCommentEntities.stream().map(entity -> {
             ResourceCommentItemResponse item = BeanUtil.copyProperties(entity, ResourceCommentItemResponse.class);
@@ -241,7 +248,7 @@ public class ResourceCommentServiceImpl implements IResourceCommentService {
         Page<ResourceCommentEntity> resourceCommentEntities = customCommentRepository.listRepliesByRootCommentId(rootCommentId, pageable);
 
         // 批量查询作者信息
-        Map<Long, UserDisplayBase> userMap = fetchCommentAuthorsInfo(resourceCommentEntities.toList());
+        Map<Long, UserDisplayBase> userMap = fetchCommentUserInfo(resourceCommentEntities.toList());
 
         List<ResourceCommentItemResponse> responses = resourceCommentEntities.stream().map(entity -> {
             ResourceCommentItemResponse item = BeanUtil.copyProperties(entity, ResourceCommentItemResponse.class);

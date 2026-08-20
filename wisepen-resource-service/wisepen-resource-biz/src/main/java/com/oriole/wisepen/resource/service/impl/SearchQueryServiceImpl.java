@@ -59,9 +59,10 @@ public class SearchQueryServiceImpl implements ISearchQueryService {
                                                      Map<Long, GroupRoleType>  groupRoleMap,
                                                      String keyword,
                                                      SearchScope scope,
+                                                     List<ResourceType> resourceTypes,
                                                      int page, int size){
         // 构建 Query
-        Query mainQuery = buildQuery(keyword, scope, currentUserId, groupRoleMap);
+        Query mainQuery = buildQuery(keyword, scope, resourceTypes, currentUserId, groupRoleMap);
         HighlightQuery highlightQuery = buildHighlightQuery(ESIndexEntity.class, "content");
         Pageable pageable = PageRequest.of(page - 1, size);
 
@@ -135,6 +136,7 @@ public class SearchQueryServiceImpl implements ISearchQueryService {
 
     private Query buildQuery(String keyword,
                              SearchScope scope,
+                             List<ResourceType> resourceTypes,
                              String userId,
                              Map<Long, GroupRoleType> groupRoleMap) {
         BoolQuery.Builder bool = new BoolQuery.Builder();
@@ -144,6 +146,9 @@ public class SearchQueryServiceImpl implements ISearchQueryService {
         // [filter] SearchScope 类型过滤
         if (scope != null) {
             bool.filter(buildScopeFilter(scope));
+        }
+        if (resourceTypes != null && !resourceTypes.isEmpty()) {
+            bool.filter(buildResourceTypesFilter(resourceTypes));
         }
         // [filter] ACL 可见性过滤
         bool.filter(buildAclFilter(userId, groupRoleMap));
@@ -188,6 +193,15 @@ public class SearchQueryServiceImpl implements ISearchQueryService {
 
     private Query buildScopeFilter(SearchScope scope) {
         List<String> exts = scope.includedResourceTypes().stream().map(ResourceType::getExtension).toList();
+        return buildResourceTypeExtensionsFilter(exts);
+    }
+
+    private Query buildResourceTypesFilter(List<ResourceType> resourceTypes) {
+        List<String> exts = resourceTypes.stream().map(ResourceType::getExtension).toList();
+        return buildResourceTypeExtensionsFilter(exts);
+    }
+
+    private Query buildResourceTypeExtensionsFilter(List<String> exts) {
         return Query.of(q -> q.terms(t -> t
                 .field("resourceType")
                 .terms(tv -> tv.value(exts.stream()

@@ -18,10 +18,4 @@ public class SecurityConstants {
 
     /** 内部服务调用时的鉴权 Header (防止绕过网关直连) */
     public static final String HEADER_FROM_SOURCE = "X-From-Source";
-
-    /** 正常账号状态，取值需与用户服务 Status.NORMAL 保持一致 */
-    public static final Integer USER_STATUS_NORMAL = 1;
-
-    /** 未完成身份认证账号状态，取值需与用户服务 Status.UNIDENTIFIED 保持一致 */
-    public static final Integer USER_STATUS_UNIDENTIFIED = -1;
 }

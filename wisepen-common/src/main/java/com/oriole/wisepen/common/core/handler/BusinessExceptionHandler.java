@@ -44,7 +44,8 @@ public class BusinessExceptionHandler {
     public R<Void> handlePermissionException(PermissionException e, HttpServletResponse response) {
         IResult errorResult = e.getErrorResult();
         int httpStatus = switch (errorResult) {
-            case PermissionError.UNAUTHORIZED, PermissionError.ACCOUNT_UNIDENTIFIED,
+            case PermissionError.UNAUTHORIZED,
+                 PermissionError.ACCOUNT_UNIDENTIFIED,
                  PermissionError.PERMISSION_DENIED -> HttpServletResponse.SC_FORBIDDEN;
             default -> HttpServletResponse.SC_UNAUTHORIZED;
         };

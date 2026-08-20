@@ -3,7 +3,7 @@ package com.oriole.wisepen.user.service;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.crypto.digest.BCrypt;
 import com.oriole.wisepen.common.core.exception.ServiceException;
-import com.oriole.wisepen.user.api.enums.Status;
+import com.oriole.wisepen.common.core.domain.enums.UserStatus;
 import com.oriole.wisepen.user.cache.RedisCacheManager;
 import com.oriole.wisepen.user.exception.UserError;
 import com.oriole.wisepen.user.api.domain.dto.req.AuthLoginRequest;
@@ -34,7 +34,7 @@ public class AuthService {
         }
 
         // 校验账号状态
-        if (user.getStatus()== Status.BANNED) {
+        if (user.getUserStatus()== UserStatus.BANNED) {
             throw new ServiceException(UserError.AUTH_USER_LOCKED);
         }
 
@@ -45,7 +45,7 @@ public class AuthService {
 
         Map<String, Integer> groupRoleMap = groupMemberService.getGroupRoleMapByUserId(user.getUserId());
 
-        String sessionId = redisCacheManager.setSession(user.getUserId(), user.getIdentityType(), user.getStatus(), groupRoleMap);
+        String sessionId = redisCacheManager.setSession(user.getUserId(), user.getIdentityType(), user.getUserStatus(), groupRoleMap);
         log.info("login succeeded. account={} userId={} groupCount={}",
                 account, user.getUserId(), groupRoleMap.size());
         return sessionId;

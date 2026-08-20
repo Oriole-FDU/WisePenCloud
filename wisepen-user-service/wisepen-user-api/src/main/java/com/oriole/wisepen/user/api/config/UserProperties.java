@@ -14,5 +14,7 @@ public class UserProperties {
     /** 用户浏览器可访问的前端或网关根地址，用于邮件中的验证和重置链接 */
     private String apiDomain;
 
+    private String authCookieDomain;
+
     private String defaultPassword;
 }

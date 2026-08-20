@@ -13,6 +13,7 @@ import com.oriole.wisepen.resource.domain.dto.res.ResourceItemResponse;
 import com.oriole.wisepen.resource.domain.entity.ResourceItemEntity;
 import com.oriole.wisepen.resource.domain.entity.TagEntity;
 import com.oriole.wisepen.resource.enums.ResourceSortBy;
+import com.oriole.wisepen.resource.enums.ResourceTagUpdateMode;
 
 import java.util.List;
 import java.util.Map;
@@ -23,6 +24,8 @@ public interface IResourceService {
     // 断言资源归某用户所有
     void assertResourceOwner(String resourceId, String userId);
 
+    void assertResourceOwner(List<String> resourceIds, String userId);
+
     ResourceItemEntity getResourceEntity(String resourceId);
 
     List<Long> listResourceCountableGroupIds(List<GroupTagBind> groupTagBinds, Map<Long, GroupRoleType> operatorGroupRoles);
@@ -32,11 +35,15 @@ public interface IResourceService {
 
     List<GroupTagBind> updateResourceGroupBinds(List<GroupTagBind> groupBinds, String groupId, List<String> tagIds);
 
-    void updatePersonalResourceTags (String resourceId, String groupId, List<String> tagIds);
+    @Deprecated
+    void updatePersonalResourceTags(List<String> resourceIds, String groupId, List<String> tagIds, ResourceTagUpdateMode mode);
 
-    void updateGroupResourceTags(String resourceId, String groupId, String userId, GroupRoleType groupRole, List<String> tagIds);
+    @Deprecated
+    void updateGroupResourceTags(List<String> resourceIds, String groupId, String userId, GroupRoleType groupRole, List<String> tagIds, ResourceTagUpdateMode mode);
 
     List<TagEntity> findAndValidateTags(String groupId, List<String> tagIds);
+
+    void checkGroupMemberTagMountPermission(String userId, List<TagEntity> tags);
 
     void updateResourceActionPermission(ResourceUpdateActionPermissionRequest req);
 

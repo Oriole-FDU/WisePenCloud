@@ -18,6 +18,7 @@ import com.oriole.wisepen.document.api.domain.dto.req.DocumentUploadInitRequest;
 import com.oriole.wisepen.document.api.domain.dto.res.DocumentInfoResponse;
 import com.oriole.wisepen.document.api.domain.dto.res.DocumentUploadInitResponse;
 import com.oriole.wisepen.document.api.domain.dto.res.DocumentVersionInfoResponse;
+import com.oriole.wisepen.document.api.enums.DocumentDownloadType;
 import com.oriole.wisepen.document.domain.entity.DocumentInfoEntity;
 import com.oriole.wisepen.document.domain.entity.DocumentVersionEntity;
 import com.oriole.wisepen.document.service.IDocumentPreviewService;
@@ -49,7 +50,7 @@ import static com.oriole.wisepen.document.exception.DocumentError.DOCUMENT_PERMI
 
 
 @Slf4j
-@Tag(name = "文档处理", description = "文档上传、处理状态、预览与信息查询")
+@Tag(name = "文档处理", description = "文档上传、处理状态、预览、下载与信息查询")
 @RestController
 @RequestMapping("/document")
 @RequiredArgsConstructor
@@ -228,6 +229,37 @@ public class DocumentController {
             throw new ServiceException(DOCUMENT_PERMISSION_DENIED);
         }
         documentPreviewService.handlePreviewRequest(request, response, resourceId, targetVersion, userId);
+    }
+
+    @Operation(
+            summary = "下载文档",
+            description = """
+                    - 用途：为有下载权限的用户下载文档原文件或带水印 PDF。
+                    - 请求：resourceId 指定文档资源；downloadType 选择 ORIGINAL 或 WATERMARK，未传时按 WATERMARK 处理；targetVersion 可选，用于 Market 版本限定权限裁决；Range 请求头仅对带水印 PDF 生效。
+                    - 约束：当前用户必须已登录；下载原文件必须拥有 DOWNLOAD_ORIGINAL 动作；下载带水印 PDF 必须拥有 DOWNLOAD_WATERMARK 动作；Market 来源下载必须传当前上架 offerVersion；文档必须已经处理完成。
+                    - 处理：先通过资源服务按下载类型校验动作权限，再通过资源服务批量获取资源基础信息作为下载文件名；原文件下载申请携带 Content-Disposition 的对象存储限时签名地址并重定向浏览器直下；带水印下载读取预览 PDF 并动态追加当前用户水印后以附件写出；不修改文档内容、资源权限或对象存储文件。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；资源无下载权限 -> DocumentError.DOCUMENT_PERMISSION_DENIED；文档不存在 -> DocumentError.DOCUMENT_NOT_FOUND；文档尚无可用版本 -> DocumentError.DOCUMENT_HAS_NO_VERSION；文档未就绪 -> DocumentError.DOCUMENT_PREVIEW_NOT_READY；下载地址申请失败 -> DocumentError.DOCUMENT_DOWNLOAD_URL_APPLY_FAILED；预览元数据缺失 -> DocumentError.DOCUMENT_PREVIEW_META_NOT_FOUND；响应流写入或对象读取失败 -> DocumentError.DOCUMENT_DOWNLOAD_FAILED。
+                    - 响应：原文件返回 302 重定向到对象存储限时下载地址并保持上传格式；带水印文件直接写出 application/pdf 附件下载流。
+                    """
+    )
+    @Log(title = "下载文档", businessType = BusinessType.EXPORT, isSaveResponseData = false)
+    @GetMapping("/download")
+    public void downloadDocument(@RequestParam String resourceId,
+                                 @RequestParam(value = "downloadType", defaultValue = "WATERMARK") DocumentDownloadType downloadType,
+                                 @RequestParam(value = "targetVersion", required = false) Integer targetVersion,
+                                 HttpServletRequest request,
+                                 HttpServletResponse response) {
+        Long userId = SecurityContextHolder.getUserId();
+        Map<Long, GroupRoleType> groupRoles = SecurityContextHolder.getGroupRoleMap();
+        ResourceAction requiredAction = downloadType == DocumentDownloadType.ORIGINAL
+                ? ResourceAction.DOWNLOAD_ORIGINAL
+                : ResourceAction.DOWNLOAD_WATERMARK;
+        ResourceCheckPermissionResDTO permission = remoteResourceService.checkResPermission(ResourceCheckPermissionReqDTO.builder()
+                .resourceId(resourceId).userId(userId).groupRoles(groupRoles).targetVersion(targetVersion).build()).getData();
+        if (permission == null || permission.getAllowedActions() == null || !permission.getAllowedActions().contains(requiredAction)) {
+            throw new ServiceException(DOCUMENT_PERMISSION_DENIED);
+        }
+        documentPreviewService.handleDownloadRequest(request, response, resourceId, targetVersion, userId.toString(), downloadType);
     }
 
     @Operation(

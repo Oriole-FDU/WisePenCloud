@@ -20,7 +20,7 @@ public class InternalDocumentController implements RemoteDocumentService {
     @GetMapping("/getDocumentSearchText")
     @Override
     public R<DocumentSearchTextResponse> getDocumentSearchText(@RequestParam("resourceId") String resourceId,
-                                                               @RequestParam("version") Integer version) {
+                                                               @RequestParam(value = "version", required = false) Integer version) {
         return R.ok(documentService.getDocumentSearchText(resourceId, version));
     }
 }

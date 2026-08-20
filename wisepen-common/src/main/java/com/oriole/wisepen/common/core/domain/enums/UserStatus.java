@@ -1,4 +1,4 @@
-package com.oriole.wisepen.user.api.enums;
+package com.oriole.wisepen.common.core.domain.enums;
 
 import com.baomidou.mybatisplus.annotation.EnumValue;
 import com.fasterxml.jackson.annotation.JsonValue;
@@ -7,7 +7,7 @@ import lombok.Getter;
 
 @Getter
 @AllArgsConstructor
-public enum Status {
+public enum UserStatus {
 
     NORMAL(1, "NORMAL"),
     UNIDENTIFIED(-1, "UNIDENTIFIED"),

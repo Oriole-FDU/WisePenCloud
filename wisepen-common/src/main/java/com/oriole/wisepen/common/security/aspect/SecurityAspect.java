@@ -1,8 +1,8 @@
 package com.oriole.wisepen.common.security.aspect;
 
 import com.oriole.wisepen.common.core.context.SecurityContextHolder;
-import com.oriole.wisepen.common.core.constant.SecurityConstants;
 import com.oriole.wisepen.common.core.domain.enums.IdentityType;
+import com.oriole.wisepen.common.core.domain.enums.UserStatus;
 import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.common.security.exception.PermissionError;
 import com.oriole.wisepen.common.security.exception.PermissionException;
@@ -45,9 +45,7 @@ public class SecurityAspect {
         if (checkRole != null) {
             // 执行身份校验
             IdentityType currentIdentity = SecurityContextHolder.getIdentityType();
-            if (currentIdentity == null) {
-                throw new PermissionException(PermissionError.UNAUTHORIZED);
-            }
+            if (currentIdentity == null) throw new PermissionException(PermissionError.UNAUTHORIZED);
             // 判断当前身份是否在允许的数组内
             if (!Arrays.asList(checkRole.value()).contains(currentIdentity)) {
                 throw new PermissionException(PermissionError.UNAUTHORIZED);
@@ -55,10 +53,11 @@ public class SecurityAspect {
 
             if (!checkRole.allowUnidentified()) {
                 Integer userStatus = SecurityContextHolder.getUserStatus();
-                if (SecurityConstants.USER_STATUS_UNIDENTIFIED.equals(userStatus)) {
+                if (userStatus == null) throw new PermissionException(PermissionError.UNAUTHORIZED);
+                if (UserStatus.UNIDENTIFIED.getCode() == userStatus) {
                     throw new PermissionException(PermissionError.ACCOUNT_UNIDENTIFIED);
                 }
-                if (!SecurityConstants.USER_STATUS_NORMAL.equals(userStatus)) {
+                if (UserStatus.NORMAL.getCode() != userStatus) {
                     throw new PermissionException(PermissionError.UNAUTHORIZED);
                 }
             }

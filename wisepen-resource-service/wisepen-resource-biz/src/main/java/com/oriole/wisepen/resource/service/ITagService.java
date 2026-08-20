@@ -19,14 +19,14 @@ public interface ITagService {
     // 确保个人空间的系统路径节点存在
     void ensurePersonalSystemTags(String groupId);
 
-    // 拖拽/移动 Tag 节点 (核心难点：维护整棵子树的 ancestors)
-    void moveTag(TagMoveRequest tagMoveRequest);
+    // 批量拖拽/移动多个 Tag 节点 (核心难点：维护多棵子树的 ancestors)
+    void moveTags(TagMoveRequest tagMoveRequest);
 
     // 更新 Tag 信息及权限配置
     void updateTag(TagUpdateRequest tagUpdateRequest);
 
-    // 级联删除 Tag 及其所有子孙节点
-    void deleteTag(TagDeleteRequest tagDeleteRequest, Boolean forceDelete);
+    // 批量级联删除多个 Tag 及其所有子孙节点
+    void deleteTags(TagDeleteRequest tagDeleteRequest, Boolean forceDelete);
 
     // 判断节点是否属于回收站
     enum TagType { IN_TRASH, TRASH, NOT_IN_TRASH }

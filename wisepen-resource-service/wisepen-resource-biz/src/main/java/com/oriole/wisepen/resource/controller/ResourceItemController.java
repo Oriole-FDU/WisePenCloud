@@ -13,11 +13,12 @@ import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.resource.constant.ResourceConstants;
 import com.oriole.wisepen.resource.constant.ResourceValidationMsg;
+import com.oriole.wisepen.resource.domain.dto.req.BatchResourceUpdateTagsRequest;
+import com.oriole.wisepen.resource.domain.dto.req.ResourceDeleteRequest;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceUpdateActionPermissionRequest;
 import com.oriole.wisepen.resource.domain.dto.res.ResourceBaseInfoResponse;
 import com.oriole.wisepen.resource.domain.dto.res.ResourceItemResponse;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceRenameRequest;
-import com.oriole.wisepen.resource.domain.dto.req.ResourceUpdateTagsRequest;
 import com.oriole.wisepen.resource.enums.ResourceSortBy;
 import com.oriole.wisepen.resource.exception.ResourceError;
 import com.oriole.wisepen.resource.service.IResourceService;
@@ -89,45 +90,46 @@ public class ResourceItemController {
                     - 用途：资源所有者批量移除自己拥有的资源。
                     - 请求：resourceIds 为待删除资源 ID 列表。
                     - 约束：当前用户必须是每个目标资源的所有者；列表中的资源必须存在。
-                    - 处理：逐个校验所有权后执行软删除，将资源写入审计回收集合并从业务资源表移除；不在本接口直接抹除对象存储中的物理文件。
+                    - 处理：批量校验所有权后执行软删除，将资源写入审计回收集合并从业务资源表移除；不在本接口直接抹除对象存储中的物理文件。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN；任一资源不存在 -> ResourceError.RESOURCE_NOT_FOUND；当前用户不是资源所有者 -> ResourceError.RESOURCE_PERMISSION_DENIED；搜索索引同步失败 -> ResourceError.RESOURCE_SEARCH_FAILED。
                     - 响应：成功时返回空结果。
                     """
     )
     @Log(title = "删除资源", businessType = BusinessType.DELETE)
     @PostMapping("/removeResources")
-    public R<Void> deleteResource(@RequestParam List<String> resourceIds) {
+    public R<Void> deleteResource(@Validated @RequestBody ResourceDeleteRequest req) {
         String currentUserId = SecurityContextHolder.getUserId().toString();
-        for (String resourceId : resourceIds) {
-            resourceService.assertResourceOwner(resourceId, currentUserId);
-        }
-        resourceService.softRemoveResources(resourceIds);
+        resourceService.assertResourceOwner(req.getResourceIds(), currentUserId);
+        resourceService.softRemoveResources(req.getResourceIds());
         return R.ok();
     }
 
     // 编辑资源的所属标签
     @Operation(
-            summary = "更新资源标签",
+            summary = "批量更新资源标签",
+            deprecated = true,
             description = """
                     - 用途：调整资源挂载到个人标签空间或小组标签空间下的位置与标签集合。
-                    - 请求：resourceId 指定目标资源；groupId 为空表示个人标签空间，不为空表示小组标签空间；tagIds 按业务顺序给出目标标签列表。
-                    - 约束：个人标签更新必须由资源所有者发起，且 tagIds 必须包含唯一的路径标签并位于首位；小组标签更新允许小组 OWNER、ADMIN 操作，普通成员必须同时是资源所有者并满足标签挂载权限。
-                    - 处理：个人空间会覆盖该资源在个人标签空间的绑定；若移入个人回收站，会剥离非个人小组绑定、资源独立权限和已计算小组 ACL。小组空间会覆盖该小组下的绑定，并触发资源 ACL 重算；不修改资源文件内容。
+                    - 请求：resourceIds 指定目标资源列表；groupId 为空表示个人标签空间，不为空表示小组标签空间；tagIds 按业务顺序给出目标标签列表；mode 表示标签绑定变更模式，REPLACE 为全量替换，ADD 为追加绑定，REMOVE 为移除绑定，默认 REPLACE。
+                    - 约束：个人标签更新必须由资源所有者发起，最终标签列表必须包含唯一的路径标签并位于首位；小组标签更新允许小组 OWNER、ADMIN 操作，普通成员必须同时是所有目标资源的所有者并满足新增标签挂载权限。
+                    - 处理：REPLACE 使用 tagIds 全量覆盖当前空间下的绑定；ADD 在当前绑定后追加 tagIds 并去重；REMOVE 从当前绑定中移除 tagIds。若个人资源移入个人回收站，会剥离非个人小组绑定、资源独立权限和已计算小组 ACL。小组空间变更会触发资源 ACL 重算；不修改资源文件内容。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN；资源不存在 -> ResourceError.RESOURCE_NOT_FOUND；当前用户不是资源所有者 -> ResourceError.RESOURCE_PERMISSION_DENIED；标签不存在或不属于目标空间 -> ResourceError.TAG_NODE_NOT_FOUND；个人路径标签数量不唯一 -> ResourceError.CANNOT_BIND_RESOURCE_TO_MULTIPLE_PATH_NODES；个人路径标签未放在首位 -> ResourceError.CANNOT_PLACE_RESOURCE_PATH_TAG_AFTER_TAGS；小组 FOLDER 模式下绑定多个标签 -> ResourceError.CANNOT_BIND_MULTIPLE_RESOURCE_TAGS_IN_FOLDER_MODE；普通成员无标签挂载权限 -> ResourceError.BIND_RESOURCE_TO_TAG_NODE_DENIED；搜索索引同步失败 -> ResourceError.RESOURCE_SEARCH_FAILED。
                     - 响应：成功时返回空结果。
                     """
     )
     @Log(title = "修改资源标签", businessType = BusinessType.UPDATE)
     @PostMapping("/changeResourceTags")
-    public R<Void> updateResourceTags(@Validated @RequestBody ResourceUpdateTagsRequest req) {
+    @Deprecated
+    public R<Void> updateResourceTags(@Validated @RequestBody BatchResourceUpdateTagsRequest req) {
         String userId = SecurityContextHolder.getUserId().toString();
         if (!StringUtils.hasText(req.getGroupId())) {
             // 资源所有者可以修改资源挂载的个人标签
-            resourceService.assertResourceOwner(req.getResourceId(), userId);
+            resourceService.assertResourceOwner(req.getResourceIds(), userId);
             resourceService.updatePersonalResourceTags(
-                    req.getResourceId(),
+                    req.getResourceIds(),
                     ResourceConstants.PERSONAL_GROUP_PREFIX + userId,
-                    req.getTagIds()
+                    req.getTagIds(),
+                    req.getMode()
             );
         } else {
             if (req.getGroupId().startsWith(ResourceConstants.MARKET_GROUP_PREFIX)) {
@@ -137,14 +139,15 @@ public class ResourceItemController {
             GroupRoleType groupRole = SecurityContextHolder.getGroupRole(Long.parseLong(req.getGroupId()));
             if (groupRole != GroupRoleType.ADMIN && groupRole != GroupRoleType.OWNER) {
                 // 非小组管理员不能添加或修改资源挂载的小组标签，除非是资源所有者且拥有该标签的资源挂载权限
-                resourceService.assertResourceOwner(req.getResourceId(), userId);
+                resourceService.assertResourceOwner(req.getResourceIds(), userId);
             }
             resourceService.updateGroupResourceTags(
-                    req.getResourceId(),
+                    req.getResourceIds(),
                     req.getGroupId(),
                     userId,
                     groupRole,
-                    req.getTagIds()
+                    req.getTagIds(),
+                    req.getMode()
             );
         }
         return R.ok();

@@ -32,11 +32,13 @@ public interface IStorageService {
     StorageRecordDTO uploadSmallFileProxy(MultipartFile file, StorageSceneEnum scene, String bizTag);
 
     /**
-     * 获取单文件的私有下载链接（防盗链）
-     * @param objectKey       文件对象相对路径
-     * @param durationSeconds 链接有效时长
+     * 获取带自定义响应头的单文件的私有下载链接
+     *
+     * @param objectKey                  文件对象相对路径
+     * @param durationSeconds            链接有效时长（秒）
+     * @param contentDisposition         OSS 下载响应的 Content-Disposition
      */
-    String getDownloadUrl(String objectKey, Long durationSeconds);
+    String getDownloadUrl(String objectKey, Long durationSeconds, String contentDisposition);
 
     /**
      * 颁发 STS 临时凭证（支持前端批量加载受保护目录）
