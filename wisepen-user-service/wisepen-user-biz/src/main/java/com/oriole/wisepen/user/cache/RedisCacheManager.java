@@ -145,6 +145,19 @@ public class RedisCacheManager {
 				SESSION_TIMEOUT_DAYS, TimeUnit.DAYS);
 	}
 
+	public void updateUserIdentityTypeInSession(Long userId, IdentityType identityType) {
+		String sessionId = stringRedisTemplateDB0.opsForValue().get(REDIS_SESSION_TO_USER_PREFIX + userId);
+		if (StrUtil.isBlank(sessionId)) return;
+
+		@SuppressWarnings("unchecked")
+		Map<String, Object> sessionData = (Map<String, Object>) redisTemplate.opsForValue().get(REDIS_SESSION_PREFIX + sessionId);
+		if (sessionData == null) return;
+
+		sessionData.put("identityType", identityType.getCode());
+		redisTemplate.opsForValue().set(REDIS_SESSION_PREFIX + sessionId, sessionData,
+				SESSION_TIMEOUT_DAYS, TimeUnit.DAYS);
+	}
+
 	public void updateGroupRoleMapInSession(Long userId, Long groupId, GroupRoleType groupRoleType) {
 		String sessionId = stringRedisTemplateDB0.opsForValue().get(REDIS_SESSION_TO_USER_PREFIX + userId);
 		if (StrUtil.isBlank(sessionId)) return; // 用户未登录则直接返回
