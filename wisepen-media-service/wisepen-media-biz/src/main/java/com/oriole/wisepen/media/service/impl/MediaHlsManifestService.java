@@ -110,7 +110,7 @@ public class MediaHlsManifestService {
 
     private String buildSignedManifest(String manifestObjectKey) throws Exception {
         // 下载 index.m3u8
-        String manifestUrl = remoteStorageService.getDownloadUrl(manifestObjectKey, null).getData();
+        String manifestUrl = remoteStorageService.getDownloadUrl(manifestObjectKey, null, null).getData();
         HttpRequest request = HttpRequest.newBuilder().uri(URI.create(manifestUrl)).GET().build();
         HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() / 100 != 2) {
@@ -130,7 +130,7 @@ public class MediaHlsManifestService {
             String cleanLine = line.replace('\\', '/').replaceAll("^/+", "");
             String segmentObjectKey = StrUtil.isBlank(segmentPrefix) ? cleanLine : segmentPrefix + "/" + cleanLine;
             String segmentUrl = segmentUrls.computeIfAbsent(segmentObjectKey,
-                    key -> remoteStorageService.getDownloadUrl(key, mediaProperties.getHlsSegmentUrlTtlSeconds()).getData());
+                    key -> remoteStorageService.getDownloadUrl(key, mediaProperties.getHlsSegmentUrlTtlSeconds(), null).getData());
             builder.append(segmentUrl).append('\n');
         }
         return builder.toString();

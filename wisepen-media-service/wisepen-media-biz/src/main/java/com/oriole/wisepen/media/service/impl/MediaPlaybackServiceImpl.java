@@ -48,8 +48,8 @@ public class MediaPlaybackServiceImpl implements IMediaPlaybackService {
             }
             return builder
                     .deliveryMode(MediaDeliveryMode.IMAGE_SOURCE)
-                    .coverUrl(remoteStorageService.getDownloadUrl(mediaInfo.getPreviewObjectKey(), null).getData())
-                    .playbackUrl(remoteStorageService.getDownloadUrl(mediaInfo.getSourceObjectKey(), null).getData())
+                    .coverUrl(remoteStorageService.getDownloadUrl(mediaInfo.getPreviewObjectKey(), null, null).getData())
+                    .playbackUrl(remoteStorageService.getDownloadUrl(mediaInfo.getSourceObjectKey(), null, null).getData())
                     .build();
         }
         if (mediaInfo.getResourceType() == ResourceType.VIDEO) {
@@ -59,7 +59,7 @@ public class MediaPlaybackServiceImpl implements IMediaPlaybackService {
             return builder
                     .deliveryMode(MediaDeliveryMode.VIDEO_SOURCE_HLS)
                     .coverUrl(StrUtil.isNotBlank(mediaInfo.getPreviewObjectKey())
-                            ? remoteStorageService.getDownloadUrl(mediaInfo.getPreviewObjectKey(), null).getData()
+                            ? remoteStorageService.getDownloadUrl(mediaInfo.getPreviewObjectKey(), null, null).getData()
                             : null)
                     .manifestUrl("/media/getPlaybackManifest?resourceId=" + resourceId)
                     .build();
@@ -67,7 +67,7 @@ public class MediaPlaybackServiceImpl implements IMediaPlaybackService {
         if (mediaInfo.getResourceType() == ResourceType.AUDIO) {
             return builder
                     .deliveryMode(MediaDeliveryMode.AUDIO_SOURCE)
-                    .playbackUrl(remoteStorageService.getDownloadUrl(mediaInfo.getSourceObjectKey(), null).getData())
+                    .playbackUrl(remoteStorageService.getDownloadUrl(mediaInfo.getSourceObjectKey(), null, null).getData())
                     .build();
         }
         throw new ServiceException(MediaError.CANNOT_SUPPORT_FILE_TYPE);

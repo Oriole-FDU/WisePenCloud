@@ -58,7 +58,7 @@ public class MediaWatermarkPlaybackServiceImpl implements IMediaWatermarkPlaybac
                     .status(WatermarkSessionStatus.READY)
                     .deliveryMode(MediaDeliveryMode.AUDIO_SOURCE)
                     .forensicStatus(ForensicStatus.UNAVAILABLE)
-                    .playbackUrl(remoteStorageService.getDownloadUrl(mediaInfo.getSourceObjectKey(), null).getData())
+                    .playbackUrl(remoteStorageService.getDownloadUrl(mediaInfo.getSourceObjectKey(), null, null).getData())
                     .build();
         }
 
@@ -117,7 +117,7 @@ public class MediaWatermarkPlaybackServiceImpl implements IMediaWatermarkPlaybac
                 || session.getStatus() == WatermarkSessionStatus.FINISHED;
         if (ready && session.getDeliveryMode() == MediaDeliveryMode.IMAGE_PREVIEW
                 && StrUtil.isNotBlank(session.getPreviewObjectKey())) {
-            builder.previewUrl(remoteStorageService.getDownloadUrl(session.getPreviewObjectKey(), null).getData());
+            builder.previewUrl(remoteStorageService.getDownloadUrl(session.getPreviewObjectKey(), null, null).getData());
         }
         if (ready && (session.getDeliveryMode() == MediaDeliveryMode.VIDEO_JIT_HLS
                 || session.getDeliveryMode() == MediaDeliveryMode.VIDEO_AB_HLS)
@@ -145,7 +145,7 @@ public class MediaWatermarkPlaybackServiceImpl implements IMediaWatermarkPlaybac
                 || session.getStatus() == WatermarkSessionStatus.FINISHED;
         if (ready && session.getDeliveryMode() == MediaDeliveryMode.IMAGE_PREVIEW
                 && StrUtil.isNotBlank(session.getPreviewObjectKey())) {
-            builder.previewUrl(remoteStorageService.getDownloadUrl(session.getPreviewObjectKey(), null).getData());
+            builder.previewUrl(remoteStorageService.getDownloadUrl(session.getPreviewObjectKey(), null, null).getData());
         }
         if (ready && (session.getDeliveryMode() == MediaDeliveryMode.VIDEO_JIT_HLS
                 || session.getDeliveryMode() == MediaDeliveryMode.VIDEO_AB_HLS)

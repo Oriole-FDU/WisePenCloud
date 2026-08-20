@@ -31,13 +31,16 @@ import com.oriole.wisepen.resource.domain.dto.res.ResourceItemResponse;
 import com.oriole.wisepen.resource.enums.ResourceType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ContentDisposition;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import static com.oriole.wisepen.common.core.util.LogIdUtils.summarizeIds;
 
@@ -128,7 +131,7 @@ public class MediaServiceImpl implements IMediaService {
         return entities.stream().map(entity -> {
             MediaInfoResponse response = BeanUtil.copyProperties(entity, MediaInfoResponse.class);
             if (StrUtil.isNotBlank(entity.getPreviewObjectKey())) {
-                response.setCoverUrl(remoteStorageService.getDownloadUrl(entity.getPreviewObjectKey(), null).getData());
+                response.setCoverUrl(remoteStorageService.getDownloadUrl(entity.getPreviewObjectKey(), null, null).getData());
             }
             return response;
         }).toList();
@@ -247,7 +250,7 @@ public class MediaServiceImpl implements IMediaService {
                 .orElseThrow(() -> new ServiceException(MediaError.MEDIA_NOT_FOUND));
         MediaInfoResponse response = BeanUtil.copyProperties(entity, MediaInfoResponse.class);
         if (StrUtil.isNotBlank(entity.getPreviewObjectKey())) {
-            response.setCoverUrl(remoteStorageService.getDownloadUrl(entity.getPreviewObjectKey(), null).getData());
+            response.setCoverUrl(remoteStorageService.getDownloadUrl(entity.getPreviewObjectKey(), null, null).getData());
         }
         if (resourceInfo != null) {
             resourceInfo.setPreview(response.getCoverUrl());
@@ -263,7 +266,17 @@ public class MediaServiceImpl implements IMediaService {
         if (mediaInfo.getMediaStatus() == null || mediaInfo.getMediaStatus().getStatus() != MediaStatusEnum.READY) {
             throw new ServiceException(MediaError.MEDIA_PREVIEW_NOT_READY);
         }
-        return remoteStorageService.getDownloadUrl(mediaInfo.getSourceObjectKey(), null).getData();
+        String filename = StrUtil.isNotBlank(mediaInfo.getOriginalFilename())
+                ? mediaInfo.getOriginalFilename().trim() : "media";
+        String extension = StrUtil.trim(mediaInfo.getSourceExtension());
+        if (StrUtil.isNotBlank(extension)
+                && !filename.toLowerCase(Locale.ROOT).endsWith("." + extension.toLowerCase(Locale.ROOT))) {
+            filename = filename + "." + extension;
+        }
+        String contentDisposition = ContentDisposition.attachment()
+                .filename(filename, StandardCharsets.UTF_8)
+                .build().toString();
+        return remoteStorageService.getDownloadUrl(mediaInfo.getSourceObjectKey(), null, contentDisposition).getData();
     }
 
     @Override

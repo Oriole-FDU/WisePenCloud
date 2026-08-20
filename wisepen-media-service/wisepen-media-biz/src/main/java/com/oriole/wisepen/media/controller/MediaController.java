@@ -26,10 +26,12 @@ import com.oriole.wisepen.resource.enums.ResourceAction;
 import com.oriole.wisepen.resource.feign.RemoteResourceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -214,21 +216,26 @@ public class MediaController {
     }
 
     @Operation(
-            summary = "获取原始媒体下载地址",
+            summary = "下载原始媒体",
             description = """
-                    - 用途：为有源文件下载权限的用户获取图片、视频或音频原始文件下载 URL。
+                    - 用途：为有源文件下载权限的用户下载图片、视频或音频原始文件。
                     - 请求：resourceId 指定媒体资源。
                     - 约束：当前用户必须拥有 DOWNLOAD_ORIGINAL 动作；媒体必须已经处理完成。
-                    - 处理：通过资源服务校验 DOWNLOAD_ORIGINAL 权限后，向存储服务申请源文件下载 URL。
+                    - 处理：通过资源服务校验 DOWNLOAD_ORIGINAL 权限后，申请携带原始文件名的对象存储限时下载 URL，并重定向浏览器直下；不创建水印会话，不修改媒体内容。
                     - 失败：无源文件下载权限 -> MediaError.MEDIA_PERMISSION_DENIED；媒体不存在 -> MediaError.MEDIA_NOT_FOUND；媒体未就绪 -> MediaError.MEDIA_PREVIEW_NOT_READY。
-                    - 响应：返回短期可用的防盗链下载 URL。
+                    - 响应：返回 302 重定向到对象存储限时下载地址，并保持上传格式。
                     """
     )
-    @GetMapping("/getOriginalDownloadUrl")
-    public R<String> getOriginalDownloadUrl(
-            @RequestParam @NotBlank(message = MediaValidationMsg.RESOURCE_ID_EMPTY) String resourceId) {
+    @Log(title = "下载媒体", businessType = BusinessType.EXPORT, isSaveResponseData = false)
+    @GetMapping("/download")
+    public void downloadOriginalMedia(
+            @RequestParam @NotBlank(message = MediaValidationMsg.RESOURCE_ID_EMPTY) String resourceId,
+            HttpServletResponse response) {
         assertResourceAction(resourceId, ResourceAction.DOWNLOAD_ORIGINAL);
-        return R.ok(mediaService.getOriginalDownloadUrl(resourceId));
+        String downloadUrl = mediaService.getOriginalDownloadUrl(resourceId);
+        response.setHeader("Cache-Control", "no-store");
+        response.setHeader("Location", downloadUrl);
+        response.setStatus(HttpStatus.FOUND.value());
     }
 
     @Operation(

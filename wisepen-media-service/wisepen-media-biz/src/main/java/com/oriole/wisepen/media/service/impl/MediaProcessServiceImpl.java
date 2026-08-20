@@ -171,7 +171,7 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
         File sourceFile = null;
         Path previewPath = null;
         try {
-            String downloadUrl = remoteStorageService.getDownloadUrl(mediaInfo.getSourceObjectKey(), null).getData();
+            String downloadUrl = remoteStorageService.getDownloadUrl(mediaInfo.getSourceObjectKey(), null, null).getData();
             String sourceExtension = getSourceExtension(mediaInfo);
             sourceFile = downloadSourceFile(downloadUrl, mediaInfo.getMediaId(), sourceExtension);
             ImageSize imageSize = probeImage(sourceFile.toPath());
@@ -220,7 +220,7 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
             workDir = Files.createTempDirectory(cacheRoot, mediaInfo.getMediaId() + "_");
 
             // 把源视频下载到缓存目录
-            String sourceUrl = remoteStorageService.getDownloadUrl(mediaInfo.getSourceObjectKey(), null).getData();
+            String sourceUrl = remoteStorageService.getDownloadUrl(mediaInfo.getSourceObjectKey(), null, null).getData();
             String sourceExtension = getSourceExtension(mediaInfo);
             File sourceFile = downloadSourceFile(sourceUrl, mediaInfo.getMediaId(), sourceExtension);
             Path sourcePath = workDir.resolve(sourceFile.getName());
@@ -287,7 +287,7 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
         // 音频不生成播放衍生产物，播放时直接签发源文件 URL，这里仅探测时长
         File sourceFile = null;
         try {
-            String downloadUrl = remoteStorageService.getDownloadUrl(mediaInfo.getSourceObjectKey(), null).getData();
+            String downloadUrl = remoteStorageService.getDownloadUrl(mediaInfo.getSourceObjectKey(), null, null).getData();
             String sourceExtension = getSourceExtension(mediaInfo);
             sourceFile = downloadSourceFile(downloadUrl, mediaInfo.getMediaId(), sourceExtension);
             AudioProbe probe = probeAudio(sourceFile.toPath());
