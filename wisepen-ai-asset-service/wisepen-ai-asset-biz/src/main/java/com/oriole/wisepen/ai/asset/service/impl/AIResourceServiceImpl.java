@@ -1,7 +1,6 @@
 package com.oriole.wisepen.ai.asset.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
-import com.oriole.wisepen.ai.asset.domain.base.AIResourceInfoBase;
 import com.oriole.wisepen.ai.asset.domain.dto.req.AIResourceCreateRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.req.AIResourceForkRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.req.AIResourceUpdateRequest;
@@ -140,9 +139,10 @@ public abstract class AIResourceServiceImpl<AT extends AIResourceBaseEntity<AT>,
     }
 
     @Override
-    public AIResourceInfoBase getAIResourceInfo(String resourceId) {
-        return aiResourceBaseRepository.findByResourceId(resourceId)
+    public AIResourceMetaInfoResponse getAIResourceInfo(String resourceId) {
+        AIResourceBaseEntity<AT> aiResourceBaseEntity = aiResourceBaseRepository.findByResourceId(resourceId)
                 .orElseThrow(() -> new ServiceException(AIResourceError.AI_RESOURCE_NOT_FOUND));
+        return  BeanUtil.copyProperties(aiResourceBaseEntity, AIResourceMetaInfoResponse.class);
     }
 
     @Override

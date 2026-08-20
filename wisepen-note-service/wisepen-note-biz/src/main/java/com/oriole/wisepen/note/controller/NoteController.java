@@ -127,6 +127,7 @@ public class NoteController {
         NoteInfoResponse noteInfoResponse = NoteInfoResponse.builder()
                 .resourceInfo(resourceInfo)
                 .version(noteInfo.getVersion())
+                .updateTime(noteInfo.getUpdateTime())
                 .authorsDisplay(authorsDisplay)
                 .build();
         return R.ok(noteInfoResponse);

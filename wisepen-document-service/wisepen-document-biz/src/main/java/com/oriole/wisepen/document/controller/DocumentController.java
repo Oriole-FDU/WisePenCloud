@@ -299,6 +299,7 @@ public class DocumentController {
         DocumentInfoResponse documentInfoResponse = DocumentInfoResponse.builder()
                 .resourceInfo(resourceInfo)
                 .documentVersionInfo(documentVersionInfo)
+                .updateTime(documentInfo.getUpdateTime())
                 .authorsDisplay(authorsDisplay)
                 .build();
         return R.ok(documentInfoResponse);

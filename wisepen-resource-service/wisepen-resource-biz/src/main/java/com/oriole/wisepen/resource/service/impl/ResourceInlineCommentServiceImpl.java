@@ -77,7 +77,7 @@ public class ResourceInlineCommentServiceImpl implements IResourceInlineCommentS
                 .anchorRef(anchorRef)
                 .items(new ArrayList<>(List.of(commentItem)))
                 .resolved(false)
-                .createTime(now).updateTime(now).build();
+                .build();
         inlineComment = inlineCommentRepository.save(inlineComment);
         if (StringUtils.hasText(resource.getOwnerId()) && !Objects.equals(resource.getOwnerId(), operatorUserId)) {
             resourceEventPublisher.publishUserMessage(ResourceInteractionMessageBuilder.inlineComment(

@@ -46,5 +46,4 @@ public interface DocumentVersionRepository extends MongoRepository<DocumentVersi
     @Query("{'_id': ?0}")
     @Update("{'$set': {'resourceId': ?1}}")
     void updateResourceIdById(String documentId, String resourceId);
-
 }

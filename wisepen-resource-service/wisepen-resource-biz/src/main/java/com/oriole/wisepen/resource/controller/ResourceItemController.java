@@ -52,7 +52,7 @@ public class ResourceItemController {
                     - 约束：当前用户必须已登录；目标资源必须存在；当前用户必须拥有资源 DISCOVER 权限。
                     - 处理：查询资源主记录，按预计算 ACL 快速校验 DISCOVER 权限，并补充资源所有者的展示信息；普通 Market 购买权限不作为本接口授权来源；不返回标签绑定、资源权限覆盖、指定用户权限或市场销售信息。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN；资源不存在 -> ResourceError.RESOURCE_NOT_FOUND；资源无发现权限 -> ResourceError.RESOURCE_PERMISSION_DENIED。
-                    - 响应：返回资源 ID、名称、类型、所有者 ID、大小、互动统计和所有者展示信息；当前用户拥有 VIEW 权限时额外返回 preview。
+                    - 响应：返回资源 ID、创建时间、名称、类型、所有者 ID、大小、互动统计和所有者展示信息；当前用户拥有 VIEW 权限时额外返回 preview。
                     """
     )
     @GetMapping("/getResourceBaseInfo")

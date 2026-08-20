@@ -101,11 +101,12 @@ public class CustomResourceInlineCommentRepository {
     public void resolveInlineComment(String resourceId, String inlineCommentId, String resolvedBy) {
         Query query = Query.query(Criteria.where("_id").is(inlineCommentId)
                 .and("resourceId").is(resourceId));
+        LocalDateTime now = LocalDateTime.now();
         Update update = new Update()
                 .set("resolved", true)
                 .set("resolvedBy", resolvedBy)
-                .set("resolvedAt", LocalDateTime.now())
-                .set("updateTime", LocalDateTime.now());
+                .set("resolvedAt", now)
+                .set("updateTime", now);
         mongoTemplate.updateFirst(query, update, ResourceInlineCommentEntity.class);
     }
 
