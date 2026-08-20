@@ -238,7 +238,7 @@ public class DocumentController {
                     - 约束：当前用户必须已登录，且必须通过资源服务的资源详情权限校验；Market 来源查看必须传当前上架 offerVersion；目标文档信息必须存在。
                     - 处理：通过资源服务获取资源详情和当前用户可执行动作，再读取文档信息并组合响应；不刷新文档状态，不触发解析或重试。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN；资源不存在 -> ResourceError.RESOURCE_NOT_FOUND；资源无查看权限 -> ResourceError.RESOURCE_PERMISSION_DENIED；文档不存在 -> DocumentError.DOCUMENT_NOT_FOUND。
-                    - 响应：返回资源信息、业务更新时间与文档信息组合结果。
+                    - 响应：返回资源信息与文档信息组合结果。
                     """
     )
     @GetMapping("/getDocInfo")

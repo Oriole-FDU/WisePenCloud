@@ -20,7 +20,7 @@ public interface IAIResourceService {
 
     void updateAIResourceInfo(AIResourceUpdateRequest req);
 
-    AIResourceInfoBase getAIResourceInfo(String resourceId);
+    AIResourceMetaInfoResponse getAIResourceInfo(String resourceId);
 
     List<AIResourceMetaInfoResponse> listPublishedAIResourcesMeta(List<String> resourceIds);
 

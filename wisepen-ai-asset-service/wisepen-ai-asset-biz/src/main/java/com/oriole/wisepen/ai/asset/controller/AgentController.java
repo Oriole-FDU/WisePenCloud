@@ -119,7 +119,7 @@ public class AgentController {
                     - 约束：当前用户必须已登录，且必须通过资源服务的资源详情权限校验；Market 来源查看必须传当前上架 offerVersion；目标智能体资产必须存在。
                     - 处理：通过资源服务获取资源详情和当前用户动作集合，再读取智能体主档信息并组合响应；不读取版本快照。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN；资源不存在 -> ResourceError.RESOURCE_NOT_FOUND；资源无查看权限 -> ResourceError.RESOURCE_PERMISSION_DENIED；智能体不存在 -> AIResourceError.AI_RESOURCE_NOT_FOUND。
-                    - 响应：返回资源信息与智能体资产信息，智能体资产信息包含业务更新时间。
+                    - 响应：返回资源信息与智能体资产信息。
                     """
     )
     @PostMapping("/getAgentInfo")
@@ -129,7 +129,7 @@ public class AgentController {
         ResourceItemResponse resourceInfo = remoteResourceService.getResourceInfo(new ResourceInfoGetReqDTO(
                 resourceId, SecurityContextHolder.getUserId(), SecurityContextHolder.getGroupRoleMap(), targetVersion
         )).getData();
-        AIResourceMetaInfoResponse agentInfo = BeanUtil.copyProperties(agentService.getAIResourceInfo(resourceId), AIResourceMetaInfoResponse.class);
+        AIResourceMetaInfoResponse agentInfo = agentService.getAIResourceInfo(resourceId);
         AgentResourceInfoResponse agentResourceInfoResponse = AgentResourceInfoResponse.builder()
                 .resourceInfo(resourceInfo)
                 .agentInfo(agentInfo)

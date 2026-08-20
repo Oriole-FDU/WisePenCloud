@@ -106,7 +106,7 @@ public class NoteController {
                     - 约束：当前用户必须已登录，且必须通过资源服务的资源详情权限校验；Market 来源查看必须传当前上架 offerVersion；目标笔记必须存在。
                     - 处理：通过资源服务获取资源详情和当前用户动作集合，读取笔记元信息中的当前版本号，并尽量调用用户服务补充作者展示信息；作者展示信息补充失败时不阻断主响应；不返回快照正文。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN；资源不存在 -> ResourceError.RESOURCE_NOT_FOUND；资源无查看权限 -> ResourceError.RESOURCE_PERMISSION_DENIED；笔记不存在 -> NoteError.NOTE_NOT_FOUND。
-                    - 响应：返回资源信息、当前版本号、业务更新时间和可用的作者展示信息。
+                    - 响应：返回资源信息、当前版本号和可用的作者展示信息。
                     """
     )
     @GetMapping("/getNoteInfo")

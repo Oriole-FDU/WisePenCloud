@@ -180,7 +180,7 @@ public class ResourceItemController {
                     - 约束：当前用户必须已登录；查询小组空间时必须属于目标小组；page 不能小于 1；size 不能超过 100；排序字段、标签组合逻辑和资源类型必须合法。
                     - 处理：个人空间默认排除个人回收站体系下的资源，除非显式传入回收站内标签；小组空间按当前用户在小组中的角色和资源 ACL 查询具备 DISCOVER 的资源；批量补充 ownerInfo、按组分隔的 tagBinds、currentActions 和互动统计；按需批量补充当前用户交互状态；tagBinds.primaryTagId 表示对应组内物理位置主标签；当前 groupId 下的 marketOffers（买家仅见已审核通过且在售条目，资源所有者与小组管理员可见全部）；仅资源所有者返回 overrideGrantedActions 与 specifiedUsersGrantedActions；不返回当前用户无权发现的资源。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN；当前用户不属于目标小组 -> PermissionError.PERMISSION_DENIED。
-                    - 响应：返回分页资源列表、总数，以及当前页资源的完整列表态 ResourceItemResponse；每条资源包含资源创建时间。
+                    - 响应：返回分页资源列表、总数，以及当前页资源的完整列表态 ResourceItemResponse。
                     """
     )
     @GetMapping("/listResources")

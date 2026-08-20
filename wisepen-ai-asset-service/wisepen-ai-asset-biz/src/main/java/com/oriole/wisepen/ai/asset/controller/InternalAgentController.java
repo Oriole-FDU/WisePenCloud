@@ -1,7 +1,7 @@
 package com.oriole.wisepen.ai.asset.controller;
 
 import cn.hutool.core.bean.BeanUtil;
-import com.oriole.wisepen.ai.asset.domain.base.AIResourceInfoBase;
+import com.oriole.wisepen.ai.asset.domain.dto.res.AIResourceMetaInfoResponse;
 import com.oriole.wisepen.ai.asset.domain.dto.res.AgentInfoResponse;
 import com.oriole.wisepen.ai.asset.domain.dto.res.AgentVersionBundleInfoResponse;
 import com.oriole.wisepen.ai.asset.domain.entity.AgentVersionBundleEntity;
@@ -27,7 +27,7 @@ public class InternalAgentController {
 
     @GetMapping("/getAgentByResourceId")
     public R<AgentInfoResponse> getAgentByResourceId(@RequestParam String resourceId, @RequestParam(required = false) Integer agentVersion) {
-        AIResourceInfoBase agent = agentService.getAIResourceInfo(resourceId);
+        AIResourceMetaInfoResponse agent = agentService.getAIResourceInfo(resourceId);
         if (agentVersion == null) agentVersion = agent.getVersion();
         if (agentVersion <= 0) {
             throw new ServiceException(AIResourceError.AI_RESOURCE_VERSION_NOT_FOUND);

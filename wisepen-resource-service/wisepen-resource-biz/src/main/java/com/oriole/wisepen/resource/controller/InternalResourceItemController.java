@@ -73,7 +73,7 @@ public class InternalResourceItemController implements RemoteResourceService {
                     - 约束：目标资源必须存在；请求用户必须拥有资源 VIEW 权限。
                     - 处理：计算资源所有者、指定用户特权和小组 ACL 得到当前用户动作集合，补充资源互动统计和所有者展示信息；不修改资源记录或权限配置。
                     - 失败：资源不存在 -> ResourceError.RESOURCE_NOT_FOUND；用户没有 VIEW 权限 -> ResourceError.RESOURCE_PERMISSION_DENIED。
-                    - 响应：返回资源详情、资源创建时间、当前用户可执行动作、互动统计和所有者展示信息。
+                    - 响应：返回资源详情、当前用户可执行动作、互动统计和所有者展示信息。
                     """
     )
     @PostMapping("/getResourceInfo")

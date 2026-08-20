@@ -1,7 +1,6 @@
 package com.oriole.wisepen.ai.asset.controller;
 
 import cn.hutool.core.bean.BeanUtil;
-import com.oriole.wisepen.ai.asset.domain.base.AIResourceInfoBase;
 import com.oriole.wisepen.ai.asset.domain.dto.req.AIResourceMetaInfoListRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.res.SkillInfoResponse;
 import com.oriole.wisepen.ai.asset.domain.dto.res.AIResourceMetaInfoResponse;
@@ -33,7 +32,7 @@ public class InternalSkillController {
 
     @GetMapping("/getSkillByResourceId")
     public R<SkillInfoResponse> getSkillByResourceId(@RequestParam String resourceId, @RequestParam(required = false) Integer skillVersion) {
-        AIResourceInfoBase skill = skillService.getAIResourceInfo(resourceId);
+        AIResourceMetaInfoResponse skill = skillService.getAIResourceInfo(resourceId);
         if (skillVersion == null) skillVersion = skill.getVersion();
         if (skillVersion <= 0) {
             throw new ServiceException(AIResourceError.AI_RESOURCE_VERSION_NOT_FOUND);
