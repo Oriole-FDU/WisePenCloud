@@ -6,7 +6,6 @@ import com.oriole.wisepen.media.api.domain.dto.res.MediaInfoResponse;
 import com.oriole.wisepen.media.api.domain.dto.res.MediaUploadInitResponse;
 import com.oriole.wisepen.file.storage.api.domain.mq.FileUploadedMessage;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
-import com.oriole.wisepen.resource.domain.dto.res.ResourceItemResponse;
 
 import java.util.List;
 import java.util.Map;
@@ -26,7 +25,7 @@ public interface IMediaService {
 
     void handleFileUploaded(FileUploadedMessage message);
 
-    MediaInfoResponse getMediaInfo(String resourceId, ResourceItemResponse resourceInfo);
+    MediaInfoResponse getMediaInfo(String resourceId);
 
     String getOriginalDownloadUrl(String resourceId);
 

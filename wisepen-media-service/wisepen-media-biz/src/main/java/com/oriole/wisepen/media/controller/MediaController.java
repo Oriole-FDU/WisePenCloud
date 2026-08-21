@@ -10,6 +10,7 @@ import com.oriole.wisepen.media.api.constant.MediaValidationMsg;
 import com.oriole.wisepen.media.api.domain.base.MediaStatus;
 import com.oriole.wisepen.media.api.domain.dto.req.MediaPlaybackSessionCreateRequest;
 import com.oriole.wisepen.media.api.domain.dto.req.MediaUploadInitRequest;
+import com.oriole.wisepen.media.api.domain.dto.res.MediaDetailResponse;
 import com.oriole.wisepen.media.api.domain.dto.res.MediaInfoResponse;
 import com.oriole.wisepen.media.api.domain.dto.res.MediaPlaybackResponse;
 import com.oriole.wisepen.media.api.domain.dto.res.MediaPlaybackSessionResponse;
@@ -246,18 +247,21 @@ public class MediaController {
                     - 约束：当前用户必须通过资源服务的资源详情权限校验；目标媒体信息必须存在。
                     - 处理：通过资源服务获取资源详情和当前用户可执行动作，再读取媒体处理信息并补充封面图 URL；不刷新媒体状态，不触发处理或重试。
                     - 失败：资源不存在 -> ResourceError.RESOURCE_NOT_FOUND；资源无查看权限 -> ResourceError.RESOURCE_PERMISSION_DENIED；媒体不存在 -> MediaError.MEDIA_NOT_FOUND。
-                    - 响应：返回资源详情、媒体处理信息和封面图 URL。
+                    - 响应：返回资源详情和媒体处理信息组合结果。
                     """
     )
     @GetMapping("/getMediaInfo")
-    public R<MediaInfoResponse> getMediaInfo(
+    public R<MediaDetailResponse> getMediaInfo(
             @RequestParam @NotBlank(message = MediaValidationMsg.RESOURCE_ID_EMPTY) String resourceId) {
         ResourceItemResponse resourceInfo = remoteResourceService.getResourceInfo(ResourceInfoGetReqDTO.builder()
                 .resourceId(resourceId)
                 .userId(SecurityContextHolder.getUserId())
                 .groupRoles(SecurityContextHolder.getGroupRoleMap())
                 .build()).getData();
-        return R.ok(mediaService.getMediaInfo(resourceId, resourceInfo));
+        return R.ok(MediaDetailResponse.builder()
+                .resourceInfo(resourceInfo)
+                .mediaInfo(mediaService.getMediaInfo(resourceId))
+                .build());
     }
 
     private void assertResourceAction(String resourceId, ResourceAction action) {

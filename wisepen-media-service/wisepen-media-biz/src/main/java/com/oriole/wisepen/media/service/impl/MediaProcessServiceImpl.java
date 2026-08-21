@@ -15,7 +15,6 @@ import com.oriole.wisepen.media.api.domain.mq.MediaProcessTaskMessage;
 import com.oriole.wisepen.media.api.domain.mq.MediaReadyMessage;
 import com.oriole.wisepen.media.api.enums.MediaStatusEnum;
 import com.oriole.wisepen.media.config.MediaProperties;
-import com.oriole.wisepen.media.domain.MediaPackagingResult;
 import com.oriole.wisepen.media.domain.entity.MediaInfoEntity;
 import com.oriole.wisepen.media.exception.MediaError;
 import com.oriole.wisepen.media.mq.KafkaMediaEventPublisher;
@@ -99,12 +98,12 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
             throw new ServiceException(MediaError.CANNOT_SUPPORT_FILE_TYPE);
         }
         mediaInfoRepository.updatePackagingResultById(mediaId,
-                packagingResult.getSourceHlsPrefix(),
-                packagingResult.getSourceHlsObjectKeys(),
-                packagingResult.getPreviewObjectKey(),
-                packagingResult.getDurationMs(),
-                packagingResult.getWidth(),
-                packagingResult.getHeight());
+                packagingResult.sourceHlsPrefix(),
+                packagingResult.sourceHlsObjectKeys(),
+                packagingResult.previewObjectKey(),
+                packagingResult.durationMs(),
+                packagingResult.width(),
+                packagingResult.height());
 
         // 基础产物和元数据落库后再注册 resource，避免资源服务暴露未完成媒体
         finalizeToReady(mediaId);
@@ -182,11 +181,13 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
                     StorageSceneEnum.PRIVATE_MEDIA.getPrefix() + "/" + mediaInfo.getMediaId() + "/preview.jpg",
                     mediaInfo.getMediaId());
 
-            return MediaPackagingResult.builder()
-                    .previewObjectKey(previewObjectKey)
-                    .width(imageSize.width())
-                    .height(imageSize.height())
-                    .build();
+            return new MediaPackagingResult(
+                    null,
+                    null,
+                    previewObjectKey,
+                    null,
+                    imageSize.width(),
+                    imageSize.height());
         } catch (Exception e) {
             log.warn("media image packaging failed. mediaId={} objectKey={}",
                     mediaInfo.getMediaId(), mediaInfo.getSourceObjectKey(), e);
@@ -253,14 +254,13 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
             }
 
             // 返回视频可播放所需的 HLS 前缀、文件清单、封面和基础元数据
-            return MediaPackagingResult.builder()
-                    .sourceHlsPrefix(hlsPrefix)
-                    .sourceHlsObjectKeys(hlsObjectKeys)
-                    .previewObjectKey(previewObjectKey)
-                    .durationMs(probe.durationMs())
-                    .width(probe.width())
-                    .height(probe.height())
-                    .build();
+            return new MediaPackagingResult(
+                    hlsPrefix,
+                    hlsObjectKeys,
+                    previewObjectKey,
+                    probe.durationMs(),
+                    probe.width(),
+                    probe.height());
         } catch (Exception e) {
             log.warn("media video packaging failed. mediaId={} objectKey={}",
                     mediaInfo.getMediaId(), mediaInfo.getSourceObjectKey(), e);
@@ -291,9 +291,13 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
             String sourceExtension = getSourceExtension(mediaInfo);
             sourceFile = downloadSourceFile(downloadUrl, mediaInfo.getMediaId(), sourceExtension);
             AudioProbe probe = probeAudio(sourceFile.toPath());
-            return MediaPackagingResult.builder()
-                    .durationMs(probe.durationMs())
-                    .build();
+            return new MediaPackagingResult(
+                    null,
+                    null,
+                    null,
+                    probe.durationMs(),
+                    null,
+                    null);
         } catch (Exception e) {
             log.warn("media audio probe failed. mediaId={} objectKey={}",
                     mediaInfo.getMediaId(), mediaInfo.getSourceObjectKey(), e);
@@ -555,5 +559,13 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
     }
 
     private record AudioProbe(Long durationMs) {
+    }
+
+    private record MediaPackagingResult(String sourceHlsPrefix,
+                                        List<String> sourceHlsObjectKeys,
+                                        String previewObjectKey,
+                                        Long durationMs,
+                                        Integer width,
+                                        Integer height) {
     }
 }

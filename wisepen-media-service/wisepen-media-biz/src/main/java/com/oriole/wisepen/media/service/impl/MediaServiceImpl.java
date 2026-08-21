@@ -27,7 +27,6 @@ import com.oriole.wisepen.media.repository.MediaInfoRepository;
 import com.oriole.wisepen.media.repository.MediaWatermarkSessionRepository;
 import com.oriole.wisepen.media.service.IMediaProcessService;
 import com.oriole.wisepen.media.service.IMediaService;
-import com.oriole.wisepen.resource.domain.dto.res.ResourceItemResponse;
 import com.oriole.wisepen.resource.enums.ResourceType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -239,12 +238,10 @@ public class MediaServiceImpl implements IMediaService {
     }
 
     @Override
-    public MediaInfoResponse getMediaInfo(String resourceId, ResourceItemResponse resourceInfo) {
+    public MediaInfoResponse getMediaInfo(String resourceId) {
         MediaInfoEntity entity = mediaInfoRepository.findByResourceId(resourceId)
                 .orElseThrow(() -> new ServiceException(MediaError.MEDIA_NOT_FOUND));
-        MediaInfoResponse response = BeanUtil.copyProperties(entity, MediaInfoResponse.class);
-        response.setResourceInfo(resourceInfo);
-        return response;
+        return BeanUtil.copyProperties(entity, MediaInfoResponse.class);
     }
 
     @Override
