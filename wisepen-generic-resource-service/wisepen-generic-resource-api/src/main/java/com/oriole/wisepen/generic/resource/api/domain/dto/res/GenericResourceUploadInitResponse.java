@@ -16,7 +16,7 @@ public class GenericResourceUploadInitResponse implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    private String uploadId;
+    private String genericResourceId;
 
     /**
      * 秒传或上传补偿完成后才有资源 ID。

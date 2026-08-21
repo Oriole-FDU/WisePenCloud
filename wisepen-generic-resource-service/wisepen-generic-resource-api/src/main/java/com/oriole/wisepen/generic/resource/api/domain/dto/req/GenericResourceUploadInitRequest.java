@@ -24,7 +24,7 @@ public class GenericResourceUploadInitRequest implements Serializable {
     private String filename;
 
     /**
-     * 可选扩展名。为空时服务端从 filename 中解析，仍无法解析时归为 UNKNOWN。
+     * 可选扩展名。服务端完全以该字段判定资源类型，为空或无法识别时归为 UNKNOWN。
      */
     private String extension;
 

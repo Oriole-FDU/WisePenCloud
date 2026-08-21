@@ -39,14 +39,11 @@ import java.util.Map;
 public class GenericResourceFileEntity implements Persistable<String> {
 
     @Id
-    private String uploadId;
+    private String genericResourceId;
 
-    /** 上传完成并注册资源主档后才写入；未就绪上传任务不会出现在资源列表中。 */
     private String resourceId;
     private String resourceName;
-    /** 资源业务类型，后续压缩包等类型迁出时按此字段筛选迁移。 */
     private ResourceType resourceType;
-    /** 真实文件扩展名；UNKNOWN 资源也保留原扩展名，避免下载和迁移时丢失文件形态。 */
     private String extension;
     private String objectKey;
     private String md5;
@@ -65,7 +62,7 @@ public class GenericResourceFileEntity implements Persistable<String> {
 
     @Override
     public String getId() {
-        return uploadId;
+        return genericResourceId;
     }
 
     @Override

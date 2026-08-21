@@ -16,7 +16,7 @@ public class GenericResourceUploadStatusResponse implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    private String uploadId;
+    private String genericResourceId;
     private String resourceId;
     private String resourceName;
     private ResourceType resourceType;

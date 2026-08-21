@@ -2,6 +2,7 @@ package com.oriole.wisepen.generic.resource.consumer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.oriole.wisepen.file.storage.api.domain.mq.FileUploadedMessage;
+import com.oriole.wisepen.file.storage.api.enums.StorageSceneEnum;
 import com.oriole.wisepen.generic.resource.service.IGenericResourceService;
 import io.github.springwolf.core.asyncapi.annotations.AsyncListener;
 import io.github.springwolf.core.asyncapi.annotations.AsyncMessage;
@@ -42,6 +43,11 @@ public class FileUploadedConsumer {
         log.info("generic resource file upload event received. topic={} objectKey={} scene={}",
                 TOPIC_FILE_UPLOADED, message.getObjectKey(), message.getScene());
         try {
+            if (message.getScene() != StorageSceneEnum.PRIVATE_GENERIC_RESOURCE || Boolean.TRUE.equals(message.getFlashUploaded())) {
+                log.debug("generic resource file upload event skipped. topic={} objectKey={} scene={} flashUploaded={} reason=\"scene mismatch or flash upload\"",
+                        TOPIC_FILE_UPLOADED, message.getObjectKey(), message.getScene(), message.getFlashUploaded());
+                return;
+            }
             genericResourceService.handleFileUploaded(message);
             log.debug("generic resource file upload event consumed. topic={} objectKey={}",
                     TOPIC_FILE_UPLOADED, message.getObjectKey());

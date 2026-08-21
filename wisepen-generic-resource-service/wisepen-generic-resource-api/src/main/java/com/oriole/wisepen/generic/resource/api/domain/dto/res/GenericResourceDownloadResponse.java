@@ -8,11 +8,11 @@ import java.io.Serial;
 import java.io.Serializable;
 
 /**
- * 通用资源源文件下载响应
+ * 通用资源下载响应
  */
 @Data
 @Builder
-public class GenericResourceSourceFileDownloadResponse implements Serializable {
+public class GenericResourceDownloadResponse implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;

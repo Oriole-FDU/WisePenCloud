@@ -38,7 +38,7 @@ public enum ResourceType {
     AGENT(32, "AGENT", "agent"),
 
     /** 压缩包类文件，由通用资源服务管理 */
-    ARCHIVE(41, "ARCHIVE", "archive", "zip", "rar", "7z", "tar", "gz", "tgz", "tar.gz", "bz2", "tar.bz2", "xz", "tar.xz"),
+    ARCHIVE(41, "ARCHIVE", "archive", "zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz"),
     /** 明确的二进制文件，由通用资源服务管理 */
     BINARY(42, "BINARY", "binary", "bin", "dat"),
 
@@ -56,7 +56,6 @@ public enum ResourceType {
     private final Set<String> extensions;
 
     private static final Map<String, ResourceType> EXT_MAP = new HashMap<>();
-    private static final Set<String> COMPOUND_EXTENSIONS = Set.of("tar.gz", "tar.bz2", "tar.xz");
 
     static {
         for (ResourceType item : values()) {
@@ -99,7 +98,4 @@ public enum ResourceType {
         return EXT_MAP.get(normalized);
     }
 
-    public static Set<String> compoundExtensions() {
-        return COMPOUND_EXTENSIONS;
-    }
 }

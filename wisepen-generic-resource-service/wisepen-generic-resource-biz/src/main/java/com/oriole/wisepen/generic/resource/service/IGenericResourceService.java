@@ -4,7 +4,7 @@ import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.file.storage.api.domain.mq.FileUploadedMessage;
 import com.oriole.wisepen.generic.resource.api.domain.dto.req.GenericResourceUploadInitRequest;
 import com.oriole.wisepen.generic.resource.api.domain.dto.res.GenericResourceFileInfoResponse;
-import com.oriole.wisepen.generic.resource.api.domain.dto.res.GenericResourceSourceFileDownloadResponse;
+import com.oriole.wisepen.generic.resource.api.domain.dto.res.GenericResourceDownloadResponse;
 import com.oriole.wisepen.generic.resource.api.domain.dto.res.GenericResourceUploadInitResponse;
 import com.oriole.wisepen.generic.resource.api.domain.dto.res.GenericResourceUploadStatusResponse;
 
@@ -15,11 +15,11 @@ public interface IGenericResourceService {
 
     GenericResourceUploadInitResponse initUploadGenericResource(GenericResourceUploadInitRequest request, Long uploaderId, Map<Long, GroupRoleType> uploaderGroupRoles);
 
-    GenericResourceUploadStatusResponse syncGenericResourceUploadStatus(String uploadId, Long operatorUserId);
+    GenericResourceUploadStatusResponse syncGenericResourceUploadStatus(String genericResourceId, Long operatorUserId);
 
     GenericResourceFileInfoResponse getGenericResourceInfo(String resourceId);
 
-    GenericResourceSourceFileDownloadResponse createSourceFileDownloadTicket(String resourceId, Long durationSeconds);
+    GenericResourceDownloadResponse getDownloadUrl(String resourceId, Long durationSeconds);
 
     void handleFileUploaded(FileUploadedMessage message);
 

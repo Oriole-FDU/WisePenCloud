@@ -18,5 +18,5 @@ public class GenericResourceInfoResponse implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private ResourceItemResponse resourceInfo;
-    private GenericResourceFileInfoResponse genericResourceInfo;
+    private GenericResourceFileInfoResponse genericResourceFileInfo;
 }
