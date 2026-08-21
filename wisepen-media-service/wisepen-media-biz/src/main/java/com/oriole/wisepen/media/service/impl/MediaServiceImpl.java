@@ -128,13 +128,7 @@ public class MediaServiceImpl implements IMediaService {
                         MediaStatusEnum.FORENSIC_PREPROCESSING,
                         MediaStatusEnum.FAILED)
         );
-        return entities.stream().map(entity -> {
-            MediaInfoResponse response = BeanUtil.copyProperties(entity, MediaInfoResponse.class);
-            if (StrUtil.isNotBlank(entity.getPreviewObjectKey())) {
-                response.setCoverUrl(remoteStorageService.getDownloadUrl(entity.getPreviewObjectKey(), null, null).getData());
-            }
-            return response;
-        }).toList();
+        return entities.stream().map(entity -> BeanUtil.copyProperties(entity, MediaInfoResponse.class)).toList();
     }
 
     @Override
@@ -249,13 +243,7 @@ public class MediaServiceImpl implements IMediaService {
         MediaInfoEntity entity = mediaInfoRepository.findByResourceId(resourceId)
                 .orElseThrow(() -> new ServiceException(MediaError.MEDIA_NOT_FOUND));
         MediaInfoResponse response = BeanUtil.copyProperties(entity, MediaInfoResponse.class);
-        if (StrUtil.isNotBlank(entity.getPreviewObjectKey())) {
-            response.setCoverUrl(remoteStorageService.getDownloadUrl(entity.getPreviewObjectKey(), null, null).getData());
-        }
-        if (resourceInfo != null) {
-            resourceInfo.setPreview(response.getCoverUrl());
-            response.setResourceInfo(resourceInfo);
-        }
+        response.setResourceInfo(resourceInfo);
         return response;
     }
 
