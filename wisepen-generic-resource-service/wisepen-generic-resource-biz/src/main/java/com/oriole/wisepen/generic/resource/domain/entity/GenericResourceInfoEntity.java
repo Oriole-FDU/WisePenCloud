@@ -36,7 +36,7 @@ import java.util.Map;
         partialFilter = "{'objectKey': {'$exists': true, '$ne': null}}"
 )
 @CompoundIndex(name = "idx_resource_type", def = "{'resourceType': 1}")
-public class GenericResourceFileEntity implements Persistable<String> {
+public class GenericResourceInfoEntity implements Persistable<String> {
 
     @Id
     private String genericResourceId;

@@ -3,7 +3,7 @@ package com.oriole.wisepen.generic.resource.service;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.file.storage.api.domain.mq.FileUploadedMessage;
 import com.oriole.wisepen.generic.resource.api.domain.dto.req.GenericResourceUploadInitRequest;
-import com.oriole.wisepen.generic.resource.api.domain.dto.res.GenericResourceFileInfoResponse;
+import com.oriole.wisepen.generic.resource.api.domain.dto.res.GenericResourceInfoResponse;
 import com.oriole.wisepen.generic.resource.api.domain.dto.res.GenericResourceDownloadResponse;
 import com.oriole.wisepen.generic.resource.api.domain.dto.res.GenericResourceUploadInitResponse;
 import com.oriole.wisepen.generic.resource.api.domain.dto.res.GenericResourceUploadStatusResponse;
@@ -17,7 +17,7 @@ public interface IGenericResourceService {
 
     GenericResourceUploadStatusResponse syncGenericResourceUploadStatus(String genericResourceId, Long operatorUserId);
 
-    GenericResourceFileInfoResponse getGenericResourceInfo(String resourceId);
+    GenericResourceInfoResponse getGenericResourceInfo(String resourceId);
 
     GenericResourceDownloadResponse getDownloadUrl(String resourceId, Long durationSeconds);
 

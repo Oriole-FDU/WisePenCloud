@@ -8,8 +8,8 @@ import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.generic.resource.api.constant.GenericResourceValidationMsg;
 import com.oriole.wisepen.generic.resource.api.domain.dto.req.GenericResourceUploadInitRequest;
-import com.oriole.wisepen.generic.resource.api.domain.dto.res.GenericResourceFileInfoResponse;
 import com.oriole.wisepen.generic.resource.api.domain.dto.res.GenericResourceInfoResponse;
+import com.oriole.wisepen.generic.resource.api.domain.dto.res.GenericResourceDetailResponse;
 import com.oriole.wisepen.generic.resource.api.domain.dto.res.GenericResourceDownloadResponse;
 import com.oriole.wisepen.generic.resource.api.domain.dto.res.GenericResourceUploadInitResponse;
 import com.oriole.wisepen.generic.resource.api.domain.dto.res.GenericResourceUploadStatusResponse;
@@ -92,7 +92,7 @@ public class GenericResourceController {
                     """
     )
     @GetMapping("/getGenericResourceInfo")
-    public R<GenericResourceInfoResponse> getGenericResourceInfo(
+    public R<GenericResourceDetailResponse> getGenericResourceInfo(
             @NotBlank(message = GenericResourceValidationMsg.RESOURCE_ID_EMPTY) @RequestParam String resourceId) {
         // 若无权限将抛出异常，此处无需重复鉴权。
         ResourceItemResponse resourceInfo = remoteResourceService.getResourceInfo(ResourceInfoGetReqDTO.builder()
@@ -100,8 +100,8 @@ public class GenericResourceController {
                 .userId(SecurityContextHolder.getUserId())
                 .groupRoles(SecurityContextHolder.getGroupRoleMap())
                 .build()).getData();
-        GenericResourceFileInfoResponse genericResourceFileInfo = genericResourceService.getGenericResourceInfo(resourceId);
-        return R.ok(GenericResourceInfoResponse.builder()
+        GenericResourceInfoResponse genericResourceFileInfo = genericResourceService.getGenericResourceInfo(resourceId);
+        return R.ok(GenericResourceDetailResponse.builder()
                 .resourceInfo(resourceInfo)
                 .genericResourceFileInfo(genericResourceFileInfo)
                 .build());
