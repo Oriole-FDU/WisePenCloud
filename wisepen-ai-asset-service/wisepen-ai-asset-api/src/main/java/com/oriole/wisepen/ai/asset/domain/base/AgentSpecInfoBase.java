@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Map;
 import java.util.Set;
 
 @Data
@@ -39,11 +40,11 @@ public class AgentSpecInfoBase {
     @AllArgsConstructor
     public static class AgentToolAndSkillPolicy {
         private Boolean enableUseTool;
-        private Set<String> allowToolNames;
-        private Set<String> denyToolNames;
+        private Boolean toolSelectionDefaultEnabled;
+        private Map<String, Boolean> toolSelectionOverrides;
         private Boolean enableUseSkill;
         private Set<String> onDemandSkillIds;
-        private Set<String> forceEnabledSkillIds;
+        private Integer skillMatchTopK;
     }
 
     @Data

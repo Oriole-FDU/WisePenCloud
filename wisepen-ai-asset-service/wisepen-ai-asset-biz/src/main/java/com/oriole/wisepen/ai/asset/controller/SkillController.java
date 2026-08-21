@@ -1,7 +1,6 @@
 package com.oriole.wisepen.ai.asset.controller;
 
 import cn.hutool.core.bean.BeanUtil;
-import com.oriole.wisepen.ai.asset.domain.base.AIResourceInfoBase;
 import com.oriole.wisepen.ai.asset.domain.dto.req.AIResourceForkRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.req.AssetDeleteRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.req.AssetUploadInitRequest;
@@ -9,6 +8,7 @@ import com.oriole.wisepen.ai.asset.domain.dto.req.AIResourceCreateRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.req.AIResourceUpdateRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.req.AIResourceVersionPublishRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.res.AssetUploadInitResponse;
+import com.oriole.wisepen.ai.asset.domain.dto.res.AIResourceMetaInfoResponse;
 import com.oriole.wisepen.ai.asset.domain.dto.res.SkillResourceInfoResponse;
 import com.oriole.wisepen.ai.asset.domain.dto.res.SkillVersionBundleInfoResponse;
 import com.oriole.wisepen.ai.asset.domain.entity.SkillVersionBundleEntity;
@@ -140,8 +140,11 @@ public class SkillController {
         ResourceItemResponse resourceInfo = remoteResourceService.getResourceInfo(new ResourceInfoGetReqDTO(
                 resourceId, SecurityContextHolder.getUserId(), SecurityContextHolder.getGroupRoleMap(), targetVersion
         )).getData();
-        AIResourceInfoBase skillInfo = skillService.getAIResourceInfo(resourceId);
-        SkillResourceInfoResponse skillResourceInfoResponse = SkillResourceInfoResponse.builder().resourceInfo(resourceInfo).skillInfo(skillInfo).build();
+        AIResourceMetaInfoResponse skillInfo = skillService.getAIResourceInfo(resourceId);
+        SkillResourceInfoResponse skillResourceInfoResponse = SkillResourceInfoResponse.builder()
+                .resourceInfo(resourceInfo)
+                .skillInfo(skillInfo)
+                .build();
         return R.ok(skillResourceInfoResponse);
     }
 

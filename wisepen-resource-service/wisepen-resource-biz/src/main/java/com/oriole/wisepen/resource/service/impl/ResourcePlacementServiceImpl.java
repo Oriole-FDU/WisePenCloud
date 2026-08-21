@@ -7,6 +7,7 @@ import com.oriole.wisepen.resource.domain.GroupTagBind;
 import com.oriole.wisepen.resource.domain.entity.ResourceItemEntity;
 import com.oriole.wisepen.resource.domain.entity.TagEntity;
 import com.oriole.wisepen.resource.enums.FileOrganizationLogic;
+import com.oriole.wisepen.resource.event.MarketResourceIndexDeleteByResourceAndGroupEvent;
 import com.oriole.wisepen.resource.exception.ResourceError;
 import com.oriole.wisepen.resource.mq.IResourceEventPublisher;
 import com.oriole.wisepen.resource.repository.ResourceItemRepository;
@@ -14,10 +15,10 @@ import com.oriole.wisepen.resource.repository.TagRepository;
 import com.oriole.wisepen.resource.service.IGroupResService;
 import com.oriole.wisepen.resource.service.IResourcePlacementService;
 import com.oriole.wisepen.resource.service.IResourceService;
-import com.oriole.wisepen.resource.service.ISearchSyncService;
 import com.oriole.wisepen.resource.service.ITagService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -35,9 +36,9 @@ public class ResourcePlacementServiceImpl implements IResourcePlacementService {
     private final TagRepository tagRepository;
     private final IGroupResService groupResService;
     private final ITagService tagService;
-    private final ISearchSyncService searchSyncService;
     private final IResourceEventPublisher eventPublisher;
     private final IResourceService resourceService;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     @Override
     public void setPersonalResourcesPathTag(List<String> resourceIds, String userId, String newPathTagId) {
@@ -59,14 +60,15 @@ public class ResourcePlacementServiceImpl implements IResourcePlacementService {
                     .filter(bind -> groupId.equals(bind.getGroupId())).findFirst().map(GroupTagBind::getTagIds)
                     .orElseGet(ArrayList::new);
 
-            currentTagIds.set(0, newPathTagId); // 修改首节点
+            if (!currentTagIds.isEmpty()) currentTagIds.set(0, newPathTagId); // 修改首节点
+            else currentTagIds.add(newPathTagId);
 
             if (isTrashed) {
                 // 移入回收站会卸载除了个人组的所有节点，如果此前有发布到市场，则还需移除市场索引
                 entity.getGroupBinds().stream()
                         .filter(bind -> bind.getMarketSaleInfo() != null)
-                        .forEach(bind -> searchSyncService.deleteMarketResourceIndexesByResourceIdAndMarketGroupId(
-                                entity.getResourceId(), bind.getGroupId()));
+                        .forEach(bind -> applicationEventPublisher.publishEvent(new MarketResourceIndexDeleteByResourceAndGroupEvent(
+                                entity.getResourceId(), bind.getGroupId())));
                 entity.getGroupBinds().removeIf(bind -> !bind.getGroupId().startsWith(ResourceConstants.PERSONAL_GROUP_PREFIX));
 
                 entity.setOverrideGrantedActionsMask(null);

@@ -5,7 +5,6 @@ import com.oriole.wisepen.common.core.domain.ResultKey;
 import com.oriole.wisepen.common.core.domain.enums.BusinessDomain;
 import com.oriole.wisepen.common.core.exception.ErrorReason;
 import com.oriole.wisepen.document.api.constant.DocumentSubject;
-import com.oriole.wisepen.resource.constant.ResourceSubject;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -30,6 +29,7 @@ public enum DocumentError implements IResult {
     DOCUMENT_STORAGE_STATUS_GET_FAILED(6143, new ResultKey(BusinessDomain.DOCUMENT, DocumentSubject.DOCUMENT, ErrorReason.FAILED),"获取文档存储文件状态失败"),
     DOCUMENT_REGISTER_RESOURCE_FAILED(6144, new ResultKey(BusinessDomain.DOCUMENT, DocumentSubject.DOCUMENT, ErrorReason.FAILED),"注册文档资源失败"),
     DOCUMENT_FORK_FAILED(6145, new ResultKey(BusinessDomain.DOCUMENT, DocumentSubject.DOCUMENT, ErrorReason.FAILED),"文档复制失败"),
+    DOCUMENT_DOWNLOAD_FAILED(6146, new ResultKey(BusinessDomain.DOCUMENT, DocumentSubject.DOCUMENT, ErrorReason.FAILED),"文档下载失败"),
     DOCUMENT_EDIT_SAVE_FAILED(6155, new ResultKey(BusinessDomain.DOCUMENT, DocumentSubject.DOCUMENT, ErrorReason.FAILED),"文档编辑保存失败"),
     DOCUMENT_VERSION_DUPLICATED(6161, new ResultKey(BusinessDomain.DOCUMENT, DocumentSubject.DOCUMENT, ErrorReason.CONFLICT), "文档版本冲突"),
 

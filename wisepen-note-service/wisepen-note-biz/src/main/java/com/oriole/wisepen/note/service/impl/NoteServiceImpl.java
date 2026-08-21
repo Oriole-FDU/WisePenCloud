@@ -24,7 +24,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -75,7 +74,6 @@ public class NoteServiceImpl implements INoteService {
                 .resourceId(resourceId)
                 .resourceType(resourceType)
                 .version(0)
-                .updateTime(LocalDateTime.now())
                 .authors(authors)
                 .build();
         noteInfoRepository.save(infoEntity);
@@ -130,7 +128,6 @@ public class NoteServiceImpl implements INoteService {
                     .authors(sourceInfo.getAuthors())
                     .resourceType(sourceInfo.getResourceType())
                     .version(0)
-                    .updateTime(LocalDateTime.now())
                     .build();
             noteInfoRepository.save(targetInfo);
 
@@ -157,10 +154,9 @@ public class NoteServiceImpl implements INoteService {
             List<NoteVersionEntity> targetVersions = new ArrayList<>();
             if (!sourceVersions.isEmpty()) {
                 for (NoteVersionEntity sourceVersion : sourceVersions) {
-                    NoteVersionEntity targetVersion = BeanUtil.copyProperties(sourceVersion, NoteVersionEntity.class);
+                    NoteVersionEntity targetVersion = BeanUtil.copyProperties(sourceVersion, NoteVersionEntity.class, "createTime");
                     targetVersion.setId(null);
                     targetVersion.setResourceId(targetResourceId);
-                    targetVersion.setCreateTime(LocalDateTime.now());
                     if (baseVersion > 0) { // 重置版本号为自 1 起始
                         targetVersion.setVersion(targetVersion.getVersion() - baseVersion);
                     }

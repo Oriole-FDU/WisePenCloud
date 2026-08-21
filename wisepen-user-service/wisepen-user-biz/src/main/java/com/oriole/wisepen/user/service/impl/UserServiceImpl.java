@@ -189,7 +189,6 @@ public class UserServiceImpl implements IUserService {
 
     @Override
     public void sendResetMail(AuthPwdResetVerifyRequest req) {
-        // 查询学号对应用户
         String username = req.getUsername();
         UserEntity userEntity = userMapper
                 .selectOne(Wrappers.<UserEntity>lambdaQuery().eq(UserEntity::getUsername, username).last("LIMIT 1"));
@@ -197,14 +196,11 @@ public class UserServiceImpl implements IUserService {
         if (userEntity == null) {
             log.warn("password reset mail skipped for unknown user. username={}", username);
             return; // 处于安全考虑，不存在也不报错，防止撞库
-        } else if (userEntity.getUserStatus() == UserStatus.UNIDENTIFIED) {
-            // 未通过身份认证，不能找回密码
-            throw new ServiceException(UserError.CANNOT_OPERATE_BEFORE_AUTH_VERIFICATION);
         }
         // uid存入Redis
         String token = redisCacheManager.setPwdResetToken(userEntity.getUserId());
         // 构建重置链接
-        String resetLink = userProperties.getApiDomain() + "/reset-pwd?token=" + token;
+        String resetLink = userProperties.getApiDomain() + "/password/reset?token=" + token;
 
         // 构建重置邮件
         Context context = new Context();

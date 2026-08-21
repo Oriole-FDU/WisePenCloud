@@ -21,12 +21,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.types.Binary;
 import org.springframework.beans.BeanUtils;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.*;
 
 @Slf4j
@@ -46,32 +46,76 @@ public class NoteVersionServiceImpl implements INoteVersionService {
             throw new ServiceException(NoteError.CANNOT_SUPPORT_NOTE_RESOURCE_TYPE);
         }
 
+        Binary snapshotData = new Binary(Base64.getDecoder().decode(msg.getData()));
+        if (VersionType.DELTA == msg.getType()) {
+            NoteVersionEntity noteVersionEntity = buildVersionEntity(msg, authors, snapshotData);
+            try {
+                noteVersionRepository.save(noteVersionEntity);
+            } catch (DuplicateKeyException e) {
+                // DELTA 不做压实语义；同版本已存在时视为重试或已被 FULL 压实，直接跳过
+                log.info("duplicate DELTA snapshot skipped. resourceId={} version={}", msg.getResourceId(), msg.getVersion());
+                return;
+            }
+            updateNoteInfoForNewVersion(noteInfo, noteVersionEntity.getVersion(), authors);
+            noteInfoRepository.save(noteInfo);
+            return;
+        }
+        if (VersionType.FULL == msg.getType() && msg.getVersion() != null && msg.getVersion() != 0) {
+            Optional<NoteVersionEntity> existingVersion = noteVersionRepository
+                    .findByResourceIdAndVersion(msg.getResourceId(), msg.getVersion());
+            if (existingVersion.isPresent()) {
+                NoteVersionEntity noteVersionEntity = existingVersion.get();
+                // FULL 可以将同版本 DELTA 原地压实为完整恢复点；同版本 FULL 则作为幂等刷新
+                noteVersionEntity.setType(VersionType.FULL);
+                noteVersionEntity.setData(snapshotData);
+                if (authors != null && !authors.isEmpty()) {
+                    noteVersionEntity.setCreatedBy(authors);
+                }
+                noteVersionRepository.save(noteVersionEntity);
+                // 更新纯文本供 ES/全文检索使用
+                saveFullPlainText(msg, noteVersionEntity.getVersion());
+                return;
+            }
+        }
+
+        NoteVersionEntity noteVersionEntity = buildVersionEntity(msg, authors, snapshotData);
+        noteVersionRepository.save(noteVersionEntity);
+        // 更新纯文本供 ES/全文检索使用
+        saveFullPlainText(msg, noteVersionEntity.getVersion());
+
+        updateNoteInfoForNewVersion(noteInfo, noteVersionEntity.getVersion(), authors);
+        noteInfoRepository.save(noteInfo);
+    }
+
+    private NoteVersionEntity buildVersionEntity(NoteSnapshotBase msg, List<Long> authors, Binary snapshotData) {
         NoteVersionEntity noteVersionEntity = NoteVersionEntity.builder()
                 .type(msg.getType())
-                .data(new Binary(Base64.getDecoder().decode(msg.getData())))
+                .data(snapshotData)
                 .createdBy(authors)
                 .build();
-        BeanUtils.copyProperties(msg, noteVersionEntity, "type","data");
-        noteVersionRepository.save(noteVersionEntity);
+        BeanUtils.copyProperties(msg, noteVersionEntity, "type", "data");
+        return noteVersionEntity;
+    }
 
-        // 更新最后修改时间
-        noteInfo.setUpdateTime(LocalDateTime.now());
-        noteInfo.setVersion(noteVersionEntity.getVersion());
+    private void updateNoteInfoForNewVersion(NoteInfoEntity noteInfo, Integer version, List<Long> authors) {
+        noteInfo.setVersion(version);
         if (authors != null && !authors.isEmpty()) {
             // 将现有的作者和当前的作者合并，利用 CollUtil.distinct 自动去重
             List<Long> existing = noteInfo.getAuthors() == null ? CollUtil.newArrayList() : noteInfo.getAuthors();
             existing.addAll(authors);
             noteInfo.setAuthors(CollUtil.distinct(existing));
         }
-        // 如果是 FULL 快照，顺便更新纯文本供 ES/全文检索使用
-        if (VersionType.FULL == msg.getType() && msg.getPlainText() != null) {
-            noteContentRepository.save(NoteContentEntity.builder()
-                    .resourceId(noteVersionEntity.getResourceId())
-                    .version(noteVersionEntity.getVersion())
-                    .rawText(msg.getPlainText())
-                    .build());
+    }
+
+    private void saveFullPlainText(NoteSnapshotBase msg, Integer version) {
+        if (VersionType.FULL != msg.getType() || msg.getPlainText() == null) {
+            return;
         }
-        noteInfoRepository.save(noteInfo);
+        noteContentRepository.save(NoteContentEntity.builder()
+                .resourceId(msg.getResourceId())
+                .version(version)
+                .rawText(msg.getPlainText())
+                .build());
     }
 
     @Override
@@ -109,8 +153,11 @@ public class NoteVersionServiceImpl implements INoteVersionService {
 
     @Override
     public NoteSearchTextResponse getSearchText(String resourceId, Integer targetVersion) {
-        NoteVersionEntity versionEntity = noteVersionRepository.findFirstByResourceIdAndTypeAndVersionLessThanEqualOrderByVersionDesc(resourceId, VersionType.FULL, targetVersion)
-                .orElseThrow(() -> new ServiceException(NoteError.NOTE_NOT_FOUND));
+        NoteVersionEntity versionEntity = targetVersion == null
+                ? noteVersionRepository.findFirstByResourceIdAndTypeOrderByVersionDesc(resourceId, VersionType.FULL)
+                    .orElseThrow(() -> new ServiceException(NoteError.NOTE_NOT_FOUND))
+                : noteVersionRepository.findFirstByResourceIdAndTypeAndVersionLessThanEqualOrderByVersionDesc(resourceId, VersionType.FULL, targetVersion)
+                    .orElseThrow(() -> new ServiceException(NoteError.NOTE_NOT_FOUND));
         NoteContentEntity contentEntity = noteContentRepository.findById(resourceId)
                 .orElseThrow(() -> new ServiceException(NoteError.NOTE_NOT_FOUND));
         String searchText = contentEntity.getRawText();

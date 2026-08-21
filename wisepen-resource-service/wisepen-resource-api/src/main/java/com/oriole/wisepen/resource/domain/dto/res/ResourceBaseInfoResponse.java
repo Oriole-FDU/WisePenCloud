@@ -8,6 +8,8 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
+import java.time.LocalDateTime;
+
 @EqualsAndHashCode(callSuper = true)
 @SuperBuilder
 @AllArgsConstructor
@@ -15,5 +17,6 @@ import lombok.experimental.SuperBuilder;
 @Data
 public class ResourceBaseInfoResponse extends ResourceItemInfoBase {
     private String resourceId;
+    private LocalDateTime createTime;
     private UserDisplayBase ownerInfo;
 }

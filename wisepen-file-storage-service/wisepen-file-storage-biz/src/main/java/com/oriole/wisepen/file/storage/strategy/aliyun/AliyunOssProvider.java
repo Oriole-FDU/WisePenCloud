@@ -8,6 +8,7 @@ import com.aliyun.oss.OSSException;
 import com.aliyun.oss.common.utils.BinaryUtil;
 import com.aliyun.oss.model.GeneratePresignedUrlRequest;
 import com.aliyun.oss.model.ObjectMetadata;
+import com.aliyun.oss.model.ResponseHeaderOverrides;
 import com.aliyun.sts20150401.Client;
 import com.aliyun.sts20150401.models.AssumeRoleRequest;
 import com.aliyun.sts20150401.models.AssumeRoleResponse;
@@ -108,14 +109,21 @@ public class AliyunOssProvider implements StorageProvider {
     }
 
     @Override
-    public String generateDownloadUrl(String objectKey, long durationSeconds) {
+    public String generateDownloadUrl(String objectKey, long durationSeconds, String contentDisposition) {
         try {
             Date expirationDate = Date.from(Instant.now().plusSeconds(durationSeconds));
-            // 生成 GET 方法的预签名 URL，供私有文件下载
-            URL url = ossClient.generatePresignedUrl(config.getBucketName(), objectKey, expirationDate, HttpMethod.GET);
+            GeneratePresignedUrlRequest request =
+                    new GeneratePresignedUrlRequest(config.getBucketName(), objectKey, HttpMethod.GET);
+            request.setExpiration(expirationDate);
+            if (contentDisposition != null && !contentDisposition.isBlank()) {
+                ResponseHeaderOverrides responseHeaders = new ResponseHeaderOverrides();
+                responseHeaders.setContentDisposition(contentDisposition);
+                request.setResponseHeaders(responseHeaders);
+            }
+            URL url = ossClient.generatePresignedUrl(request);
             return url.toString();
         } catch (Exception e) {
-            log.error("aliyun oss download url generate failed. objectKey={}", objectKey, e);
+            log.error("aliyun oss download url generate failed. objectKey={} contentDisposition={}", objectKey, contentDisposition, e);
             throw new ServiceException(FileStorageError.STORAGE_PROVIDER_GET_FILE_DOWNLOAD_URL_FAILED);
         }
     }

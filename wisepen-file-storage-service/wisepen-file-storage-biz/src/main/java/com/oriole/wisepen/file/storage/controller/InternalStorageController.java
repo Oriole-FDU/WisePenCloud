@@ -55,7 +55,7 @@ public class InternalStorageController {
             summary = "内部获取文件下载地址",
             description = """
                     - 用途：供业务服务为已上传文件生成限时下载地址。
-                    - 请求：objectKey 指定目标文件；duration 指定下载地址有效时长，默认 900 秒。
+                    - 请求：objectKey 指定目标文件；duration 指定下载地址有效时长，默认 900 秒；contentDisposition 可选，用于覆盖对象存储下载响应的 Content-Disposition。
                     - 约束：调用方必须通过内部服务调用边界；目标文件记录必须存在且未删除。
                     - 处理：查询存储记录；若仍是 UPLOADING 会尝试补偿检查上传状态；确认可用后按对应存储配置生成防盗链下载 URL；不改变业务资源状态。
                     - 失败：文件记录不存在或仍未上传完成 -> FileStorageError.FILE_RECORD_NOT_FOUND；存储配置不支持 -> FileStorageError.CANNOT_SUPPORT_STORAGE_PROVIDER；存储服务生成下载地址失败 -> FileStorageError.STORAGE_PROVIDER_GET_FILE_DOWNLOAD_URL_FAILED。
@@ -65,8 +65,9 @@ public class InternalStorageController {
     @GetMapping("/getDownloadUrl")
     public R<String> getDownloadUrl(
             @RequestParam("objectKey") String objectKey,
-            @RequestParam(value = "duration", defaultValue = "900") Long duration) {
-        return R.ok(storageService.getDownloadUrl(objectKey, duration));
+            @RequestParam(value = "duration", defaultValue = "900") Long duration,
+            @RequestParam(value = "contentDisposition", required = false) String contentDisposition) {
+        return R.ok(storageService.getDownloadUrl(objectKey, duration, contentDisposition));
     }
 
     /**

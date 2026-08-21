@@ -32,6 +32,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 @Slf4j
@@ -40,6 +41,8 @@ import java.util.regex.Pattern;
 public class EmailVerificationStrategy implements UserVerificationStrategy {
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@([A-Za-z0-9-]+\\.)+[A-Za-z]{2,}$");
+    private static final Set<String> PARTNER_UNIVERSITIES_EMAIL_DOMAINS = Set.of("fudan.edu.cn", "shmu.edu.cn", "m.fudan.edu.cn");
+
 
     private final RedisCacheManager redisCacheManager;
     private final RemoteMailService remoteMailService;
@@ -63,6 +66,7 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
             log.warn("email verification skipped. email={} userId={} reason=\"invalid email format\"", email, userId);
             throw new ServiceException(UserError.VERIFICATION_EMAIL_INVALID);
         }
+        rejectPartnerUniversitiesEmail(email, userId);
 
         educationEmailSchoolResolver.findByEmail(email)
                 .orElseThrow(() -> {
@@ -86,10 +90,11 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
         String token = redisCacheManager.setEmailVerificationCode(email, userId);
 
         // 构建验证链接
-        String verifyLink = userProperties.getApiDomain() + "/verify-email?token=" + token;
+        String verifyLink = userProperties.getApiDomain() + "/email/verify?token=" + token;
 
         // 构建验证邮件
         Context context = new Context();
+        context.setVariable("username", currentUser.getUsername());
         context.setVariable("verify_link", verifyLink);
         context.setVariable("current_date", DateUtil.now());
         // Thymeleaf 渲染
@@ -114,6 +119,7 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
         }
         Long userId = verifyInfo.getLeft();
         String email = verifyInfo.getRight();
+        rejectPartnerUniversitiesEmail(email, userId);
 
         EducationEmailSchool school = educationEmailSchoolResolver.findByEmail(email)
                 .orElseThrow(() -> new ServiceException(UserError.VERIFICATION_EMAIL_INVALID));
@@ -138,12 +144,16 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
         userEntity.setUserStatus(UserStatus.NORMAL);
         userEntity.setVerificationMode(UserVerificationMode.EDU_EMAIL);
 
-        userMapper.updateById(userEntity);
+        if (userMapper.updateById(userEntity) != 1) {
+            throw new ServiceException(UserError.VERIFICATION_EMAIL_UPDATE_FAILED);
+        }
 
         UserProfileEntity userProfileEntity = new UserProfileEntity();
         userProfileEntity.setUserId(userId);
         userProfileEntity.setUniversity(school.getNameZh());
-        userProfileMapper.updateById(userProfileEntity);
+        if (userProfileMapper.updateById(userProfileEntity) != 1) {
+            throw new ServiceException(UserError.VERIFICATION_EMAIL_UPDATE_FAILED);
+        }
 
         redisCacheManager.updateUserStatusInSession(userId, UserStatus.NORMAL);
         log.info("email verification succeeded. userId={} emailDomain={} university={}",
@@ -158,12 +168,32 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
 
     private void validateEmailVerificationState(UserEntity userEntity, Long userId, String email) {
         if (userEntity == null
-                || userEntity.getUserStatus() == UserStatus.BANNED // 被封禁的账号不能认证
-                || !IdentityType.STUDENT.equals(userEntity.getIdentityType()) // 仅学生可通过邮箱认证
-                || (userEntity.getVerificationMode() != null
-                && userEntity.getVerificationMode() != UserVerificationMode.EDU_EMAIL)) {
+                || userEntity.getUserStatus() != UserStatus.UNIDENTIFIED // 被封禁的账号不能认证
+                || userEntity.getVerificationMode() != null) {
             log.warn("email verification skipped. email={} userId={} reason=\"user state invalid\"", email, userId);
             throw new ServiceException(UserError.VERIFICATION_EMAIL_STATE_INVALID);
         }
+    }
+
+    private void rejectPartnerUniversitiesEmail(String email, Long userId) {
+        String emailDomain = extractEmailDomain(email);
+        boolean isPartnerUniversitiesEmail = PARTNER_UNIVERSITIES_EMAIL_DOMAINS.stream()
+                .anyMatch(domain -> emailDomain.equals(domain) || emailDomain.endsWith("." + domain));
+        if (isPartnerUniversitiesEmail) {
+            log.warn("email verification rejected. email={} userId={} emailDomain={} reason=\"partner universities  email domain\"",
+                    email, userId, emailDomain);
+            throw new ServiceException(UserError.VERIFICATION_EMAIL_NOT_ALLOWED);
+        }
+    }
+
+    private static String extractEmailDomain(String email) {
+        if (StrUtil.isBlank(email)) {
+            return "";
+        }
+        int atIndex = email.lastIndexOf('@');
+        if (atIndex < 0 || atIndex == email.length() - 1) {
+            return "";
+        }
+        return email.substring(atIndex + 1).trim().toLowerCase(Locale.ROOT);
     }
 }

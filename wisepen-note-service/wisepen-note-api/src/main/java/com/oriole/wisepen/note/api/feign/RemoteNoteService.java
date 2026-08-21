@@ -15,5 +15,5 @@ public interface RemoteNoteService {
 
     @GetMapping("/internal/note/getNoteSearchText")
     R<NoteSearchTextResponse> getNoteSearchText(@RequestParam("resourceId") String resourceId,
-                                                @RequestParam("version") Integer version);
+                                                @RequestParam(value = "version", required = false) Integer version);
 }

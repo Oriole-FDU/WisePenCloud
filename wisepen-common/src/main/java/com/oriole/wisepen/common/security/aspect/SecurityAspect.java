@@ -45,9 +45,7 @@ public class SecurityAspect {
         if (checkRole != null) {
             // 执行身份校验
             IdentityType currentIdentity = SecurityContextHolder.getIdentityType();
-            if (currentIdentity == null) {
-                throw new PermissionException(PermissionError.UNAUTHORIZED);
-            }
+            if (currentIdentity == null) throw new PermissionException(PermissionError.UNAUTHORIZED);
             // 判断当前身份是否在允许的数组内
             if (!Arrays.asList(checkRole.value()).contains(currentIdentity)) {
                 throw new PermissionException(PermissionError.UNAUTHORIZED);
@@ -55,6 +53,7 @@ public class SecurityAspect {
 
             if (!checkRole.allowUnidentified()) {
                 Integer userStatus = SecurityContextHolder.getUserStatus();
+                if (userStatus == null) throw new PermissionException(PermissionError.UNAUTHORIZED);
                 if (UserStatus.UNIDENTIFIED.getCode() == userStatus) {
                     throw new PermissionException(PermissionError.ACCOUNT_UNIDENTIFIED);
                 }

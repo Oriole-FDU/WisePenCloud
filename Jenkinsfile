@@ -113,7 +113,7 @@ pipeline {
                     # 删除坏文件
                     rm -f "$FILE"
                     # 弃用 GitHub，改用阿里云 Maven 官方镜像仓库，解决国内网络阻断问题
-                    curl -f -L -# -o "$FILE" https://maven.aliyun.com/repository/public/io/opentelemetry/javaagent/opentelemetry-javaagent/1.32.0/opentelemetry-javaagent-1.32.0.jar
+                    curl -f -L -# -o "$FILE" https://maven.aliyun.com/repository/public/io/opentelemetry/javaagent/opentelemetry-javaagent/2.30.0/opentelemetry-javaagent-2.30.0.jar
                 else
                     echo "探针文件已存在且大小正常，跳过下载。"
                 fi

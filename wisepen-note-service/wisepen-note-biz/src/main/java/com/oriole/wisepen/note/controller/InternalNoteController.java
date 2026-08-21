@@ -39,7 +39,7 @@ public class InternalNoteController implements RemoteNoteService {
     @GetMapping("/getNoteSearchText")
     @Override
     public R<NoteSearchTextResponse> getNoteSearchText(@RequestParam("resourceId") String resourceId,
-                                                       @RequestParam("version") Integer version) {
+                                                       @RequestParam(value = "version", required = false) Integer version) {
         return R.ok(noteVersionService.getSearchText(resourceId, version));
     }
 }

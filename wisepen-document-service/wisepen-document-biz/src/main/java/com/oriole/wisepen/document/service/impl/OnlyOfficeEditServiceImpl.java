@@ -141,7 +141,8 @@ public class OnlyOfficeEditServiceImpl implements IOnlyOfficeEditService {
         try {
             sourceUrl = remoteStorageService.getDownloadUrl(
                     versionEntity.getSourceObjectKey(),
-                    documentProperties.getOnlyofficeSourceUrlDurationSeconds()
+                    documentProperties.getOnlyofficeSourceUrlDurationSeconds(),
+                    null
             ).getData();
         } catch (Exception exception){
             throw new ServiceException(DocumentError.DOCUMENT_DOWNLOAD_URL_APPLY_FAILED);

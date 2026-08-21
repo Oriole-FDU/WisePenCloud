@@ -6,6 +6,7 @@ import org.springframework.data.mongodb.repository.Query;
 import org.springframework.data.mongodb.repository.Update;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,6 +21,6 @@ public interface DocumentInfoRepository extends MongoRepository<DocumentInfoEnti
     void deleteByResourceIdIn(List<String> resourceIds);
 
     @Query("{ '_id': ?0 }")
-    @Update("{ '$set': { 'version': ?1 } }")
-    void updateVersionByResourceId(String resourceId, Integer version);
+    @Update("{ '$set': { 'version': ?1, 'updateTime': ?2 } }")
+    void updateVersionByResourceId(String resourceId, Integer version, LocalDateTime updateTime);
 }

@@ -10,6 +10,7 @@ import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.resource.domain.dto.res.MarketSearchHitItemResponse;
 import com.oriole.wisepen.resource.domain.dto.res.SearchHitItemResponse;
 import com.oriole.wisepen.resource.enums.MarketSaleStatus;
+import com.oriole.wisepen.resource.enums.ResourceType;
 import com.oriole.wisepen.resource.enums.SearchScope;
 import com.oriole.wisepen.resource.service.ISearchQueryService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -17,6 +18,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -35,7 +37,7 @@ public class SearchController {
             summary = "全文搜索资源",
             description = """
                     - 用途：在当前用户可见范围内跨资源类型检索资源内容和元信息。
-                    - 请求：keyword 为搜索关键字，可为空；scope 指定搜索范围；page 和 size 控制分页。
+                    - 请求：keyword 为搜索关键字，可为空；scope 指定搜索范围；resourceTypes 可选，用于进一步限定资源类型；page 和 size 控制分页。
                     - 约束：当前用户必须已登录；scope 必须是合法枚举。
                     - 处理：使用当前用户 ID 和小组角色上下文执行全文搜索，并应用资源可见性过滤与高亮处理；不返回当前用户无权查看的资源。
                     - 失败：搜索服务执行失败 -> ResourceError.RESOURCE_SEARCH_FAILED。
@@ -47,6 +49,7 @@ public class SearchController {
     public R<PageR<SearchHitItemResponse>> searchResources(
             @RequestParam(value = "keyword", required = false) String keyword,
             @RequestParam(value = "scope") SearchScope scope,
+            @RequestParam(value = "resourceTypes", required = false) List<ResourceType> resourceTypes,
             @RequestParam(value = "page", defaultValue = "1") int page,
             @RequestParam(value = "size", defaultValue = "20") int size) {
         String userId = SecurityContextHolder.getUserId().toString();
@@ -57,6 +60,7 @@ public class SearchController {
                 groupRoleMap,
                 keyword,
                 scope,
+                resourceTypes,
                 page,
                 size
         ));
