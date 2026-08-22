@@ -14,13 +14,16 @@
         <outputRelativeToContentRoot value="true" />
         <processorPath useClasspath="false">
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.30/lombok-1.18.30.jar" />
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.30/lombok-1.18.30.jar" />
         </processorPath>
         <module name="wisepen-system-api" />
         <module name="wisepen-note-api" />
+        <module name="wisepen-generic-resource-biz" />
         <module name="wisepen-common-log" />
         <module name="wisepen-user-api" />
         <module name="wisepen-note-biz" />
         <module name="wisepen-document-biz" />
+        <module name="wisepen-generic-resource-api" />
         <module name="wisepen-resource-biz" />
         <module name="wisepen-ai-asset-api" />
         <module name="wisepen-file-storage-biz" />
@@ -56,6 +59,9 @@
       <module name="wisepen-fudan-extension-api" options="-parameters -parameters" />
       <module name="wisepen-fudan-extension-biz" options="-parameters -parameters" />
       <module name="wisepen-fudan-extension-service" options="-parameters -parameters" />
+      <module name="wisepen-generic-resource-api" options="-parameters -parameters" />
+      <module name="wisepen-generic-resource-biz" options="-parameters -parameters" />
+      <module name="wisepen-generic-resource-service" options="-parameters -parameters" />
       <module name="wisepen-note-api" options="-parameters -parameters" />
       <module name="wisepen-note-biz" options="-parameters -parameters" />
       <module name="wisepen-note-service" options="-parameters -parameters" />

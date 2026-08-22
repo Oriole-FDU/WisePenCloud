@@ -3,18 +3,18 @@ package com.oriole.wisepen.resource.enums;
 import com.baomidou.mybatisplus.annotation.EnumValue;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 平台资源类型枚举
  * 覆盖所有受平台管理的资源类型，包括有实体文件的文档类型和无扩展名的笔记类型。
  */
 @Getter
-@AllArgsConstructor
 public enum ResourceType {
 
     /** 无扩展名的笔记，由笔记服务管理 */
@@ -37,6 +37,11 @@ public enum ResourceType {
     /** 无扩展名的 Agent，由 AI资产 服务管理 */
     AGENT(32, "AGENT", "agent"),
 
+    /** 压缩包类文件，由通用资源服务管理 */
+    ARCHIVE(41, "ARCHIVE", "archive", "zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz"),
+    /** 明确的二进制文件，由通用资源服务管理 */
+    BINARY(42, "BINARY", "binary", "bin", "dat"),
+
     /** 未知资源，兜底 */
     UNKNOWN(99, "UNKNOWN", "unknown");
 
@@ -48,11 +53,30 @@ public enum ResourceType {
 
     private final String extension;
 
+    private final Set<String> extensions;
+
     private static final Map<String, ResourceType> EXT_MAP = new HashMap<>();
 
     static {
         for (ResourceType item : values()) {
-            EXT_MAP.put(item.extension, item);
+            for (String extension : item.extensions) {
+                EXT_MAP.put(extension, item);
+            }
+        }
+    }
+
+    ResourceType(int code, String value, String extension, String... aliases) {
+        this.code = code;
+        this.value = value;
+        this.extension = extension;
+        this.extensions = new HashSet<>();
+        this.extensions.add(extension);
+        if (aliases != null) {
+            for (String alias : aliases) {
+                if (alias != null && !alias.isBlank()) {
+                    this.extensions.add(alias.trim().toLowerCase());
+                }
+            }
         }
     }
 
@@ -67,6 +91,11 @@ public enum ResourceType {
         if (ext == null) {
             return null;
         }
-        return EXT_MAP.get(ext.trim().toLowerCase());
+        String normalized = ext.trim().toLowerCase();
+        while (normalized.startsWith(".")) {
+            normalized = normalized.substring(1);
+        }
+        return EXT_MAP.get(normalized);
     }
+
 }
