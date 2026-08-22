@@ -21,6 +21,8 @@ public interface IMediaService {
 
     void retryMediaProcess(String mediaId);
 
+    void cancelMediaProcess(String mediaId);
+
     void assertMediaUploader(String mediaId, Long uploaderId);
 
     void handleFileUploaded(FileUploadedMessage message);

@@ -189,6 +189,45 @@ public class MediaServiceImpl implements IMediaService {
     }
 
     @Override
+    public void cancelMediaProcess(String mediaId) {
+        MediaInfoEntity entity = mediaInfoRepository.findById(mediaId)
+                .orElseThrow(() -> new ServiceException(MediaError.MEDIA_NOT_FOUND));
+        MediaStatusEnum status = entity.getMediaStatus() != null ? entity.getMediaStatus().getStatus() : null;
+        if (status == MediaStatusEnum.READY) {
+            throw new ServiceException(MediaError.CANNOT_CANCEL_READY_MEDIA_PROCESS);
+        }
+        if (status == MediaStatusEnum.PROCESSING || status == MediaStatusEnum.REGISTERING_RES) {
+            throw new ServiceException(MediaError.CANNOT_CANCEL_MEDIA_PROCESS_IN_CURRENT_STATE);
+        }
+
+        if (StrUtil.isNotBlank(entity.getResourceId())) {
+            deleteMediaByResourceIds(List.of(entity.getResourceId()));
+            log.info("media process cancelled. mediaId={} resourceId={} status={}",
+                    mediaId, entity.getResourceId(), status);
+            return;
+        }
+
+        Set<String> objectKeys = new LinkedHashSet<>();
+        if (StrUtil.isNotBlank(entity.getSourceObjectKey())) {
+            objectKeys.add(entity.getSourceObjectKey());
+        }
+        if (entity.getSourceHlsObjectKeys() != null) {
+            entity.getSourceHlsObjectKeys().stream()
+                    .filter(StrUtil::isNotBlank)
+                    .forEach(objectKeys::add);
+        }
+        if (StrUtil.isNotBlank(entity.getPreviewObjectKey())) {
+            objectKeys.add(entity.getPreviewObjectKey());
+        }
+        if (!objectKeys.isEmpty()) {
+            eventPublisher.publishFileDeleteEvent(new ArrayList<>(objectKeys));
+        }
+        mediaInfoRepository.deleteById(mediaId);
+        log.info("media process cancelled. mediaId={} status={} objectKeys={}",
+                mediaId, status, summarizeIds(new ArrayList<>(objectKeys)));
+    }
+
+    @Override
     public void assertMediaUploader(String mediaId, Long uploaderId) {
         MediaInfoEntity entity = mediaInfoRepository.findById(mediaId)
                 .orElseThrow(() -> new ServiceException(MediaError.MEDIA_NOT_FOUND));

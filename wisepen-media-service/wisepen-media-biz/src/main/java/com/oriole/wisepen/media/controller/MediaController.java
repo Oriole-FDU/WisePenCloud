@@ -128,6 +128,25 @@ public class MediaController {
     }
 
     @Operation(
+            summary = "取消媒体处理",
+            description = """
+                    - 用途：取消当前用户尚未完成的媒体上传或处理任务。
+                    - 请求：mediaId 指定待取消的媒体任务。
+                    - 约束：当前用户必须是该媒体上传者；媒体已就绪后不能取消；处理中或正在注册资源的媒体当前不允许取消。
+                    - 处理：删除媒体信息以及相关对象存储待清理文件；如果媒体已经关联资源，则同时删除资源关联的媒体记录和水印会话。
+                    - 失败：媒体不存在 -> MediaError.MEDIA_NOT_FOUND；当前用户不是上传者 -> MediaError.MEDIA_PERMISSION_DENIED；媒体已就绪 -> MediaError.CANNOT_CANCEL_READY_MEDIA_PROCESS；媒体当前状态不能取消 -> MediaError.CANNOT_CANCEL_MEDIA_PROCESS_IN_CURRENT_STATE。
+                    - 响应：成功时返回空结果。
+                    """
+    )
+    @Log(title = "取消媒体处理", businessType = BusinessType.DELETE)
+    @PostMapping("/cancelMediaProcess")
+    public R<Void> cancelMediaProcess(@RequestParam @NotBlank(message = MediaValidationMsg.MEDIA_ID_EMPTY) String mediaId) {
+        mediaService.assertMediaUploader(mediaId, SecurityContextHolder.getUserId());
+        mediaService.cancelMediaProcess(mediaId);
+        return R.ok();
+    }
+
+    @Operation(
             summary = "获取媒体播放授权",
             description = """
                     - 用途：为有查看权限的用户获取无水印媒体播放地址。

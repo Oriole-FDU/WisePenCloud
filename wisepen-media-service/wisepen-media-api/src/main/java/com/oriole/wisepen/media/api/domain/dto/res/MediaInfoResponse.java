@@ -6,7 +6,7 @@ import lombok.Data;
 
 import java.io.Serial;
 import java.io.Serializable;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Data
 public class MediaInfoResponse implements Serializable {
@@ -34,5 +34,5 @@ public class MediaInfoResponse implements Serializable {
 
     private MediaStatus mediaStatus;
 
-    private LocalDate updateTime;
+    private LocalDateTime updateTime;
 }

@@ -27,8 +27,10 @@ public enum MediaError implements IResult {
     MEDIA_PLAYBACK_FAILED(10231, new ResultKey(BusinessDomain.MEDIA, MediaSubject.MEDIA_PREVIEW, ErrorReason.FAILED), "媒体播放会话创建失败"),
     MEDIA_FORENSIC_UNAVAILABLE(10241, new ResultKey(BusinessDomain.MEDIA, MediaSubject.MEDIA_PREVIEW, ErrorReason.UNSUPPORTED), "媒体暗水印能力不可用"),
 
+    MEDIA_PROCESS_FAILED(10321, new ResultKey(BusinessDomain.MEDIA, MediaSubject.MEDIA_PROCESS, ErrorReason.FAILED), "媒体处理失败"),
     CANNOT_RETRY_MEDIA_PROCESS_IN_CURRENT_STATE(10322, new ResultKey(BusinessDomain.MEDIA, MediaSubject.MEDIA_PROCESS, ErrorReason.STATE_INVALID), "媒体当前状态不能重试处理流程"),
-    MEDIA_PROCESS_FAILED(10321, new ResultKey(BusinessDomain.MEDIA, MediaSubject.MEDIA_PROCESS, ErrorReason.FAILED), "媒体处理失败");
+    CANNOT_CANCEL_READY_MEDIA_PROCESS(10323, new ResultKey(BusinessDomain.MEDIA, MediaSubject.MEDIA_PROCESS, ErrorReason.STATE_INVALID), "媒体已就绪，不能取消处理流程"),
+    CANNOT_CANCEL_MEDIA_PROCESS_IN_CURRENT_STATE(10324, new ResultKey(BusinessDomain.MEDIA, MediaSubject.MEDIA_PROCESS, ErrorReason.STATE_INVALID), "媒体当前状态不能取消处理流程");
 
     private final Integer code;
     private final ResultKey key;
