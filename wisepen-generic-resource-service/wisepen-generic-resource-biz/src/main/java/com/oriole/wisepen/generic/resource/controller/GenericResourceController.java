@@ -7,12 +7,12 @@ import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.generic.resource.api.constant.GenericResourceValidationMsg;
+import com.oriole.wisepen.generic.resource.api.domain.base.GenericResourceStatus;
 import com.oriole.wisepen.generic.resource.api.domain.dto.req.GenericResourceUploadInitRequest;
 import com.oriole.wisepen.generic.resource.api.domain.dto.res.GenericResourceInfoResponse;
 import com.oriole.wisepen.generic.resource.api.domain.dto.res.GenericResourceDetailResponse;
 import com.oriole.wisepen.generic.resource.api.domain.dto.res.GenericResourceDownloadResponse;
 import com.oriole.wisepen.generic.resource.api.domain.dto.res.GenericResourceUploadInitResponse;
-import com.oriole.wisepen.generic.resource.api.domain.dto.res.GenericResourceUploadStatusResponse;
 import com.oriole.wisepen.generic.resource.exception.GenericResourceError;
 import com.oriole.wisepen.generic.resource.service.IGenericResourceService;
 import com.oriole.wisepen.resource.domain.dto.ResourceCheckPermissionReqDTO;
@@ -57,27 +57,27 @@ public class GenericResourceController {
                     """
     )
     @Log(title = "初始化通用资源上传", businessType = BusinessType.INSERT)
-    @PostMapping("/initUploadGenericResource")
-    public R<GenericResourceUploadInitResponse> initUploadGenericResource(@Valid @RequestBody GenericResourceUploadInitRequest request) {
+    @PostMapping("/uploadGenericResource")
+    public R<GenericResourceUploadInitResponse> uploadGenericResource(@Valid @RequestBody GenericResourceUploadInitRequest request) {
         return R.ok(genericResourceService.initUploadGenericResource(request, SecurityContextHolder.getUserId(), SecurityContextHolder.getGroupRoleMap()));
     }
 
     @Operation(
-            summary = "同步通用资源上传状态",
+            summary = "刷新通用资源状态",
             description = """
-                    - 用途：主动同步当前用户发起的通用资源上传任务，并在存储状态已就绪但事件尚未消费时补偿注册资源。
-                    - 请求：genericResourceId 指定通用资源上传处理记录。
+                    - 用途：主动刷新当前用户发起的通用资源上传任务状态，并在存储状态已就绪但事件尚未消费时补偿注册资源。
+                    - 请求：genericResourceId 指定待刷新的通用资源上传任务。
                     - 约束：当前用户必须是该上传任务创建者；目标上传任务必须存在。
                     - 处理：读取上传任务状态；若任务尚未 READY，会查询文件存储记录，确认对象已就绪后注册资源并更新状态；不重新申请上传 URL，不重复上传文件。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN；上传任务不存在 -> GenericResourceError.GENERIC_RESOURCE_UPLOAD_NOT_FOUND；当前用户不是上传者 -> GenericResourceError.GENERIC_RESOURCE_PERMISSION_DENIED；存储状态查询失败 -> GenericResourceError.GENERIC_RESOURCE_STORAGE_STATUS_GET_FAILED；资源注册失败 -> GenericResourceError.GENERIC_RESOURCE_REGISTER_FAILED。
-                    - 响应：返回上传任务、资源类型、objectKey、资源 ID 和当前状态。
+                    - 响应：返回刷新后的通用资源状态。
                     """
     )
-    @Log(title = "同步通用资源上传状态", businessType = BusinessType.UPDATE)
-    @PostMapping("/syncGenericResourceUploadStatus")
-    public R<GenericResourceUploadStatusResponse> syncGenericResourceUploadStatus(
+    @Log(title = "刷新通用资源状态", businessType = BusinessType.UPDATE)
+    @PostMapping("/syncGenericResourceStatus")
+    public R<GenericResourceStatus> syncGenericResourceStatus(
             @NotBlank(message = GenericResourceValidationMsg.GENERIC_RESOURCE_ID_EMPTY) @RequestParam String genericResourceId) {
-        return R.ok(genericResourceService.syncGenericResourceUploadStatus(genericResourceId, SecurityContextHolder.getUserId()));
+        return R.ok(genericResourceService.refreshGenericResourceStatus(genericResourceId, SecurityContextHolder.getUserId()));
     }
 
     @Operation(

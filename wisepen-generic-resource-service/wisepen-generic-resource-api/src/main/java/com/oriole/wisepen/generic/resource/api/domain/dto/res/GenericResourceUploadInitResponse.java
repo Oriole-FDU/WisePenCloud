@@ -18,9 +18,6 @@ public class GenericResourceUploadInitResponse implements Serializable {
 
     private String genericResourceId;
 
-    /**
-     * 秒传或上传补偿完成后才有资源 ID。
-     */
     private String resourceId;
 
     private GenericResourceStatusEnum status;
@@ -31,10 +28,8 @@ public class GenericResourceUploadInitResponse implements Serializable {
 
     private String objectKey;
 
-    /** OSS 预签名直传 PUT URL（flashUploaded=true 时为 null） */
     private String putUrl;
 
-    /** 直传时需附加在 PUT 请求 Header 中的 x-oss-callback 字符串 */
     private String callbackHeader;
 
     private Boolean flashUploaded;

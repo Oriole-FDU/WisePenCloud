@@ -11,11 +11,11 @@ import com.oriole.wisepen.file.storage.api.domain.mq.FileUploadedMessage;
 import com.oriole.wisepen.file.storage.api.enums.StorageSceneEnum;
 import com.oriole.wisepen.file.storage.api.feign.RemoteStorageService;
 import com.oriole.wisepen.generic.resource.api.constant.GenericResourceConstants;
+import com.oriole.wisepen.generic.resource.api.domain.base.GenericResourceStatus;
 import com.oriole.wisepen.generic.resource.api.domain.dto.req.GenericResourceUploadInitRequest;
 import com.oriole.wisepen.generic.resource.api.domain.dto.res.GenericResourceDownloadResponse;
 import com.oriole.wisepen.generic.resource.api.domain.dto.res.GenericResourceInfoResponse;
 import com.oriole.wisepen.generic.resource.api.domain.dto.res.GenericResourceUploadInitResponse;
-import com.oriole.wisepen.generic.resource.api.domain.dto.res.GenericResourceUploadStatusResponse;
 import com.oriole.wisepen.generic.resource.api.enums.GenericResourceStatusEnum;
 import com.oriole.wisepen.generic.resource.domain.entity.GenericResourceInfoEntity;
 import com.oriole.wisepen.generic.resource.exception.GenericResourceError;
@@ -125,7 +125,7 @@ public class GenericResourceServiceImpl implements IGenericResourceService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public GenericResourceUploadStatusResponse syncGenericResourceUploadStatus(String genericResourceId, Long operatorUserId) {
+    public GenericResourceStatus refreshGenericResourceStatus(String genericResourceId, Long operatorUserId) {
         GenericResourceInfoEntity entity = genericResourceInfoRepository.findById(genericResourceId)
                 .orElseThrow(() -> new ServiceException(GenericResourceError.GENERIC_RESOURCE_UPLOAD_NOT_FOUND));
         if (!Objects.equals(entity.getUploaderId(), operatorUserId)) {
@@ -145,9 +145,7 @@ public class GenericResourceServiceImpl implements IGenericResourceService {
                 entity = finalizeToReady(entity, storageRecord.getMd5(), storageRecord.getSize());
             }
         }
-        GenericResourceUploadStatusResponse response = BeanUtil.copyProperties(entity, GenericResourceUploadStatusResponse.class);
-        response.setStatus(entity.getStatus());
-        return response;
+        return new GenericResourceStatus(entity.getStatus());
     }
 
     @Override
