@@ -11,6 +11,11 @@ public enum GenericResourceStatusEnum {
     UPLOADING(0, "UPLOADING"),
     REGISTERING_RES(1, "REGISTERING_RES"),
     READY(2, "READY"),
+
+    /** 上传超时：对象存储在预期时限内未收到文件。 */
+    TRANSFER_TIMEOUT(-2, "TRANSFER_TIMEOUT"),
+
+    /** 注册资源超时：资源服务创建失败或超时。 */
     REGISTERING_RES_TIMEOUT(-1, "REGISTERING_RES_TIMEOUT");
 
     private final int code;

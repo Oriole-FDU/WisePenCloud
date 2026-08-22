@@ -149,6 +149,16 @@ public class GenericResourceServiceImpl implements IGenericResourceService {
     }
 
     @Override
+    public void updateStatus(String genericResourceId, GenericResourceStatus status) {
+        GenericResourceInfoEntity entity = genericResourceInfoRepository.findById(genericResourceId)
+                .orElseThrow(() -> new ServiceException(GenericResourceError.GENERIC_RESOURCE_NOT_FOUND));
+        GenericResourceStatusEnum from = entity.getStatus();
+        genericResourceInfoRepository.updateStatusById(genericResourceId, status.getStatus());
+        log.info("generic resource status changed. genericResourceId={} resourceId={} from={} to={}",
+                genericResourceId, entity.getResourceId(), from, status.getStatus());
+    }
+
+    @Override
     public GenericResourceInfoResponse getGenericResourceInfo(String resourceId) {
         GenericResourceInfoEntity entity = genericResourceInfoRepository.findByResourceId(resourceId)
                 .orElseThrow(() -> new ServiceException(GenericResourceError.GENERIC_RESOURCE_NOT_FOUND));

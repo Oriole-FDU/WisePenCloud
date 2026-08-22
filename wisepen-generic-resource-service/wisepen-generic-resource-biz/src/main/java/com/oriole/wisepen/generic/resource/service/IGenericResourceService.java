@@ -17,6 +17,8 @@ public interface IGenericResourceService {
 
     GenericResourceStatus refreshGenericResourceStatus(String genericResourceId, Long operatorUserId);
 
+    void updateStatus(String genericResourceId, GenericResourceStatus status);
+
     GenericResourceInfoResponse getGenericResourceInfo(String resourceId);
 
     GenericResourceDownloadResponse getDownloadUrl(String resourceId, Long durationSeconds);
