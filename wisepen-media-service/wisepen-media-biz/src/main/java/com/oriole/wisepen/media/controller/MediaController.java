@@ -77,10 +77,10 @@ public class MediaController {
     @Operation(
             summary = "查询未就绪媒体",
             description = """
-                    - 用途：查询当前用户仍处于上传、处理、注册或失败状态的媒体任务。
+                    - 用途：查询当前用户仍处于上传、上传超时、处理、注册或失败状态的媒体任务。
                     - 请求：无显式请求参数，上传者来自当前登录上下文。
                     - 约束：当前用户必须已登录。
-                    - 处理：按当前用户筛选非 READY 的待处理媒体；不触发重试。
+                    - 处理：按当前用户筛选 UPLOADING、TRANSFER_TIMEOUT、UPLOADED、PROCESSING、REGISTERING_RES、REGISTERING_RES_TIMEOUT 和 FAILED 状态的媒体；不触发重试。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN。
                     - 响应：返回未就绪媒体基础信息列表。
                     """

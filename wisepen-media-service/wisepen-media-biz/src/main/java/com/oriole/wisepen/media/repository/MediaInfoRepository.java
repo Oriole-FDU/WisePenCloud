@@ -26,6 +26,9 @@ public interface MediaInfoRepository extends MongoRepository<MediaInfoEntity, St
     @Query("{ 'ownerId': ?0, 'mediaStatus.status': { $in: ?1 } }")
     List<MediaInfoEntity> findByOwnerIdAndStatusIn(Long ownerId, List<MediaStatusEnum> statusList);
 
+    @Query("{ 'mediaStatus.status': ?0 }")
+    List<MediaInfoEntity> findByStatus(MediaStatusEnum status);
+
     @Query("{'_id': ?0}")
     @Update("{'$set': {'mediaStatus': ?1}}")
     void updateStatusById(String mediaId, MediaStatus status);
