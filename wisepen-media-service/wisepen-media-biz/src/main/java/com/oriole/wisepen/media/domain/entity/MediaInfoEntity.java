@@ -57,10 +57,7 @@ public class MediaInfoEntity implements Persistable<String> {
     /** 图片预览图或视频封面图在 OSS 中的 ObjectKey */
     private String previewObjectKey;
 
-    /** 首次上传时的目标挂载标签。 */
     private String mountTargetTagId;
-
-    /** 首次上传者的小组角色快照。 */
     private Map<Long, GroupRoleType> uploaderGroupRoles;
 
     private Long durationMs;
@@ -71,7 +68,6 @@ public class MediaInfoEntity implements Persistable<String> {
 
     private Long size;
 
-    /** 当前媒体处理状态和失败原因 */
     private MediaStatus mediaStatus;
 
     @CreatedDate

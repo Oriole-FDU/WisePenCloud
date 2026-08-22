@@ -1,6 +1,6 @@
 package com.oriole.wisepen.media.provider;
 
-import com.oriole.wisepen.media.api.enums.ForensicStatus;
+import com.oriole.wisepen.media.api.enums.WatermarkCapabilityStatus;
 import com.oriole.wisepen.media.api.enums.WatermarkSessionStatus;
 import com.oriole.wisepen.media.domain.MediaPlaybackGrant;
 import com.oriole.wisepen.media.domain.entity.MediaInfoEntity;
@@ -25,7 +25,7 @@ public class UnsupportedMediaWatermarkProvider implements MediaWatermarkProvider
         MediaPlaybackGrant.MediaPlaybackGrantBuilder builder = MediaPlaybackGrant.builder()
                 .status(WatermarkSessionStatus.READY)
                 .deliveryMode(session.getDeliveryMode())
-                .forensicStatus(ForensicStatus.UNAVAILABLE);
+                .capabilityStatus(WatermarkCapabilityStatus.UNAVAILABLE);
         if (mediaInfo.getResourceType() == ResourceType.IMAGE && StrUtil.isNotBlank(mediaInfo.getPreviewObjectKey())) {
             builder.previewObjectKey(mediaInfo.getPreviewObjectKey())
                     .deliveryObjectKeys(List.of(mediaInfo.getPreviewObjectKey()));

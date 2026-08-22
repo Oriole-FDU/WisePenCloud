@@ -122,9 +122,7 @@ public class MediaServiceImpl implements IMediaService {
                         MediaStatusEnum.REGISTERING_RES,
                         MediaStatusEnum.TRANSFER_TIMEOUT,
                         MediaStatusEnum.REGISTERING_RES_TIMEOUT,
-                        MediaStatusEnum.PROBING,
-                        MediaStatusEnum.PACKAGING,
-                        MediaStatusEnum.FORENSIC_PREPROCESSING,
+                        MediaStatusEnum.PROCESSING,
                         MediaStatusEnum.FAILED)
         );
         return entities.stream().map(entity -> BeanUtil.copyProperties(entity, MediaInfoResponse.class)).toList();

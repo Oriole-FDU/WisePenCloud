@@ -1,7 +1,7 @@
 package com.oriole.wisepen.media.domain;
 
-import com.oriole.wisepen.media.api.enums.ForensicStatus;
 import com.oriole.wisepen.media.api.enums.MediaDeliveryMode;
+import com.oriole.wisepen.media.api.enums.WatermarkCapabilityStatus;
 import com.oriole.wisepen.media.api.enums.WatermarkSessionStatus;
 import lombok.Builder;
 import lombok.Data;
@@ -22,7 +22,7 @@ public class MediaPlaybackGrant {
     private MediaDeliveryMode deliveryMode;
 
     /** Provider 返回的暗水印取证能力状态。 */
-    private ForensicStatus forensicStatus;
+    private WatermarkCapabilityStatus capabilityStatus;
 
     /** 图片预览产物在 OSS 中的 ObjectKey。 */
     private String previewObjectKey;

@@ -7,11 +7,12 @@ import lombok.Getter;
 
 @Getter
 @AllArgsConstructor
-public enum WatermarkPurpose {
-    PREVIEW(1, "PREVIEW"),
-    PLAYBACK(2, "PLAYBACK"),
-    /** 历史取证水印下载会话用途，保留用于读取旧会话记录。 */
-    DOWNLOAD(3, "DOWNLOAD");
+public enum WatermarkCapabilityStatus {
+    READY(1, "READY"),
+    PREPARING(2, "PREPARING"),
+    WEAK(3, "WEAK"),
+    UNAVAILABLE(4, "UNAVAILABLE"),
+    FAILED(5, "FAILED");
 
     private final int code;
 

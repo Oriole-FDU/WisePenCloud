@@ -82,15 +82,13 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
             return;
         }
 
-        updateStatus(mediaId, new MediaStatus(MediaStatusEnum.PROBING));
+        updateStatus(mediaId, new MediaStatus(MediaStatusEnum.PROCESSING));
 
-        // packaging 只生成媒体基础产物：图片尺寸、视频源 HLS 与封面；音频只读取音频流元数据
+        // processing 读取媒体元数据并生成基础产物：图片预览、视频源 HLS 与封面；音频只读取音频流元数据
         MediaPackagingResult packagingResult;
         if (entity.getResourceType() == ResourceType.IMAGE) {
-            updateStatus(mediaId, new MediaStatus(MediaStatusEnum.PACKAGING));
             packagingResult = packageImage(entity);
         } else if (entity.getResourceType() == ResourceType.VIDEO) {
-            updateStatus(mediaId, new MediaStatus(MediaStatusEnum.PACKAGING));
             packagingResult = packageVideo(entity);
         } else if (entity.getResourceType() == ResourceType.AUDIO) {
             packagingResult = packageAudio(entity);
@@ -136,9 +134,7 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
         if (status == null
                 || status == MediaStatusEnum.UPLOADING
                 || status == MediaStatusEnum.UPLOADED
-                || status == MediaStatusEnum.PROBING
-                || status == MediaStatusEnum.PACKAGING
-                || status == MediaStatusEnum.FORENSIC_PREPROCESSING) {
+                || status == MediaStatusEnum.PROCESSING) {
             if (status != MediaStatusEnum.UPLOADED) {
                 updateStatus(mediaId, new MediaStatus(MediaStatusEnum.UPLOADED));
             }

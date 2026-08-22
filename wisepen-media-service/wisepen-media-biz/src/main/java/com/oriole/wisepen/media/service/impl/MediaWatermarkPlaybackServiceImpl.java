@@ -7,10 +7,9 @@ import cn.hutool.core.util.StrUtil;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.file.storage.api.feign.RemoteStorageService;
 import com.oriole.wisepen.media.api.domain.dto.res.MediaPlaybackSessionResponse;
-import com.oriole.wisepen.media.api.enums.ForensicStatus;
 import com.oriole.wisepen.media.api.enums.MediaDeliveryMode;
 import com.oriole.wisepen.media.api.enums.MediaStatusEnum;
-import com.oriole.wisepen.media.api.enums.WatermarkPurpose;
+import com.oriole.wisepen.media.api.enums.WatermarkCapabilityStatus;
 import com.oriole.wisepen.media.api.enums.WatermarkSessionStatus;
 import com.oriole.wisepen.media.config.MediaProperties;
 import com.oriole.wisepen.media.domain.MediaPlaybackGrant;
@@ -57,7 +56,7 @@ public class MediaWatermarkPlaybackServiceImpl implements IMediaWatermarkPlaybac
             return MediaPlaybackSessionResponse.builder()
                     .status(WatermarkSessionStatus.READY)
                     .deliveryMode(MediaDeliveryMode.AUDIO_SOURCE)
-                    .forensicStatus(ForensicStatus.UNAVAILABLE)
+                    .capabilityStatus(WatermarkCapabilityStatus.UNAVAILABLE)
                     .playbackUrl(remoteStorageService.getDownloadUrl(mediaInfo.getSourceObjectKey(), null, null).getData())
                     .build();
         }
@@ -65,8 +64,6 @@ public class MediaWatermarkPlaybackServiceImpl implements IMediaWatermarkPlaybac
         LocalDateTime accessedAt = LocalDateTime.now();
         String sessionId = IdUtil.fastSimpleUUID();
         String wmId = IdUtil.fastSimpleUUID();
-        WatermarkPurpose purpose = mediaInfo.getResourceType() == ResourceType.IMAGE
-                ? WatermarkPurpose.PREVIEW : WatermarkPurpose.PLAYBACK;
         MediaDeliveryMode deliveryMode = mediaInfo.getResourceType() == ResourceType.IMAGE
                 ? MediaDeliveryMode.IMAGE_PREVIEW : MediaDeliveryMode.VIDEO_JIT_HLS;
 
@@ -76,23 +73,22 @@ public class MediaWatermarkPlaybackServiceImpl implements IMediaWatermarkPlaybac
                 .viewerId(viewerId)
                 .resourceId(resourceId)
                 .mediaId(mediaInfo.getMediaId())
-                .purpose(purpose)
                 .accessedAt(accessedAt)
                 .expiresAt(accessedAt.plusMinutes(mediaProperties.getSessionTtlMinutes()))
                 .watermarkText(viewerId + " " + accessedAt.format(WATERMARK_TIME_FORMAT) + " " + mediaProperties.getAcademicUseText())
                 .deliveryMode(deliveryMode)
                 .status(WatermarkSessionStatus.PREPARING)
-                .forensicStatus(ForensicStatus.PREPARING)
+                .forensicStatus(WatermarkCapabilityStatus.PREPARING)
                 .build();
         watermarkSessionRepository.save(session);
 
         // 会话先落库再调用 provider，确保后续泄露检测可以用 wmId 反查 viewer/resource/session。
         MediaPlaybackGrant grant = mediaWatermarkProvider.createPlaybackGrant(mediaInfo, session);
         // VIEW 权限不等于允许看源文件；暗水印不可用时直接 fail closed。
-        if (grant.getForensicStatus() == ForensicStatus.UNAVAILABLE) {
+        if (grant.getCapabilityStatus() == WatermarkCapabilityStatus.UNAVAILABLE) {
             BeanUtil.copyProperties(MediaWatermarkSessionEntity.builder()
                     .status(WatermarkSessionStatus.FAILED)
-                    .forensicStatus(ForensicStatus.UNAVAILABLE)
+                    .forensicStatus(WatermarkCapabilityStatus.UNAVAILABLE)
                     .build(), session, IGNORE_NULL_COPY_OPTIONS);
             watermarkSessionRepository.save(session);
             throw new ServiceException(MediaError.MEDIA_FORENSIC_UNAVAILABLE);
@@ -100,7 +96,7 @@ public class MediaWatermarkPlaybackServiceImpl implements IMediaWatermarkPlaybac
         BeanUtil.copyProperties(MediaWatermarkSessionEntity.builder()
                 .status(grant.getStatus())
                 .deliveryMode(grant.getDeliveryMode())
-                .forensicStatus(grant.getForensicStatus())
+                .forensicStatus(grant.getCapabilityStatus())
                 .previewObjectKey(grant.getPreviewObjectKey())
                 .manifestObjectKey(grant.getManifestObjectKey())
                 .deliveryObjectKeys(grant.getDeliveryObjectKeys())
@@ -110,7 +106,7 @@ public class MediaWatermarkPlaybackServiceImpl implements IMediaWatermarkPlaybac
                 .sessionId(session.getSessionId())
                 .status(session.getStatus())
                 .deliveryMode(session.getDeliveryMode())
-                .forensicStatus(session.getForensicStatus())
+                .capabilityStatus(session.getForensicStatus())
                 .watermarkText(session.getWatermarkText())
                 .retryAfterMs(grant.getRetryAfterMs());
         boolean ready = session.getStatus() == WatermarkSessionStatus.READY
@@ -138,7 +134,7 @@ public class MediaWatermarkPlaybackServiceImpl implements IMediaWatermarkPlaybac
                 .sessionId(session.getSessionId())
                 .status(session.getStatus())
                 .deliveryMode(session.getDeliveryMode())
-                .forensicStatus(session.getForensicStatus())
+                .capabilityStatus(session.getForensicStatus())
                 .watermarkText(session.getWatermarkText())
                 .retryAfterMs(null);
         boolean ready = session.getStatus() == WatermarkSessionStatus.READY
