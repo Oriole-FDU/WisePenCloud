@@ -27,9 +27,9 @@ public class UserFeedbackController {
             summary = "提交用户反馈",
             description = """
                     - 用途：让登录用户提交问题报错、功能建议或使用咨询反馈。
-                    - 请求：content 为反馈正文；type 为反馈类型；contact 和 browser 为可选补充信息。
-                    - 约束：当前用户必须已登录；content 和 type 必须表达有效的反馈内容与反馈类型。
-                    - 处理：创建反馈记录并将状态初始化为 PENDING；不在本接口分派处理人或发送通知。
+                    - 请求：content 为反馈正文；contact 为联系方式；imageUrl 为可选图片地址；bugReport、suggestion、consultation、complaint 和 other 标记反馈包含的问题类型。
+                    - 约束：当前用户必须已登录；content 必须表达有效的反馈内容；至少一个问题类型标记必须为 true。
+                    - 处理：创建反馈记录；不在本接口分派处理人或发送通知。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN；反馈记录写入发生未处理异常 -> CommonError.INTERNAL_ERROR。
                     - 响应：成功时返回空结果。
                     """
