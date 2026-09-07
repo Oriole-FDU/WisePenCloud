@@ -1,0 +1,50 @@
+server:
+  port: 19912 # 本地启动占用 19912 端口
+
+spring:
+  application:
+    name: wisepen-generic-resource-service
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+      config:
+        server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+        file-extension: yaml
+        group: DEFAULT_GROUP
+        shared-configs:
+          - data-id: wisepen-common-${spring.profiles.active}.yaml
+            group: DEFAULT_GROUP
+            refresh: true
+    inetutils:
+      ignored-interfaces:
+        - VMnet.*
+        - vEthernet.*
+        - docker0
+      preferred-networks:
+        - 10
+  profiles:
+    active: dev
+
+wisepen:
+  openapi:
+    title: 通用资源服务 API
+    version: 1.0.0
+    description: WisePen 通用文件资源上传、状态查询和下载接口
+
+springwolf:
+  plugin:
+    kafka:
+      scanner:
+        kafka-listener:
+          enabled: false
+  docket:
+    base-package: com.oriole.wisepen.generic.resource
+    info:
+      title: 通用资源服务 Kafka Events
+      version: 1.0.0
+      description: 通用资源文件上传完成、资源删除与文件清理相关 Kafka 消息契约

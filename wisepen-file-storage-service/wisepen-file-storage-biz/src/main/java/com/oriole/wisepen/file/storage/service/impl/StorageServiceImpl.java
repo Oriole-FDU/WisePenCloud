@@ -86,6 +86,8 @@ public class StorageServiceImpl implements IStorageService {
                     "fileId", "createTime", "objectKey");
             newRecord.setStatus(StorageStatusEnum.AVAILABLE);
             newRecord.setObjectKey(newObjectKey);
+            // 秒传命中的是物理内容，业务场景必须以本次请求为准，不能继承来源文件的 scene。
+            newRecord.setScene(req.getScene());
             storageRecordMapper.insert(newRecord);
 
             FileUploadedMessage fileUploadedMessage = BeanUtil.copyProperties(newRecord, FileUploadedMessage.class);
@@ -282,7 +284,13 @@ public class StorageServiceImpl implements IStorageService {
         String cleanBizTag = StrUtil.isNotBlank(bizTag)
                 ? bizTag.replaceAll("^/+", "").replaceAll("/+$", "")
                 : DateTimeFormatter.ofPattern("yyyy/MM/dd").format(LocalDateTime.now());
-        String fileName = IdUtil.fastSimpleUUID() + "." + extension;
+        // 通用资源允许无扩展名文件，objectKey 不能生成 ".null" 或尾随点。
+        String normalizedExtension = StrUtil.isNotBlank(extension)
+                ? extension.replaceAll("^\\.+", "")
+                : "";
+        String fileName = StrUtil.isNotBlank(normalizedExtension)
+                ? IdUtil.fastSimpleUUID() + "." + normalizedExtension
+                : IdUtil.fastSimpleUUID();
 
         // 场景后缀 + 时间戳 / 业务Tag + 文件名
         // 例如 public/images/user/2026/1/1/XXXX.png private/images/note/XXXX/XXXX.png
