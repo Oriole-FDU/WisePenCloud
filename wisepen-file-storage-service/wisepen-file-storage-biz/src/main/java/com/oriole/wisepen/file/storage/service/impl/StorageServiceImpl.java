@@ -68,7 +68,7 @@ public class StorageServiceImpl implements IStorageService {
                         .last("LIMIT 1")
         );
 
-        String newObjectKey = buildObjectKey(req.getScene().getPrefix(), req.getBizTag(), req.getExtension());
+        String newObjectKey = resolveObjectKey(req.getScene(), req.getBizTag(), req.getExtension(), req.getTargetObjectKey());
         String domain = provider.getDomain();
 
         if (existRecord != null) {
@@ -86,6 +86,7 @@ public class StorageServiceImpl implements IStorageService {
                     "fileId", "createTime", "objectKey");
             newRecord.setStatus(StorageStatusEnum.AVAILABLE);
             newRecord.setObjectKey(newObjectKey);
+            newRecord.setScene(req.getScene());
             storageRecordMapper.insert(newRecord);
 
             FileUploadedMessage fileUploadedMessage = BeanUtil.copyProperties(newRecord, FileUploadedMessage.class);
@@ -276,6 +277,21 @@ public class StorageServiceImpl implements IStorageService {
         eventPublisher.publishFileUploadedEvent(fileUploadedMessage);
 
         log.info("storage callback persisted. objectKey={} domain={} status={}", objectKey, provider.getDomain(), StorageStatusEnum.AVAILABLE);
+    }
+
+    private String resolveObjectKey(StorageSceneEnum scene, String bizTag, String extension, String targetObjectKey) {
+        if (StrUtil.isBlank(targetObjectKey)) {
+            return buildObjectKey(scene.getPrefix(), bizTag, extension);
+        }
+
+        String cleanObjectKey = targetObjectKey.replace('\\', '/')
+                .replaceAll("^/+", "")
+                .replaceAll("/+$", "");
+        String scenePrefix = scene.getPrefix() + "/";
+        if (!cleanObjectKey.startsWith(scenePrefix) || cleanObjectKey.contains("..")) {
+            throw new ServiceException(FileStorageError.FILE_URL_INVALID);
+        }
+        return cleanObjectKey;
     }
 
     private String buildObjectKey(String scenePrefix, String bizTag, String extension) {

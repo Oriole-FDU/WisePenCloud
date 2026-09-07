@@ -17,6 +17,11 @@ public class UploadInitReqDTO implements Serializable {
     private String extension;
     private StorageSceneEnum scene;
     private String bizTag;
+    /**
+     * 内部服务生成固定文件名产物时指定目标 objectKey。
+     * 为空时由存储服务按 scene/bizTag/extension 自动生成。
+     */
+    private String targetObjectKey;
     private Long configId;
     private Long expectedSize;
     private Boolean isNeedCallback = true;

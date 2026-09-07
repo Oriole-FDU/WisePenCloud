@@ -1,0 +1,50 @@
+server:
+  port: 19911 # 本地启动占用 19911 端口
+
+spring:
+  application:
+    name: wisepen-media-service
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+      config:
+        server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+        file-extension: yaml
+        group: DEFAULT_GROUP
+        shared-configs:
+          - data-id: wisepen-common-${spring.profiles.active}.yaml
+            group: DEFAULT_GROUP
+            refresh: true
+    inetutils:
+      ignored-interfaces:
+        - VMnet.*
+        - vEthernet.*
+        - docker0
+      preferred-networks:
+        - 10
+  profiles:
+    active: dev
+
+wisepen:
+  openapi:
+    title: 媒体服务 API
+    version: 1.0.0
+    description: WisePen 图片、视频、音频上传、处理与播放接口
+
+springwolf:
+  plugin:
+    kafka:
+      scanner:
+        kafka-listener:
+          enabled: false
+  docket:
+    base-package: com.oriole.wisepen.media
+    info:
+      title: 媒体服务 Kafka Events
+      version: 1.0.0
+      description: 媒体上传回调、媒体处理、资源删除与媒体就绪相关 Kafka 消息契约

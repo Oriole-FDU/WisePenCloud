@@ -32,6 +32,13 @@ public enum ResourceType {
     XLS(26, "XLS", "xls"),
     XLSX(27, "XLSX", "xlsx"),
 
+    /** 图片资源，由媒体服务管理 */
+    IMAGE(41, "IMAGE", "image"),
+    /** 视频资源，由媒体服务管理 */
+    VIDEO(42, "VIDEO", "video"),
+    /** 音频资源，由媒体服务管理 */
+    AUDIO(43, "AUDIO", "audio"),
+
     /** 无扩展名的 Skill，由 AI资产 服务管理 */
     SKILL(31, "SKILL", "skill"),
     /** 无扩展名的 Agent，由 AI资产 服务管理 */
