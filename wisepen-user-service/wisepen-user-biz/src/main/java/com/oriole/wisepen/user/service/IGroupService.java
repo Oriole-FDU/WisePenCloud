@@ -2,7 +2,6 @@ package com.oriole.wisepen.user.service;
 
 import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.enums.GroupType;
-import com.oriole.wisepen.user.api.domain.base.GroupDisplayBase;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupCreateRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupDeleteRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupMemberJoinRequest;
@@ -11,7 +10,6 @@ import com.oriole.wisepen.user.api.domain.dto.res.GroupDetailInfoResponse;
 import com.oriole.wisepen.user.api.domain.dto.res.GroupItemInfoResponse;
 import com.oriole.wisepen.user.api.enums.GroupRoleFilter;
 
-import java.util.Map;
 import java.util.Set;
 
 public interface IGroupService {
@@ -20,8 +18,6 @@ public interface IGroupService {
     GroupDetailInfoResponse getGroupDetailInfoById(Long groupId);
     // 根据 groupId 获取小组基础信息
     GroupItemInfoResponse getGroupBaseInfoById(Long groupId);
-    // 根据 groupIds 列表获取小组展示信息
-    Map<Long, GroupDisplayBase> getGroupDisplayInfoByIds(Set<Long> groupIds);
 
     // 创建群组
     Long createGroup(GroupCreateRequest req, Long userId);

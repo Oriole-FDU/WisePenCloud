@@ -21,8 +21,8 @@ import com.oriole.wisepen.user.domain.entity.GroupResourceUserDailyMetricEntity;
 import com.oriole.wisepen.user.mapper.GroupResourceDailyMetricMapper;
 import com.oriole.wisepen.user.mapper.GroupResourceSummaryDailyMetricMapper;
 import com.oriole.wisepen.user.mapper.GroupResourceUserDailyMetricMapper;
+import com.oriole.wisepen.user.service.IDisplayService;
 import com.oriole.wisepen.user.service.IGroupDashboardService;
-import com.oriole.wisepen.user.service.IUserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -41,7 +41,7 @@ public class GroupDashboardServiceImpl implements IGroupDashboardService {
     private final GroupResourceDailyMetricMapper groupResourceDailyMetricMapper;
     private final GroupResourceUserDailyMetricMapper groupResourceUserDailyMetricMapper;
     private final RemoteResourceService remoteResourceService;
-    private final IUserService userService;
+    private final IDisplayService displayService;
 
     @Override
     public void aggregateRecentResourceMetrics() {
@@ -227,7 +227,7 @@ public class GroupDashboardServiceImpl implements IGroupDashboardService {
         Set<Long> actorUserIds = userMetricPage.getRecords().stream()
                 .map(GroupResourceUserDailyMetricEntity::getActorUserId)
                 .collect(Collectors.toSet());
-        Map<Long, UserDisplayBase> userInfoMap = userService.getUserDisplayInfoByIds(actorUserIds);
+        Map<Long, UserDisplayBase> userInfoMap = displayService.getUserDisplayInfoByIds(actorUserIds);
         // 组装用户维度指标和行为人展示信息
         pageR.addAll(userMetricPage.getRecords().stream().map(entity -> {
             GroupDashboardActorMetricResponse response = new GroupDashboardActorMetricResponse();

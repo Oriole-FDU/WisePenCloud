@@ -2,6 +2,7 @@ package com.oriole.wisepen.user.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.IdUtil;
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
@@ -25,6 +26,7 @@ import com.oriole.wisepen.user.domain.entity.*;
 import com.oriole.wisepen.user.event.GroupTokenConsumeEvent;
 import com.oriole.wisepen.user.exception.UserError;
 import com.oriole.wisepen.user.mapper.*;
+import com.oriole.wisepen.user.service.IDisplayService;
 import com.oriole.wisepen.user.service.IWalletService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,7 +46,7 @@ public class WalletServiceImpl implements IWalletService {
 
     private final ApplicationEventPublisher eventPublisher;
 
-    private final UserServiceImpl userService;
+    private final IDisplayService displayService;
     private final GroupMapper groupMapper;
     private final GroupMemberMapper groupMemberMapper;
     private final UserWalletsMapper userWalletsMapper;
@@ -65,36 +67,75 @@ public class WalletServiceImpl implements IWalletService {
         Long groupId = message.getGroupId();
 
         Integer tokenBill = message.getBillableTokens();
+        Map<String, Object> billingDetail = message.getBillingDetail();
+        if (tokenBill == null) {
+            log.error("token consumption event discarded because billableTokens is null. traceId={} userId={} groupId={} billingDetail={}",
+                    message.getTraceId(), userId, groupId, JSONUtil.toJsonStr(billingDetail));
+            return;
+        }
+
         // AI 服务已按实际 Provider 归属计算可扣费用量；用户自带 Provider 和免费官方模型只记用量，不进入钱包扣费
-        String billMeta = "%s (%d Tokens x%s = %d Billable Tokens)".formatted(
-                message.getModelName(),
-                message.getUsageTokens(),
-                message.getBillingRatio(),
-                tokenBill
-        );
+        String billMeta = buildTokenBillMeta(tokenBill, billingDetail);
+        String billingDetailJson = billingDetail == null ? null : JSONUtil.toJsonStr(billingDetail);
+
         if (tokenBill <= 0) {
             // 仅记录交易
             WalletTransactionRecordEntity record = WalletTransactionRecordEntity.builder()
-                    .traceId(IdUtil.randomUUID())
+                    .traceId(message.getTraceId())
                     .payerId(userId).payerType(WalletPayerType.USER)
                     .count(message.getUsageTokens()) // 记录值是 UsageTokens
                     .walletTransactionType(WalletTransactionType.ONLY_RECORD_META) // 零交易
                     .walletBusinessType(WalletBusinessType.TOKEN)
                     .operatorId(userId)
-                    .meta(billMeta).build();
+                    .meta(billMeta)
+                    .billingDetail(billingDetailJson).build();
             walletTransactionRecordMapper.insert(record);
             return;
         }
 
         if (groupId != null) {
             // 组账单优先从组扣除
-            tokenBill = this.updateGroupMemberTokenUsed(groupId, userId, message.getTraceId(), tokenBill, billMeta);
+            tokenBill = this.updateGroupMemberTokenUsed(groupId, userId, message.getTraceId(), tokenBill, billMeta, billingDetailJson);
         }
         // 即个人账单，或组内未能支付全部账单
         if (tokenBill > 0) {
             // 从个人侧扣除
-            this.updateUserTokenUsed(userId, message.getTraceId(), tokenBill, billMeta);
+            this.updateUserTokenUsed(userId, message.getTraceId(), tokenBill, billMeta, billingDetailJson);
         }
+    }
+
+    private static String buildTokenBillMeta(Integer billableTokens, Map<String, Object> billingDetail) {
+        int inputTokens = billingDetail != null && billingDetail.get("inputTokens") instanceof Number
+                ? ((Number) billingDetail.get("inputTokens")).intValue() : 0;
+        int cachedInputTokens = billingDetail != null && billingDetail.get("cachedInputTokens") instanceof Number
+                ? ((Number) billingDetail.get("cachedInputTokens")).intValue() : 0;
+        int outputTokens = billingDetail != null && billingDetail.get("outputTokens") instanceof Number
+                ? ((Number) billingDetail.get("outputTokens")).intValue() : 0;
+
+        int uncachedInputTokens = Math.max(inputTokens - cachedInputTokens, 0);
+
+        String inputBillingRatio = billingDetail != null && billingDetail.get("inputBillingRatio") != null
+                ? String.valueOf(billingDetail.get("inputBillingRatio"))
+                : "n/a";
+        String cachedInputBillingRatio = billingDetail != null && billingDetail.get("cachedInputBillingRatio") != null
+                ? String.valueOf(billingDetail.get("cachedInputBillingRatio"))
+                : "n/a";
+        String outputBillingRatio = billingDetail != null && billingDetail.get("outputBillingRatio") != null
+                ? String.valueOf(billingDetail.get("outputBillingRatio"))
+                : "n/a";
+
+        return "%s | %s(%s) | Billable: %d Tokens | Uncached Input: %d x%s, Cached Input: %d x%s, Output: %d x%s".formatted(
+                billingDetail.get("modelName"),
+                billingDetail.get("providerName"),
+                billingDetail.get("providerScope"),
+                billableTokens,
+                uncachedInputTokens,
+                inputBillingRatio,
+                cachedInputTokens,
+                cachedInputBillingRatio,
+                outputTokens,
+                outputBillingRatio
+        );
     }
 
     @Override
@@ -133,7 +174,7 @@ public class WalletServiceImpl implements IWalletService {
 
     @Override
     // 改变个人 Token 余额
-    public void changeUserTokenBalance(Long userId, Long operator, Integer changedToken, WalletTransactionType type, String Meta) {
+    public void changeUserTokenBalance(Long userId, Long operator, String traceId, Integer changedToken, WalletTransactionType type, String Meta) {
         UserWalletEntity walletEntity = userWalletsMapper.selectById(userId);
 
         LambdaUpdateWrapper<UserWalletEntity> wrapper = new LambdaUpdateWrapper<>();
@@ -141,8 +182,9 @@ public class WalletServiceImpl implements IWalletService {
                 .setSql("token_balance = token_balance + " + changedToken);
 
         // 记录日志
+        if (traceId == null) traceId = IdUtil.randomUUID();
         WalletTransactionRecordEntity record = WalletTransactionRecordEntity.builder()
-                .traceId(IdUtil.randomUUID())
+                .traceId(traceId)
                 .payerId(userId).payerType(WalletPayerType.USER)
                 .count(changedToken)
                 .walletBusinessType(WalletBusinessType.TOKEN)
@@ -221,7 +263,7 @@ public class WalletServiceImpl implements IWalletService {
 
     @Override
     // 更新组成员 Token 用量
-    public Integer updateGroupMemberTokenUsed(Long groupId, Long userId, String traceId, Integer tokenBill, String billMeta) {
+    public Integer updateGroupMemberTokenUsed(Long groupId, Long userId, String traceId, Integer tokenBill, String billMeta, String billingDetail) {
         // 查询组成员最新额度消耗情况
         LambdaQueryWrapper<GroupMemberEntity> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(GroupMemberEntity::getGroupId, groupId)
@@ -258,14 +300,15 @@ public class WalletServiceImpl implements IWalletService {
                 .walletTransactionType(WalletTransactionType.SPEND)
                 .walletBusinessType(WalletBusinessType.TOKEN)
                 .operatorId(userId)
-                .meta(billMeta).build();
+                .meta(billMeta)
+                .billingDetail(billingDetail).build();
         walletTransactionRecordMapper.insert(record);
         return overageTokenBill;
     }
 
     @Override
     // 更新个人 Token 用量
-    public void updateUserTokenUsed(Long userId, String traceId, Integer tokenBill, String billMeta) {
+    public void updateUserTokenUsed(Long userId, String traceId, Integer tokenBill, String billMeta, String billingDetail) {
         // 个人允许小额透支，因此不事先检查余量
         UpdateWrapper<UserWalletEntity> wrapper = new UpdateWrapper<>();
         wrapper.eq("user_id", userId)
@@ -288,7 +331,8 @@ public class WalletServiceImpl implements IWalletService {
                 .count(tokenBill).walletTransactionType(WalletTransactionType.SPEND)
                 .walletBusinessType(WalletBusinessType.TOKEN)
                 .operatorId(userId)
-                .meta(billMeta).build();
+                .meta(billMeta)
+                .billingDetail(billingDetail).build();
         walletTransactionRecordMapper.insert(record);
     }
 
@@ -309,12 +353,12 @@ public class WalletServiceImpl implements IWalletService {
         switch (tokenTransferType) {
             case GROUP_INFLOW:
                 if (userWalletEntity.getTokenBalance() < tokenCount) throw new ServiceException(UserError.WALLET_TOKEN_LIMIT_BELOW_USED);
-                this.changeUserTokenBalance(userId, userId, -tokenCount, WalletTransactionType.TRANSFER_OUT, null);
+                this.changeUserTokenBalance(userId, userId, null, -tokenCount, WalletTransactionType.TRANSFER_OUT, null);
                 this.changeGroupTokenBalance(groupId, userId, tokenCount, WalletTransactionType.TRANSFER_IN, null);
                 break;
             case USER_INFLOW:
                 if (groupEntity.getTokenBalance() < tokenCount) throw new ServiceException(UserError.WALLET_TOKEN_LIMIT_BELOW_USED);
-                this.changeUserTokenBalance(userId, userId, tokenCount, WalletTransactionType.TRANSFER_IN, null);
+                this.changeUserTokenBalance(userId, userId, null, tokenCount, WalletTransactionType.TRANSFER_IN, null);
                 this.changeGroupTokenBalance(groupId, userId, -tokenCount, WalletTransactionType.TRANSFER_OUT, null);
                 break;
         }
@@ -347,7 +391,7 @@ public class WalletServiceImpl implements IWalletService {
             throw new ServiceException(UserError.WALLET_VOUCHER_INVALID);
         }
         // 执行充值
-        this.changeUserTokenBalance(userId, userId, voucher.getAmount(), WalletTransactionType.REFILL, voucherCodeMasked);
+        this.changeUserTokenBalance(userId, userId, null, voucher.getAmount(), WalletTransactionType.REFILL, voucherCodeMasked);
     }
 
     @Override
@@ -382,7 +426,7 @@ public class WalletServiceImpl implements IWalletService {
         // 批量查询用户信息
         Map<Long, UserDisplayBase> operatorInfoMap = operatorIds.isEmpty() ?
                 Collections.emptyMap() :
-                userService.getUserDisplayInfoByIds(operatorIds);
+                displayService.getUserDisplayInfoByIds(operatorIds);
 
         // 遍历组装返回值
         List<WalletTransactionRecordResponse> records = transactionPage.getRecords().stream()

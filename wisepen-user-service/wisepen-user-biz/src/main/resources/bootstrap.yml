@@ -34,6 +34,14 @@ wisepen:
   user:
     api-domain: ${WISEPEN_USER_API_DOMAIN:}
     auth-cookie-domain: ${WISEPEN_USER_AUTH_COOKIE_DOMAIN:}
+  token-grant:
+    rules:
+      STUDENT_VERIFICATION:
+        enabled: ${WISEPEN_TOKEN_GRANT_STUDENT_VERIFICATION_ENABLED:true}
+        token-amount: ${WISEPEN_TOKEN_GRANT_STUDENT_VERIFICATION_TOKEN_AMOUNT:5000000}
+      TEACHER_VERIFICATION:
+        enabled: ${WISEPEN_TOKEN_GRANT_TEACHER_VERIFICATION_ENABLED:true}
+        token-amount: ${WISEPEN_TOKEN_GRANT_TEACHER_VERIFICATION_TOKEN_AMOUNT:100000000}
   openapi:
     title: 用户服务 API
     version: 1.0.0

@@ -18,8 +18,8 @@ import com.oriole.wisepen.user.cache.RedisCacheManager;
 import com.oriole.wisepen.user.domain.entity.*;
 import com.oriole.wisepen.user.exception.UserError;
 import com.oriole.wisepen.user.mapper.*;
+import com.oriole.wisepen.user.service.IDisplayService;
 import com.oriole.wisepen.user.service.IGroupMemberService;
-import com.oriole.wisepen.user.service.IUserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -35,7 +35,7 @@ public class GroupMemberServiceImpl implements IGroupMemberService {
 
 	private final GroupMemberMapper groupMemberMapper;
 	private final GroupMapper groupMapper;
-	private final IUserService userService;
+	private final IDisplayService displayService;
 	private final RedisCacheManager redisCacheManager;
 
 	@Override
@@ -144,7 +144,7 @@ public class GroupMemberServiceImpl implements IGroupMemberService {
 		}
 
 		boolean includePrivateFields = GroupType.ADVANCED_GROUP.equals(groupEntity.getGroupType());
-		UserDisplayBase userInfo = userService.getUserDisplayInfoByIds(Set.of(userId), includePrivateFields).get(userId);
+		UserDisplayBase userInfo = displayService.getUserDisplayInfoByIds(Set.of(userId), includePrivateFields).get(userId);
 
 		GroupMemberDetailResponse resp = new GroupMemberDetailResponse();
 		BeanUtil.copyProperties(memberEntity, resp);
@@ -177,7 +177,7 @@ public class GroupMemberServiceImpl implements IGroupMemberService {
 		PageR<GroupMemberDetailResponse> pageR = new PageR<>(memberPage.getTotal(), page, size);
 
 		boolean includePrivateFields = GroupType.ADVANCED_GROUP.equals(groupEntity.getGroupType());
-		Map<Long, UserDisplayBase> userMap = userService.getUserDisplayInfoByIds(userIds, includePrivateFields);
+		Map<Long, UserDisplayBase> userMap = displayService.getUserDisplayInfoByIds(userIds, includePrivateFields);
 
 		List<GroupMemberDetailResponse> records = memberPage.getRecords().stream().map(memberEntity -> {
 			GroupMemberDetailResponse resp = new GroupMemberDetailResponse();

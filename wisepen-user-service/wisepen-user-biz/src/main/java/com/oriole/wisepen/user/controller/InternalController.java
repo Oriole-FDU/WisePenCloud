@@ -10,10 +10,9 @@ import com.oriole.wisepen.user.api.domain.dto.req.WalletSettleCoinTradeRequest;
 import com.oriole.wisepen.user.api.feign.RemoteUserMessageService;
 import com.oriole.wisepen.user.api.feign.RemoteUserService;
 import com.oriole.wisepen.user.api.feign.RemoteWalletService;
+import com.oriole.wisepen.user.service.IDisplayService;
 import com.oriole.wisepen.user.service.IGroupMemberService;
-import com.oriole.wisepen.user.service.IGroupService;
 import com.oriole.wisepen.user.service.IMessageService;
-import com.oriole.wisepen.user.service.IUserService;
 import com.oriole.wisepen.user.service.IWalletService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -36,8 +35,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class InternalController implements RemoteUserService, RemoteWalletService, RemoteUserMessageService {
 
-    private final IUserService userService;
-    private final IGroupService groupService;
+    private final IDisplayService displayService;
     private final IGroupMemberService groupMemberService;
     private final IWalletService walletService;
     private final IMessageService messageService;
@@ -56,7 +54,7 @@ public class InternalController implements RemoteUserService, RemoteWalletServic
     )
     @GetMapping("/user/getUserDisplayInfo")
     public R<Map<Long, UserDisplayBase>> getUserDisplayInfo(@RequestParam("userId") List<Long> userIds) {
-        return R.ok(userService.getUserDisplayInfoByIds(new HashSet<>(userIds)));
+        return R.ok(displayService.getUserDisplayInfoByIds(new HashSet<>(userIds)));
     }
 
     @Override
@@ -73,7 +71,7 @@ public class InternalController implements RemoteUserService, RemoteWalletServic
     )
     @GetMapping("/group/getGroupDisplayInfo")
     public R<Map<Long, GroupDisplayBase>> getGroupDisplayInfo(@RequestParam("groupId") List<Long> groupIds) {
-        return R.ok(groupService.getGroupDisplayInfoByIds(new HashSet<>(groupIds)));
+        return R.ok(displayService.getGroupDisplayInfoByIds(new HashSet<>(groupIds)));
     }
 
     @Override

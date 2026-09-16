@@ -17,7 +17,6 @@ import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.system.api.domain.dto.MailSendDTO;
 import com.oriole.wisepen.system.api.feign.RemoteMailService;
 import com.oriole.wisepen.user.api.config.UserProperties;
-import com.oriole.wisepen.user.api.domain.base.UserDisplayBase;
 import com.oriole.wisepen.user.api.domain.base.UserInfoBase;
 import com.oriole.wisepen.user.api.domain.base.UserProfileBase;
 import com.oriole.wisepen.user.api.domain.dto.req.*;
@@ -70,37 +69,6 @@ public class UserServiceImpl implements IUserService {
         return userMapper.selectOne(Wrappers.<UserEntity>lambdaQuery()
                 .and(w -> w.eq(UserEntity::getUsername, account).or().eq(UserEntity::getCampusNo, account))
                 .last("LIMIT 1"));
-    }
-
-    @Override
-    public Map<Long, UserDisplayBase> getUserDisplayInfoByIds(Set<Long> userIds) {
-        return getUserDisplayInfoByIds(userIds, false);
-    }
-
-    @Override
-    public Map<Long, UserDisplayBase> getUserDisplayInfoByIds(Set<Long> userIds, boolean includePrivateFields) {
-        if (CollectionUtils.isEmpty(userIds)) {
-            return Collections.emptyMap();
-        }
-        List<UserEntity> userList = userMapper.selectBatchIds(userIds);
-
-        if (CollectionUtils.isEmpty(userList)) {
-            return Collections.emptyMap();
-        }
-
-        return userList.stream().filter(Objects::nonNull).collect(Collectors.toMap(
-                UserEntity::getUserId,
-                user -> {
-                    UserDisplayBase response = BeanUtil.copyProperties(user, UserDisplayBase.class);
-                    if (!includePrivateFields) {
-                        response.setRealName(null);
-                        response.setCampusNo(null);
-                        response.setEmail(null);
-                        response.setMobile(null);
-                    }
-                    return response;
-                },
-                (existing, replacement) -> existing));
     }
 
     @Override

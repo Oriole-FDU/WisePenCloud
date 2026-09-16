@@ -23,5 +23,7 @@ public class WalletTransactionRecordBase {
     WalletBusinessType walletBusinessType;
     // 元信息
     String meta;
+    // Token 计费明细 JSON 快照
+    String billingDetail;
 }
 
