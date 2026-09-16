@@ -21,6 +21,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @Tag(name = "用户钱包", description = "用户钱包信息点、兑换码、转账与流水查询")
 @RestController
 @RequestMapping("/user/wallet")
@@ -89,7 +91,7 @@ public class WalletController {
             summary = "分页查询钱包流水",
             description = """
                     - 用途：查询当前用户个人钱包或其管理小组钱包的交易流水。
-                    - 请求：groupId 为空时查询个人钱包流水；groupId 非空时查询小组钱包流水；walletTransactionType 和 walletBusinessType 用于过滤流水类型；page 和 size 控制分页。
+                    - 请求：groupId 为空时查询个人钱包流水；groupId 非空时查询小组钱包流水；walletTransactionTypes 用于多选过滤交易类型；walletBusinessType 用于过滤业务类型；page 和 size 控制分页。
                     - 约束：当前用户必须已登录；查询小组钱包时当前用户必须是该小组 OWNER。
                     - 处理：按付款主体、业务类型和交易类型分页查询流水，并补充操作人展示信息。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN；当前用户不是小组 OWNER -> PermissionError.PERMISSION_DENIED。
@@ -99,7 +101,7 @@ public class WalletController {
     @GetMapping("/listTransactions")
     public R<PageR<WalletTransactionRecordResponse>> listTransactions(
             @RequestParam(value = "groupId", required = false) Long groupId,
-            @RequestParam(value = "walletTransactionType", required = false) WalletTransactionType walletTransactionType,
+            @RequestParam(value = "walletTransactionTypes", required = false) List<WalletTransactionType> walletTransactionTypes,
             @RequestParam(value = "walletBusinessType", required = false) WalletBusinessType walletBusinessType,
             @RequestParam(value = "page", defaultValue = "1") @Min(1) Integer page,
             @RequestParam(value = "size", defaultValue = "20") @Min(1) Integer size
@@ -114,6 +116,6 @@ public class WalletController {
             payerId = groupId;
             SecurityContextHolder.assertGroupRole(groupId, GroupRoleType.OWNER);
         }
-        return R.ok(walletService.listTransactions(payerType, payerId, walletTransactionType, walletBusinessType, page, size));
+        return R.ok(walletService.listTransactions(payerType, payerId, walletTransactionTypes, walletBusinessType, page, size));
     }
 }

@@ -13,6 +13,8 @@ import com.oriole.wisepen.user.api.domain.mq.TokenConsumptionMessage;
 import com.oriole.wisepen.user.api.enums.WalletTransactionType;
 import com.oriole.wisepen.user.api.enums.TokenTransferType;
 
+import java.util.List;
+
 public interface IWalletService {
 
     // 消耗 Token
@@ -48,7 +50,7 @@ public interface IWalletService {
     PageR<WalletTransactionRecordResponse> listTransactions(
             WalletPayerType payerType,
             Long payerId,
-            WalletTransactionType walletTransactionType,
+            List<WalletTransactionType> walletTransactionTypes,
             WalletBusinessType walletBusinessType,
             Integer page, Integer size
     );

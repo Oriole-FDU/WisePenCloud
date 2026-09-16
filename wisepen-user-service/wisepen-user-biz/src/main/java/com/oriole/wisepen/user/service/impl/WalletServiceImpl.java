@@ -398,7 +398,7 @@ public class WalletServiceImpl implements IWalletService {
     public PageR<WalletTransactionRecordResponse> listTransactions(
             WalletPayerType payerType,
             Long payerId,
-            WalletTransactionType walletTransactionType,
+            List<WalletTransactionType> walletTransactionTypes,
             WalletBusinessType walletBusinessType,
             Integer page, Integer size
     ) {
@@ -407,7 +407,7 @@ public class WalletServiceImpl implements IWalletService {
         wrapper.eq(WalletTransactionRecordEntity::getPayerId, payerId)
                 .eq(WalletTransactionRecordEntity::getPayerType, payerType)
                 .eq(walletBusinessType != null, WalletTransactionRecordEntity::getWalletBusinessType, walletBusinessType)
-                .eq(walletTransactionType != null, WalletTransactionRecordEntity::getWalletTransactionType, walletTransactionType)
+                .in(!CollectionUtils.isEmpty(walletTransactionTypes), WalletTransactionRecordEntity::getWalletTransactionType, walletTransactionTypes)
                 .orderByDesc(WalletTransactionRecordEntity::getCreateTime);
 
         IPage<WalletTransactionRecordEntity> transactionPage = walletTransactionRecordMapper.selectPage(pageParam, wrapper);
