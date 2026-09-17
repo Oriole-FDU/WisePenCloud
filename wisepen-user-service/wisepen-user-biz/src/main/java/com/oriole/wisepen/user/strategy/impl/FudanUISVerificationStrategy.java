@@ -13,7 +13,7 @@ import com.oriole.wisepen.extension.fudan.feign.RemoteFudanExtensionService;
 import com.oriole.wisepen.user.api.domain.dto.VerificationResultDTO;
 import com.oriole.wisepen.user.api.enums.DegreeLevel;
 import com.oriole.wisepen.user.api.enums.GenderType;
-import com.oriole.wisepen.user.api.enums.TokenGrantCode;
+import com.oriole.wisepen.user.api.enums.UserTaskCode;
 import com.oriole.wisepen.user.api.enums.UserVerificationMode;
 import com.oriole.wisepen.user.cache.RedisCacheManager;
 import com.oriole.wisepen.user.domain.entity.UserEntity;
@@ -22,7 +22,7 @@ import com.oriole.wisepen.user.exception.UserError;
 import com.oriole.wisepen.user.mapper.UserMapper;
 import com.oriole.wisepen.user.mapper.UserProfileMapper;
 import com.oriole.wisepen.user.mq.KafkaUserEventPublisher;
-import com.oriole.wisepen.user.service.ITokenGrantService;
+import com.oriole.wisepen.user.service.IUserTaskService;
 import com.oriole.wisepen.user.strategy.UserVerificationStrategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,7 +45,7 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
     private final RemoteFudanExtensionService remoteFudanExtensionService;
     private final KafkaUserEventPublisher kafkaUserEventPublisher;
     private final RedisCacheManager redisCacheManager;
-    private final ITokenGrantService tokenGrantService;
+    private final IUserTaskService userTaskService;
 
     @Override
     public UserVerificationMode getMode() {
@@ -197,20 +197,16 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
         if (teacherProfile) {
             // 修改教师认证身份
             redisCacheManager.updateUserIdentityTypeInSession(userId, IdentityType.TEACHER);
-            // 教师Token赠款
-            tokenGrantService.grantMaxTimes(
+            userTaskService.complete(
                     userId,
-                    TokenGrantCode.TEACHER_VERIFICATION,
-                    1,
+                    UserTaskCode.TEACHER_VERIFICATION,
                     userId,
                     "[复旦专属]教师认证赠送"
             );
         } else {
-            // 学生Token赠款
-            tokenGrantService.grantMaxTimes(
+            userTaskService.complete(
                     userId,
-                    TokenGrantCode.STUDENT_VERIFICATION,
-                    1,
+                    UserTaskCode.STUDENT_VERIFICATION,
                     userId,
                     "[复旦专属]学生认证赠送"
             );

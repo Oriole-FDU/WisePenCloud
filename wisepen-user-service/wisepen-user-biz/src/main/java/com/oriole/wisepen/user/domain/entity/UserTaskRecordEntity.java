@@ -5,7 +5,8 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.oriole.wisepen.user.api.enums.TokenGrantCode;
+import com.oriole.wisepen.user.api.enums.RewardType;
+import com.oriole.wisepen.user.api.enums.UserTaskCode;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,17 +19,19 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("sys_token_grant_record")
-public class TokenGrantRecordEntity implements Serializable {
+@TableName("sys_user_task_record")
+public class UserTaskRecordEntity implements Serializable {
 
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     private Long userId;
 
-    private TokenGrantCode grantCode;
+    private UserTaskCode taskCode;
 
-    private Integer tokenAmount;
+    private RewardType rewardType;
+
+    private Integer rewardAmount;
 
     private String walletTraceId;
 
@@ -37,5 +40,5 @@ public class TokenGrantRecordEntity implements Serializable {
     @TableField(value = "create_time", fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 
-    private LocalDateTime grantTime;
+    private LocalDateTime completeTime;
 }

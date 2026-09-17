@@ -7,7 +7,8 @@ import lombok.Getter;
 
 @Getter
 @AllArgsConstructor
-public enum TokenGrantCode {
+public enum UserTaskCode {
+    DAILY_CHECK_IN("DAILY_CHECK_IN"),
     STUDENT_VERIFICATION("STUDENT_VERIFICATION"),
     TEACHER_VERIFICATION("TEACHER_VERIFICATION");
 
