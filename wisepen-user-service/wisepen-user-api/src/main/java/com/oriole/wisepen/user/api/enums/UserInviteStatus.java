@@ -7,11 +7,9 @@ import lombok.Getter;
 
 @Getter
 @AllArgsConstructor
-public enum UserTaskCode {
-    DAILY_CHECK_IN("DAILY_CHECK_IN"),
-    STUDENT_VERIFICATION("STUDENT_VERIFICATION"),
-    TEACHER_VERIFICATION("TEACHER_VERIFICATION"),
-    INVITE_VERIFIED_USER("INVITE_VERIFIED_USER");
+public enum UserInviteStatus {
+    BOUND("BOUND"),
+    REWARDED("REWARDED");
 
     @EnumValue
     @JsonValue

@@ -22,6 +22,7 @@ import com.oriole.wisepen.user.exception.UserError;
 import com.oriole.wisepen.user.mapper.UserMapper;
 import com.oriole.wisepen.user.mapper.UserProfileMapper;
 import com.oriole.wisepen.user.mq.KafkaUserEventPublisher;
+import com.oriole.wisepen.user.service.IUserInviteService;
 import com.oriole.wisepen.user.service.IUserTaskService;
 import com.oriole.wisepen.user.strategy.UserVerificationStrategy;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +47,7 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
     private final KafkaUserEventPublisher kafkaUserEventPublisher;
     private final RedisCacheManager redisCacheManager;
     private final IUserTaskService userTaskService;
+    private final IUserInviteService userInviteService;
 
     @Override
     public UserVerificationMode getMode() {
@@ -57,7 +59,7 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
         return Arrays.asList(
                 "username", "realName", "campusNo", "email", "mobile", "userStatus",
                 "sex", "university", "college", "major",
-                "className", "enrollmentYear", "degreeLevel"
+                "className", "enrollmentYear", "degreeLevel", "inviteCode"
         );
     }
 
@@ -211,6 +213,7 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
                     "[复旦专属]学生认证赠送"
             );
         }
+        userInviteService.rewardInviterAfterVerification(userId);
 
         log.info("fudan uis verify succeeded. userId={} campusNo={} teacherProfile={}",
                 userId, campusNo, teacherProfile);

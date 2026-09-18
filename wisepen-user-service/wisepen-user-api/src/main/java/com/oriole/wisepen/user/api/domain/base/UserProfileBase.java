@@ -13,6 +13,8 @@ import lombok.experimental.SuperBuilder;
 public class UserProfileBase {
     private GenderType sex;
 
+    private String inviteCode;
+
     private String university;
     private String college;
     private String major;

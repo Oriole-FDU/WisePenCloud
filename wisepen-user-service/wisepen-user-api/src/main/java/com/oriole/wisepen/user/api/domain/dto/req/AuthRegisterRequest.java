@@ -20,4 +20,6 @@ public class AuthRegisterRequest implements Serializable {
     @NotBlank(message = UserValidationMsg.PASSWORD_EMPTY)
     @Pattern(regexp = UserRegexPatterns.PASSWORD_PATTERN, message = UserValidationMsg.PASSWORD_INVALID)
     private String password; // 密码
+
+    private String inviteCode; // 邀请码
 }

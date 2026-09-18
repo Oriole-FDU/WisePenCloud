@@ -30,6 +30,7 @@ import com.oriole.wisepen.user.domain.entity.UserWalletEntity;
 import com.oriole.wisepen.user.exception.UserError;
 import com.oriole.wisepen.user.mapper.GroupMemberMapper;
 import com.oriole.wisepen.user.mapper.UserWalletsMapper;
+import com.oriole.wisepen.user.service.IUserInviteService;
 import com.oriole.wisepen.user.service.IUserService;
 import com.oriole.wisepen.user.mapper.UserMapper;
 import com.oriole.wisepen.user.mapper.UserProfileMapper;
@@ -39,6 +40,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
@@ -55,6 +57,7 @@ public class UserServiceImpl implements IUserService {
     private final GroupMemberMapper groupMemberMapper;
     private final UserWalletsMapper userWalletsMapper;
     private final RedisCacheManager redisCacheManager;
+    private final IUserInviteService userInviteService;
 
     private final TemplateEngine templateEngine;
     private final RemoteMailService remoteMailService;
@@ -125,6 +128,7 @@ public class UserServiceImpl implements IUserService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void register(AuthRegisterRequest req) {
         // 校验用户名是否存在
         if (userMapper
@@ -147,12 +151,15 @@ public class UserServiceImpl implements IUserService {
         // 新建档案
         UserProfileEntity userProfile = UserProfileEntity.builder()
                 .userId(user.getUserId())
+                .inviteCode(userInviteService.generateInviteCode())
                 .build();
         userProfileMapper.insert(userProfile);
 
         UserWalletEntity userWallets = UserWalletEntity.builder().userId(user.getUserId())
                 .tokenBalance(0).tokenUsed(0).coinBalance(0).build();
         userWalletsMapper.insert(userWallets);
+
+        userInviteService.bindAtRegistration(user.getUserId(), req.getInviteCode());
     }
 
     @Override
@@ -255,6 +262,7 @@ public class UserServiceImpl implements IUserService {
 
         UserVerificationStrategy strategy = strategyFactory.getStrategy(userEntity.getVerificationMode());
         List<String> readonlyFields = strategy.getReadonlyFields();
+        readonlyFields.add("inviteCode");
 
         CopyOptions copyOptions = CopyOptions.create()
                 .setIgnoreNullValue(true)
@@ -276,7 +284,9 @@ public class UserServiceImpl implements IUserService {
 
     @Override
     public void updateProfileAdmin(UserProfileAdminUpdateRequest req) {
-        UserProfileEntity userProfileEntity = BeanUtil.copyProperties(req, UserProfileEntity.class);
+        UserProfileEntity userProfileEntity = new UserProfileEntity();
+        BeanUtil.copyProperties(req, userProfileEntity,
+                CopyOptions.create().setIgnoreProperties("inviteCode"));
         userProfileMapper.updateById(userProfileEntity);
     }
 

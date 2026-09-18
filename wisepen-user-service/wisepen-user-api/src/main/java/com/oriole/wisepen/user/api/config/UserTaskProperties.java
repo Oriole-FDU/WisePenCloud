@@ -20,6 +20,8 @@ public class UserTaskProperties {
 
     private DailyCheckIn dailyCheckIn = new DailyCheckIn();
 
+    private InviteVerifiedUser inviteVerifiedUser = new InviteVerifiedUser();
+
     @Data
     public static class Rule {
         private Boolean enabled = false;
@@ -36,5 +38,14 @@ public class UserTaskProperties {
         private Integer rewardStepAmount = 100000;
         private Integer refreshCycleDays = 1;
         private Integer guaranteeCycleCount = 10;
+    }
+
+    @Data
+    public static class InviteVerifiedUser {
+        private Boolean enabled = false;
+        private RewardType rewardType = RewardType.TOKEN;
+        private Integer minRewardAmount = 1000000;
+        private Integer maxRewardAmount = 10000000;
+        private Integer rewardStepAmount = 1000000;
     }
 }

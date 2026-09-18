@@ -163,7 +163,7 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
 
     @Override
     public List<String> getReadonlyFields() {
-        return Arrays.asList("username", "email", "userStatus", "university");
+        return Arrays.asList("username", "email", "userStatus", "university", "inviteCode");
     }
 
     private void validateEmailVerificationState(UserEntity userEntity, Long userId, String email) {

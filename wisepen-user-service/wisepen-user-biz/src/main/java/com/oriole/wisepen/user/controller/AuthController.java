@@ -94,10 +94,10 @@ public class AuthController {
             summary = "用户注册",
             description = """
                     - 用途：创建一个待身份认证的新学生账号。
-                    - 请求：username 为新账号用户名；password 为初始密码，需满足密码格式校验。
+                    - 请求：username 为新账号用户名；password 为初始密码，需满足密码格式校验；inviteCode 可选，表示注册时使用的邀请码。
                     - 约束：username 必须全局唯一，且符合用户名校验规则。
-                    - 处理：创建 UNIDENTIFIED 状态的学生用户，写入密码密文，并初始化用户资料和钱包记录；不自动登录，不自动完成身份认证。
-                    - 失败：用户名重复 -> UserError.USERNAME_ALREADY_EXISTS。
+                    - 处理：创建 UNIDENTIFIED 状态的学生用户，写入密码密文，生成该用户的邀请码，初始化用户资料和钱包记录，并在传入邀请码时建立邀请关系；不自动登录，不自动完成身份认证。
+                    - 失败：用户名重复 -> UserError.USERNAME_ALREADY_EXISTS；邀请码不存在 -> UserError.INVITE_CODE_NOT_FOUND。
                     - 响应：成功时返回空字符串结果。
                     """
     )
