@@ -1,6 +1,7 @@
 package com.oriole.wisepen.user.task;
 
 import com.oriole.wisepen.user.api.config.UserTaskProperties;
+import com.oriole.wisepen.user.api.domain.dto.res.UserTaskStatusResponse;
 import com.oriole.wisepen.user.api.enums.RewardType;
 import com.oriole.wisepen.user.api.enums.UserTaskCode;
 import com.oriole.wisepen.user.domain.entity.UserTaskRecordEntity;
@@ -29,6 +30,20 @@ public class VerificationTaskHandler implements UserTaskHandler {
     @Override
     public UserTaskLimit getLimit(UserTaskCode taskCode) {
         return UserTaskLimit.once();
+    }
+
+    @Override
+    public UserTaskStatusResponse.UserTaskRewardPreview previewReward(UserTaskCode taskCode) {
+        UserTaskProperties.Rule rule = userTaskProperties.getRules().get(taskCode.getValue());
+        if (rule == null) {
+            return UserTaskStatusResponse.UserTaskRewardPreview.builder().rewardType(RewardType.NONE).rewardAmount(0).build();
+        }
+        RewardType rewardType = rule.getRewardType() == null ? RewardType.NONE : rule.getRewardType();
+        int rewardAmount = rule.getRewardAmount() == null ? 0 : rule.getRewardAmount();
+        return UserTaskStatusResponse.UserTaskRewardPreview.builder()
+                .rewardType(rewardType)
+                .rewardAmount(Math.max(rewardAmount, 0))
+                .build();
     }
 
     @Override

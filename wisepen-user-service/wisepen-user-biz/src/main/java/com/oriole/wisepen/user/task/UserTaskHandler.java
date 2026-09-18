@@ -1,5 +1,6 @@
 package com.oriole.wisepen.user.task;
 
+import com.oriole.wisepen.user.api.domain.dto.res.UserTaskStatusResponse;
 import com.oriole.wisepen.user.api.enums.RewardType;
 import com.oriole.wisepen.user.api.enums.UserTaskCode;
 import com.oriole.wisepen.user.domain.entity.UserTaskRecordEntity;
@@ -15,6 +16,8 @@ public interface UserTaskHandler {
     boolean isEnabled(UserTaskCode taskCode);
 
     UserTaskLimit getLimit(UserTaskCode taskCode);
+
+    UserTaskStatusResponse.UserTaskRewardPreview previewReward(UserTaskCode taskCode);
 
     UserTaskReward calculateReward(Long userId, UserTaskCode taskCode, UserTaskContext context);
 

@@ -3,6 +3,7 @@ package com.oriole.wisepen.user.task;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.oriole.wisepen.user.api.config.UserTaskProperties;
 import com.oriole.wisepen.user.api.domain.dto.res.UserTaskCheckInResponse;
+import com.oriole.wisepen.user.api.domain.dto.res.UserTaskStatusResponse;
 import com.oriole.wisepen.user.api.enums.RewardType;
 import com.oriole.wisepen.user.api.enums.UserTaskCode;
 import com.oriole.wisepen.user.domain.entity.UserTaskRecordEntity;
@@ -38,6 +39,19 @@ public class DailyCheckInTaskHandler implements UserTaskHandler {
         UserTaskProperties.DailyCheckIn config = userTaskProperties.getDailyCheckIn();
         // 在 refreshCycleDays 天窗口内最多 1 次
         return UserTaskLimit.dailyMaxTimes(positiveOrDefault(config.getRefreshCycleDays(), 1), 1);
+    }
+
+    @Override
+    public UserTaskStatusResponse.UserTaskRewardPreview previewReward(UserTaskCode taskCode) {
+        UserTaskProperties.DailyCheckIn config = userTaskProperties.getDailyCheckIn();
+        int minAmount = positiveOrDefault(config.getMinRewardAmount(), 100000);
+        int maxAmount = Math.max(positiveOrDefault(config.getMaxRewardAmount(), 1000000), minAmount);
+        return UserTaskStatusResponse.UserTaskRewardPreview.builder()
+                .rewardType(config.getRewardType() == null ? RewardType.TOKEN : config.getRewardType())
+                .minRewardAmount(minAmount)
+                .maxRewardAmount(maxAmount)
+                .rewardStepAmount(positiveOrDefault(config.getRewardStepAmount(), 100000))
+                .build();
     }
 
     @Override

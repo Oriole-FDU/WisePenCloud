@@ -2,8 +2,10 @@ package com.oriole.wisepen.user.service.impl;
 
 import cn.hutool.core.util.IdUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.oriole.wisepen.user.api.domain.dto.res.UserTaskStatusResponse;
 import com.oriole.wisepen.user.api.enums.RewardType;
 import com.oriole.wisepen.user.api.enums.UserTaskCode;
+import com.oriole.wisepen.user.api.enums.UserTaskType;
 import com.oriole.wisepen.user.api.enums.WalletTransactionType;
 import com.oriole.wisepen.user.domain.entity.UserTaskRecordEntity;
 import com.oriole.wisepen.user.mapper.UserTaskRecordMapper;
@@ -16,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -66,7 +69,7 @@ public class UserTaskServiceImpl implements IUserTaskService {
         UserTaskHandler.UserTaskLimit limit = handler.getLimit(taskCode);
 
         // 查询是否存在满足限制条件的记录
-        UserTaskRecordEntity existingRecord = findExistingRecord(userId, taskCode, limit);
+        UserTaskRecordEntity existingRecord = findBlockingRecord(userId, taskCode, limit);
         if (existingRecord != null) { // 被限制完成，跳过
             log.info("user task skipped by limit. userId={} taskCode={} limitType={}",
                     userId, taskCode.getValue(), limit.getType());
@@ -105,7 +108,93 @@ public class UserTaskServiceImpl implements IUserTaskService {
         return handler.buildCompletedResponse(userId, taskCode, context, record, reward);
     }
 
-    private UserTaskRecordEntity findExistingRecord(Long userId, UserTaskCode taskCode, UserTaskHandler.UserTaskLimit limit) {
+    @Override
+    public List<UserTaskStatusResponse> listTaskStatus(Long userId) {
+        // 遍历所有已注册任务，构建当前用户的任务状态
+        return handlerMap.entrySet().stream()
+                .sorted(Comparator.comparing(entry -> entry.getKey().getValue()))
+                .map(entry -> buildTaskStatus(userId, entry.getKey(), entry.getValue()))
+                .toList();
+    }
+
+    private UserTaskStatusResponse buildTaskStatus(Long userId, UserTaskCode taskCode, UserTaskHandler handler) {
+        // 获取任务限制和奖励预览
+        UserTaskHandler.UserTaskLimit limit = handler.getLimit(taskCode);
+        UserTaskStatusResponse.UserTaskRewardPreview rewardPreview = handler.previewReward(taskCode);
+        boolean enabled = handler.isEnabled(taskCode);
+
+        if (limit == null || UserTaskHandler.UserTaskLimit.LimitType.UNCHECKED.equals(limit.getType())) {
+            // 不限制完成次数时，当前只表达是否可继续完成
+            return UserTaskStatusResponse.builder()
+                    .taskCode(taskCode)
+                    .taskType(UserTaskType.UNCHECKED)
+                    .enabled(enabled)
+                    .canComplete(enabled)
+                    .rewardPreview(rewardPreview)
+                    .build();
+        }
+
+        if (UserTaskHandler.UserTaskLimit.LimitType.ONCE.equals(limit.getType())) {
+            // 一次性任务按历史记录判断是否完成
+            UserTaskRecordEntity record = userTaskRecordMapper.selectOne(Wrappers.<UserTaskRecordEntity>lambdaQuery()
+                    .eq(UserTaskRecordEntity::getUserId, userId)
+                    .eq(UserTaskRecordEntity::getTaskCode, taskCode)
+                    .orderByDesc(UserTaskRecordEntity::getCompleteTime)
+                    .last("LIMIT 1"));
+            boolean completed = record != null;
+            return UserTaskStatusResponse.builder()
+                    .taskCode(taskCode)
+                    .taskType(UserTaskType.ONCE)
+                    .enabled(enabled)
+                    .canComplete(enabled && !completed)
+                    .rewardPreview(rewardPreview)
+                    .once(UserTaskStatusResponse.OnceTaskStatus.builder()
+                            .completed(completed)
+                            .completeTime(completed ? record.getCompleteTime() : null)
+                            .build())
+                    .build();
+        }
+
+        if (UserTaskHandler.UserTaskLimit.LimitType.DAILY_MAX_TIMES.equals(limit.getType())) {
+            // 周期任务只统计当前窗口内的完成次数
+            int maxTimes = limit.getMaxTimes() == null ? 1 : limit.getMaxTimes();
+            int refreshCycleDays = limit.getRefreshCycleDays() == null ? 1 : limit.getRefreshCycleDays();
+            LocalDateTime windowStart = LocalDate.now()
+                    .minusDays(Math.max(refreshCycleDays, 1) - 1L)
+                    .atStartOfDay();
+            LocalDateTime windowEnd = windowStart.plusDays(Math.max(refreshCycleDays, 1));
+            Long completedTimes = userTaskRecordMapper.selectCount(Wrappers.<UserTaskRecordEntity>lambdaQuery()
+                    .eq(UserTaskRecordEntity::getUserId, userId)
+                    .eq(UserTaskRecordEntity::getTaskCode, taskCode)
+                    .ge(UserTaskRecordEntity::getCompleteTime, windowStart)
+                    .lt(UserTaskRecordEntity::getCompleteTime, windowEnd));
+            UserTaskRecordEntity lastRecord = userTaskRecordMapper.selectOne(Wrappers.<UserTaskRecordEntity>lambdaQuery()
+                    .eq(UserTaskRecordEntity::getUserId, userId)
+                    .eq(UserTaskRecordEntity::getTaskCode, taskCode)
+                    .ge(UserTaskRecordEntity::getCompleteTime, windowStart)
+                    .lt(UserTaskRecordEntity::getCompleteTime, windowEnd)
+                    .orderByDesc(UserTaskRecordEntity::getCompleteTime)
+                    .last("LIMIT 1"));
+            return UserTaskStatusResponse.builder()
+                    .taskCode(taskCode)
+                    .taskType(UserTaskType.PERIODIC)
+                    .enabled(enabled)
+                    .canComplete(enabled && completedTimes < maxTimes)
+                    .rewardPreview(rewardPreview)
+                    .periodic(UserTaskStatusResponse.PeriodicTaskStatus.builder()
+                            .completedTimes(completedTimes.intValue())
+                            .maxTimes(maxTimes)
+                            .windowStart(windowStart)
+                            .windowEnd(windowEnd)
+                            .lastCompleteTime(lastRecord == null ? null : lastRecord.getCompleteTime())
+                            .build())
+                    .build();
+        }
+
+        throw new IllegalArgumentException("Unsupported task limit: " + limit.getType());
+    }
+
+    private UserTaskRecordEntity findBlockingRecord(Long userId, UserTaskCode taskCode, UserTaskHandler.UserTaskLimit limit) {
         // 如果任务没有限制，或者明确不检查，直接允许完成
         if (limit == null || UserTaskHandler.UserTaskLimit.LimitType.UNCHECKED.equals(limit.getType())) {
             return null;
