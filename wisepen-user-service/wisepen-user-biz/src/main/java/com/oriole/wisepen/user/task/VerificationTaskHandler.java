@@ -1,6 +1,7 @@
 package com.oriole.wisepen.user.task;
 
 import com.oriole.wisepen.user.api.config.UserTaskProperties;
+import com.oriole.wisepen.user.api.domain.dto.req.MessagePublishRequest;
 import com.oriole.wisepen.user.api.domain.dto.res.UserTaskStatusResponse;
 import com.oriole.wisepen.user.api.enums.RewardType;
 import com.oriole.wisepen.user.api.enums.UserTaskCode;
@@ -61,6 +62,18 @@ public class VerificationTaskHandler implements UserTaskHandler {
     @Override
     public String buildMeta(Long userId, UserTaskCode taskCode, UserTaskContext context, UserTaskReward reward) {
         return context == null ? null : context.getMeta();
+    }
+
+    @Override
+    public MessagePublishRequest buildRewardMessage(Long userId, UserTaskCode taskCode,
+                                                     UserTaskContext context, UserTaskRecordEntity record,
+                                                     UserTaskReward reward) {
+        String identity = UserTaskCode.TEACHER_VERIFICATION.equals(taskCode) ? "教师" : "学生";
+        String rewardUnit = RewardType.COIN.equals(record.getRewardType()) ? "Coin" : "Token";
+        return MessagePublishRequest.builder()
+                .title("认证奖励到账")
+                .content(String.format("你已完成%s认证，获得 %,d %s。", identity, record.getRewardAmount(), rewardUnit))
+                .build();
     }
 
     @Override

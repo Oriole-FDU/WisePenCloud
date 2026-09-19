@@ -1,6 +1,7 @@
 package com.oriole.wisepen.user.task;
 
 import com.oriole.wisepen.user.api.config.UserTaskProperties;
+import com.oriole.wisepen.user.api.domain.dto.req.MessagePublishRequest;
 import com.oriole.wisepen.user.api.domain.dto.res.UserTaskStatusResponse;
 import com.oriole.wisepen.user.api.enums.RewardType;
 import com.oriole.wisepen.user.api.enums.UserTaskCode;
@@ -70,6 +71,19 @@ public class InviteVerifiedUserTaskHandler implements UserTaskHandler {
     public String buildMeta(Long userId, UserTaskCode taskCode, UserTaskContext context, UserTaskReward reward) {
         String meta = context == null ? null : context.getMeta();
         return meta == null || meta.isBlank() ? META : meta;
+    }
+
+    @Override
+    public MessagePublishRequest buildRewardMessage(Long userId, UserTaskCode taskCode,
+                                                     UserTaskContext context, UserTaskRecordEntity record,
+                                                     UserTaskReward reward) {
+        Long inviteeUserId = context == null ? null : context.getOperatorId();
+        String rewardUnit = RewardType.COIN.equals(record.getRewardType()) ? "Coin" : "Token";
+        String inviteeText = inviteeUserId == null ? "你邀请的用户" : "{{USER:" + inviteeUserId + "}}";
+        return MessagePublishRequest.builder()
+                .title("邀请奖励到账")
+                .content(String.format("%s已完成认证，你获得 %,d %s。", inviteeText, record.getRewardAmount(), rewardUnit))
+                .build();
     }
 
     @Override

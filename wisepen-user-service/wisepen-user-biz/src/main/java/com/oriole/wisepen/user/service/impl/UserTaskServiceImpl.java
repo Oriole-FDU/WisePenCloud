@@ -2,13 +2,18 @@ package com.oriole.wisepen.user.service.impl;
 
 import cn.hutool.core.util.IdUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.oriole.wisepen.common.core.domain.enums.BusinessDomain;
+import com.oriole.wisepen.user.api.domain.dto.req.MessagePublishRequest;
 import com.oriole.wisepen.user.api.domain.dto.res.UserTaskStatusResponse;
+import com.oriole.wisepen.user.api.enums.MessageDeliveryScope;
+import com.oriole.wisepen.user.api.enums.MessageType;
 import com.oriole.wisepen.user.api.enums.RewardType;
 import com.oriole.wisepen.user.api.enums.UserTaskCode;
 import com.oriole.wisepen.user.api.enums.UserTaskType;
 import com.oriole.wisepen.user.api.enums.WalletTransactionType;
 import com.oriole.wisepen.user.domain.entity.UserTaskRecordEntity;
 import com.oriole.wisepen.user.mapper.UserTaskRecordMapper;
+import com.oriole.wisepen.user.service.IMessageService;
 import com.oriole.wisepen.user.service.IUserTaskService;
 import com.oriole.wisepen.user.service.IWalletService;
 import com.oriole.wisepen.user.task.UserTaskHandler;
@@ -29,12 +34,15 @@ public class UserTaskServiceImpl implements IUserTaskService {
 
     private final UserTaskRecordMapper userTaskRecordMapper;
     private final IWalletService walletService;
+    private final IMessageService messageService;
     private final Map<UserTaskCode, UserTaskHandler> handlerMap = new EnumMap<>(UserTaskCode.class);
 
     // Spring 会注入所有 UserTaskHandler
-    public UserTaskServiceImpl(UserTaskRecordMapper userTaskRecordMapper, IWalletService walletService, List<UserTaskHandler> handlers) {
+    public UserTaskServiceImpl(UserTaskRecordMapper userTaskRecordMapper, IWalletService walletService,
+                               IMessageService messageService, List<UserTaskHandler> handlers) {
         this.userTaskRecordMapper = userTaskRecordMapper;
         this.walletService = walletService;
+        this.messageService = messageService;
         for (UserTaskHandler handler : handlers) {
             for (UserTaskCode taskCode : handler.getTaskCodes()) {
                 handlerMap.put(taskCode, handler);
@@ -105,6 +113,7 @@ public class UserTaskServiceImpl implements IUserTaskService {
         userTaskRecordMapper.insert(record); // 插入任务记录
 
         grantReward(userId, rewardType, rewardAmount, walletTraceId, context.getOperatorId(), taskMeta); // 发放奖励
+        publishRewardMessage(userId, taskCode, context, handler, record, reward);
         return handler.buildCompletedResponse(userId, taskCode, context, record, reward);
     }
 
@@ -248,5 +257,26 @@ public class UserTaskServiceImpl implements IUserTaskService {
             return;
         }
         throw new IllegalArgumentException("unsupported reward type: " + rewardType);
+    }
+
+    private void publishRewardMessage(Long userId, UserTaskCode taskCode, UserTaskHandler.UserTaskContext context,
+                                      UserTaskHandler handler, UserTaskRecordEntity record,
+                                      UserTaskHandler.UserTaskReward reward) {
+        if (RewardType.NONE.equals(record.getRewardType()) || record.getRewardAmount() == null
+                || record.getRewardAmount() <= 0) {
+            return;
+        }
+
+        MessagePublishRequest message = handler.buildRewardMessage(userId, taskCode, context, record, reward);
+        if (message == null) {
+            return;
+        }
+
+        message.setReceiverUserIds(List.of(userId));
+        message.setDeliveryScope(MessageDeliveryScope.DIRECT);
+        message.setMessageType(MessageType.SYSTEM);
+        message.setSourceService(BusinessDomain.USER);
+        message.setBizTraceId("USER_TASK_REWARD:" + record.getId());
+        messageService.publishMessage(message);
     }
 }

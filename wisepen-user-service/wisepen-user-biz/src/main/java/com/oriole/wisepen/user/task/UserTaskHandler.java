@@ -1,5 +1,6 @@
 package com.oriole.wisepen.user.task;
 
+import com.oriole.wisepen.user.api.domain.dto.req.MessagePublishRequest;
 import com.oriole.wisepen.user.api.domain.dto.res.UserTaskStatusResponse;
 import com.oriole.wisepen.user.api.enums.RewardType;
 import com.oriole.wisepen.user.api.enums.UserTaskCode;
@@ -22,6 +23,12 @@ public interface UserTaskHandler {
     UserTaskReward calculateReward(Long userId, UserTaskCode taskCode, UserTaskContext context);
 
     String buildMeta(Long userId, UserTaskCode taskCode, UserTaskContext context, UserTaskReward reward);
+
+    default MessagePublishRequest buildRewardMessage(Long userId, UserTaskCode taskCode,
+                                                     UserTaskContext context, UserTaskRecordEntity record,
+                                                     UserTaskReward reward) {
+        return null;
+    }
 
     Object buildCompletedResponse(Long userId, UserTaskCode taskCode, UserTaskContext context,
                                   UserTaskRecordEntity record, UserTaskReward reward);
