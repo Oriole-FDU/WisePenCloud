@@ -11,6 +11,7 @@ import com.oriole.wisepen.extension.fudan.domain.mq.FudanUISAuthRequestMessage;
 import com.oriole.wisepen.extension.fudan.enums.FudanUISTaskState;
 import com.oriole.wisepen.extension.fudan.feign.RemoteFudanExtensionService;
 import com.oriole.wisepen.user.api.domain.dto.VerificationResultDTO;
+import com.oriole.wisepen.user.api.domain.mq.UserTaskCompleteMessage;
 import com.oriole.wisepen.user.api.enums.DegreeLevel;
 import com.oriole.wisepen.user.api.enums.GenderType;
 import com.oriole.wisepen.user.api.enums.UserTaskCode;
@@ -23,7 +24,6 @@ import com.oriole.wisepen.user.mapper.UserMapper;
 import com.oriole.wisepen.user.mapper.UserProfileMapper;
 import com.oriole.wisepen.user.mq.KafkaUserEventPublisher;
 import com.oriole.wisepen.user.service.IUserInviteService;
-import com.oriole.wisepen.user.service.IUserTaskService;
 import com.oriole.wisepen.user.strategy.UserVerificationStrategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,7 +46,6 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
     private final RemoteFudanExtensionService remoteFudanExtensionService;
     private final KafkaUserEventPublisher kafkaUserEventPublisher;
     private final RedisCacheManager redisCacheManager;
-    private final IUserTaskService userTaskService;
     private final IUserInviteService userInviteService;
 
     @Override
@@ -199,19 +198,19 @@ public class FudanUISVerificationStrategy implements UserVerificationStrategy {
         if (teacherProfile) {
             // 修改教师认证身份
             redisCacheManager.updateUserIdentityTypeInSession(userId, IdentityType.TEACHER);
-            userTaskService.complete(
-                    userId,
-                    UserTaskCode.TEACHER_VERIFICATION,
-                    userId,
-                    "[复旦专属]教师认证赠送"
-            );
+            kafkaUserEventPublisher.publishUserTaskComplete(UserTaskCompleteMessage.builder()
+                    .userId(userId)
+                    .taskCode(UserTaskCode.TEACHER_VERIFICATION)
+                    .operatorId(userId)
+                    .meta("[复旦专属]教师认证赠送")
+                    .build());
         } else {
-            userTaskService.complete(
-                    userId,
-                    UserTaskCode.STUDENT_VERIFICATION,
-                    userId,
-                    "[复旦专属]学生认证赠送"
-            );
+            kafkaUserEventPublisher.publishUserTaskComplete(UserTaskCompleteMessage.builder()
+                    .userId(userId)
+                    .taskCode(UserTaskCode.STUDENT_VERIFICATION)
+                    .operatorId(userId)
+                    .meta("[复旦专属]学生认证赠送")
+                    .build());
         }
         userInviteService.rewardInviterAfterVerification(userId);
 

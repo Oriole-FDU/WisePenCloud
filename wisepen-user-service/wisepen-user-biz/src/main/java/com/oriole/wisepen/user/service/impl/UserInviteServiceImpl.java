@@ -10,6 +10,7 @@ import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.user.api.domain.base.UserDisplayBase;
 import com.oriole.wisepen.user.api.domain.dto.res.UserInviteRecordResponse;
+import com.oriole.wisepen.user.api.domain.mq.UserTaskCompleteMessage;
 import com.oriole.wisepen.user.api.enums.UserInviteStatus;
 import com.oriole.wisepen.user.api.enums.UserTaskCode;
 import com.oriole.wisepen.user.domain.entity.UserInviteRecordEntity;
@@ -17,9 +18,9 @@ import com.oriole.wisepen.user.domain.entity.UserProfileEntity;
 import com.oriole.wisepen.user.exception.UserError;
 import com.oriole.wisepen.user.mapper.UserInviteRecordMapper;
 import com.oriole.wisepen.user.mapper.UserProfileMapper;
+import com.oriole.wisepen.user.mq.KafkaUserEventPublisher;
 import com.oriole.wisepen.user.service.IDisplayService;
 import com.oriole.wisepen.user.service.IUserInviteService;
-import com.oriole.wisepen.user.service.IUserTaskService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,7 +40,7 @@ public class UserInviteServiceImpl implements IUserInviteService {
 
     private final UserProfileMapper userProfileMapper;
     private final UserInviteRecordMapper userInviteRecordMapper;
-    private final IUserTaskService userTaskService;
+    private final KafkaUserEventPublisher kafkaUserEventPublisher;
     private final IDisplayService displayService;
 
     @Override
@@ -106,23 +107,13 @@ public class UserInviteServiceImpl implements IUserInviteService {
             return;
         }
 
-        // 奖励金额和钱包流水由任务系统处理
-        Object result = userTaskService.complete(
-                inviteRecord.getInviterUserId(),
-                UserTaskCode.INVITE_VERIFIED_USER,
-                inviteeUserId,
-                "邀请用户认证赠送"
-        );
-        if (!Boolean.TRUE.equals(result)) {
-            userInviteRecordMapper.update(
-                    null,
-                    new LambdaUpdateWrapper<UserInviteRecordEntity>()
-                            .eq(UserInviteRecordEntity::getId, inviteRecord.getId())
-                            .eq(UserInviteRecordEntity::getStatus, UserInviteStatus.REWARDED)
-                            .set(UserInviteRecordEntity::getStatus, UserInviteStatus.BOUND)
-                            .set(UserInviteRecordEntity::getRewardTime, null)
-            );
-        }
+        // 奖励金额和钱包流水由任务系统异步处理
+        kafkaUserEventPublisher.publishUserTaskComplete(UserTaskCompleteMessage.builder()
+                .userId(inviteRecord.getInviterUserId())
+                .taskCode(UserTaskCode.INVITE_VERIFIED_USER)
+                .operatorId(inviteeUserId)
+                .meta("邀请用户认证赠送")
+                .build());
     }
 
     @Override
