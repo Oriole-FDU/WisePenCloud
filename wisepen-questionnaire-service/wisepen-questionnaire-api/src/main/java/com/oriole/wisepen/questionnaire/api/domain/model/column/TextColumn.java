@@ -45,4 +45,10 @@ public class TextColumn extends TableColumn {
             throw new IllegalArgumentException("value length must be less than or equal to maxLength");
         }
     }
+
+    @Override
+    protected boolean isEmptyValue(Object value) {
+        return super.isEmptyValue(value)
+                || value instanceof CharSequence text && text.toString().trim().isEmpty();
+    }
 }

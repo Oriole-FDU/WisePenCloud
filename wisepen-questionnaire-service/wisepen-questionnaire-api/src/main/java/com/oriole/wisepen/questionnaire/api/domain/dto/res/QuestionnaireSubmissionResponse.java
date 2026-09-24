@@ -1,6 +1,6 @@
 package com.oriole.wisepen.questionnaire.api.domain.dto.res;
 
-import com.oriole.wisepen.questionnaire.api.enums.SubmissionStatus;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -15,13 +15,9 @@ import java.util.Map;
 @AllArgsConstructor
 public class QuestionnaireSubmissionResponse {
     private String submissionId;
-    private String resourceId;
-    private Integer submittedTableVersion;
-    private Integer projectedTableVersion;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private Long userId;
-    private SubmissionStatus status;
     private Map<String, Object> values;
-    private LocalDateTime createTime;
-    private LocalDateTime updateTime;
     private LocalDateTime submitTime;
+    private LocalDateTime updateTime;
 }

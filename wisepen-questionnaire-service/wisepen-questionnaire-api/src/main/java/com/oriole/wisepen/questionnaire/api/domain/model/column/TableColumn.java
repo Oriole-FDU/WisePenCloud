@@ -7,9 +7,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
-import java.util.Collection;
-import java.util.Map;
-
 @Data
 @NoArgsConstructor
 @SuperBuilder
@@ -45,19 +42,7 @@ public abstract class TableColumn {
 
     protected abstract void validateNonEmptyValue(Object value);
 
-    private boolean isEmptyValue(Object value) {
-        if (value == null) {
-            return true;
-        }
-        if (value instanceof CharSequence text) {
-            return text.toString().trim().isEmpty();
-        }
-        if (value instanceof Collection<?> collection) {
-            return collection.isEmpty();
-        }
-        if (value instanceof Map<?, ?> map) {
-            return map.isEmpty();
-        }
-        return false;
+    protected boolean isEmptyValue(Object value) {
+        return value == null;
     }
 }
