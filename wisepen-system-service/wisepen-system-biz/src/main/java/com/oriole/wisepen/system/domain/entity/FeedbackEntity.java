@@ -1,8 +1,11 @@
 package com.oriole.wisepen.system.domain.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import com.oriole.wisepen.system.api.enums.FeedbackStatus;
-import com.oriole.wisepen.system.api.enums.FeedbackType;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -18,8 +21,12 @@ public class FeedbackEntity {
     private Long userId;
     private String content;
     private String contact;
-    private String browser;
-    private FeedbackType type;
+    private String imageUrl;
+    private Boolean bugReport;
+    private Boolean suggestion;
+    private Boolean consultation;
+    private Boolean complaint;
+    private Boolean other;
     private FeedbackStatus status;
 
     @TableField(value = "create_time", fill = FieldFill.INSERT)

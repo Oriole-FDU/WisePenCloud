@@ -1,0 +1,37 @@
+server:
+  port: 19909
+
+spring:
+  application:
+    name: wisepen-questionnaire-service
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR}
+        username: ${NACOS_USERNAME}
+        password: ${NACOS_PASSWORD}
+      config:
+        server-addr: ${NACOS_SERVER_ADDR}
+        username: ${NACOS_USERNAME}
+        password: ${NACOS_PASSWORD}
+        file-extension: yaml
+        group: DEFAULT_GROUP
+        shared-configs:
+          - data-id: wisepen-common-${spring.profiles.active}.yaml
+            group: DEFAULT_GROUP
+            refresh: true
+    inetutils:
+      ignored-interfaces:
+        - VMnet.*
+        - vEthernet.*
+        - docker0
+      preferred-networks:
+        - 10
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
+wisepen:
+  openapi:
+    title: 问卷服务 API
+    version: 1.0.0
+    description: WisePen 问卷编制、版本与答卷接口

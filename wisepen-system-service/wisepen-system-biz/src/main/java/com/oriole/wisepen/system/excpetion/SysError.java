@@ -15,7 +15,8 @@ import lombok.Getter;
 @AllArgsConstructor
 public enum SysError implements IResult {
 
-    MAIL_SEND_FAILED(2111, new ResultKey(BusinessDomain.SYSTEM, SystemSubject.MAIL, ErrorReason.FAILED),"邮件发送失败");
+    MAIL_SEND_FAILED(2111, new ResultKey(BusinessDomain.SYSTEM, SystemSubject.MAIL, ErrorReason.FAILED), "邮件发送失败"),
+    FEEDBACK_NOT_FOUND(2211, new ResultKey(BusinessDomain.SYSTEM, SystemSubject.FEEDBACK, ErrorReason.NOT_FOUND), "工单不存在");
 
     private final Integer code;
     private final ResultKey key;
