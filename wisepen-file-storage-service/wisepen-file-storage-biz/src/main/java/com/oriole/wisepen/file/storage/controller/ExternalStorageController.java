@@ -3,6 +3,7 @@ package com.oriole.wisepen.file.storage.controller;
 import com.oriole.wisepen.file.storage.service.IStorageService; // 根据你的实际命名调整
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +33,7 @@ public class ExternalStorageController {
                     """
     )
     @PostMapping("/callback/upload")
+    @WithSpan("storage.upload.callback")
     public String handleUploadCallback(HttpServletRequest request, @RequestBody(required = false) String rawBody) {
         log.info("storage callback received. uri={}", request.getRequestURI());
         storageService.handleUploadCallback(request, rawBody);

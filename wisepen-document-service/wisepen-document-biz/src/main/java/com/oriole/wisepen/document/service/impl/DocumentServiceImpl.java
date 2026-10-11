@@ -40,6 +40,7 @@ import com.oriole.wisepen.file.storage.api.feign.RemoteStorageService;
 import com.oriole.wisepen.resource.domain.dto.ResourceCreateReqDTO;
 import com.oriole.wisepen.resource.enums.ResourceType;
 import com.oriole.wisepen.resource.feign.RemoteResourceService;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
@@ -124,12 +125,14 @@ public class DocumentServiceImpl implements IDocumentService {
         return resourceId;
     }
 
+    @WithSpan("document.upload.initialize")
     public DocumentUploadInitResponse initUploadDocument(DocumentUploadInitRequest request, Long uploaderId,
                                                           Map<Long, GroupRoleType> uploaderGroupRoles)  {
         // 普通上传新增版本，检查编辑状态
         return initUploadDocument(request, uploaderId, uploaderGroupRoles, true, true);
     }
 
+    @WithSpan("document.upload.initialize")
     public DocumentUploadInitResponse initUploadDocumentByOnlyOffice(DocumentUploadInitRequest request, Long uploaderId, Boolean isVersioned)  {
         // OnlyOffice 回调上传不检查编辑状态，是否新增版本由调用方决定
         return initUploadDocument(request, uploaderId, null, isVersioned, false);

@@ -44,6 +44,7 @@
         <lombok.version>1.18.30</lombok.version>
         <fastjson2.version>2.0.43</fastjson2.version>
         <springwolf.version>1.0.0</springwolf.version>
+        <opentelemetry.instrumentation.version>2.30.0</opentelemetry.instrumentation.version>
     </properties>
 
     <dependencyManagement>
@@ -127,6 +128,12 @@
                 <groupId>com.wisepen</groupId>
                 <artifactId>wisepen-user-service-api</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.opentelemetry.instrumentation</groupId>
+                <artifactId>opentelemetry-instrumentation-annotations</artifactId>
+                <version>${opentelemetry.instrumentation.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

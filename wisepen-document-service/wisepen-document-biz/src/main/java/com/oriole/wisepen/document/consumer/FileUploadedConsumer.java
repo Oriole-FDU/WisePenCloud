@@ -14,6 +14,7 @@ import io.github.springwolf.core.asyncapi.annotations.AsyncListener;
 import io.github.springwolf.core.asyncapi.annotations.AsyncMessage;
 import io.github.springwolf.core.asyncapi.annotations.AsyncOperation;
 import io.github.springwolf.plugins.kafka.asyncapi.annotations.KafkaAsyncOperationBinding;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -41,6 +42,7 @@ public class FileUploadedConsumer {
             message = @AsyncMessage(name = "FileUploadedMessage", title = "文件上传完成事件")
     ))
     @KafkaAsyncOperationBinding(groupId = "wisepen-document-upload-callback-group")
+    @WithSpan("document.upload.consume")
     public void onFileUploaded(String payload) throws Exception {
         // 从兼容非Java微服务的发布者订阅，使用objectMapper显式转换
         FileUploadedMessage msg = objectMapper.readValue(payload, FileUploadedMessage.class);

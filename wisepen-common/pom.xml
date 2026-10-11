@@ -104,5 +104,11 @@
             <artifactId>spring-retry</artifactId>
         </dependency>
 
+        <!-- 业务方法 span 注解由 OTel Java Agent 运行时处理 -->
+        <dependency>
+            <groupId>io.opentelemetry.instrumentation</groupId>
+            <artifactId>opentelemetry-instrumentation-annotations</artifactId>
+        </dependency>
+
     </dependencies>
 </project>
