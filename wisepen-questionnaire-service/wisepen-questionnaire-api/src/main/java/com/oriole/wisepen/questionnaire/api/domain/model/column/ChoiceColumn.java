@@ -1,7 +1,6 @@
 package com.oriole.wisepen.questionnaire.api.domain.model.column;
 
 import com.oriole.wisepen.questionnaire.api.enums.TableColumnType;
-import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -13,14 +12,12 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 
 @Data
 @NoArgsConstructor
 @SuperBuilder
 @EqualsAndHashCode(callSuper = true)
 public class ChoiceColumn extends TableColumn {
-    @Valid
     private List<OptionDefinition> options;
     private Boolean multiple;
     private Integer minSelections;
@@ -36,38 +33,51 @@ public class ChoiceColumn extends TableColumn {
         if (options == null || options.isEmpty()) {
             throw new IllegalArgumentException("options must not be empty");
         }
+        if (multiple == null) {
+            throw new IllegalArgumentException("multiple must not be null");
+        }
         Set<String> optionIds = new HashSet<>();
         for (OptionDefinition option : options) {
-            option.ensureOptionId();
+            if (option == null || option.getOptionId() == null || option.getOptionId().isBlank()) {
+                throw new IllegalArgumentException("optionId must not be blank");
+            }
             if (!optionIds.add(option.getOptionId())) {
                 throw new IllegalArgumentException("optionId must be unique");
             }
-            option.validateDefinition();
         }
         if (minSelections != null && minSelections < 0) {
             throw new IllegalArgumentException("minSelections must be greater than or equal to 0");
         }
-        if (maxSelections != null && maxSelections < 0) {
-            throw new IllegalArgumentException("maxSelections must be greater than or equal to 0");
+        if (maxSelections != null && maxSelections < 1) {
+            throw new IllegalArgumentException("maxSelections must be greater than or equal to 1");
         }
-        if (Boolean.FALSE.equals(multiple) && maxSelections != null && maxSelections > 1) {
+        if (!multiple && maxSelections != null && maxSelections > 1) {
             throw new IllegalArgumentException("maxSelections must be less than or equal to 1 when multiple is false");
         }
-        if (Boolean.FALSE.equals(multiple) && minSelections != null && minSelections > 1) {
+        if (!multiple && minSelections != null && minSelections > 1) {
             throw new IllegalArgumentException("minSelections must be less than or equal to 1 when multiple is false");
         }
         if (minSelections != null && maxSelections != null && minSelections > maxSelections) {
             throw new IllegalArgumentException("minSelections must be less than or equal to maxSelections");
         }
+        if (minSelections != null && minSelections > options.size()) {
+            throw new IllegalArgumentException("minSelections must be less than or equal to option count");
+        }
     }
 
     @Override
     protected void validateNonEmptyValue(Object value) {
-        if (Boolean.TRUE.equals(multiple)) {
+        if (multiple) {
             validateMultipleValue(value);
             return;
         }
         validateSingleValue(value);
+    }
+
+    @Override
+    protected boolean isEmptyValue(Object value) {
+        return super.isEmptyValue(value)
+                || Boolean.TRUE.equals(multiple) && value instanceof Collection<?> values && values.isEmpty();
     }
 
     private void validateSingleValue(Object value) {
@@ -119,22 +129,9 @@ public class ChoiceColumn extends TableColumn {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class OptionDefinition {
-        @Builder.Default
-        private String optionId = UUID.randomUUID().toString();
+        private String optionId;
         private Boolean isImage;
         private String content;
         private Boolean other;
-
-        private void ensureOptionId() {
-            if (optionId == null || optionId.isBlank()) {
-                optionId = UUID.randomUUID().toString();
-            }
-        }
-
-        private void validateDefinition() {
-            if (content == null || content.isBlank()) {
-                throw new IllegalArgumentException("option content must not be blank");
-            }
-        }
     }
 }

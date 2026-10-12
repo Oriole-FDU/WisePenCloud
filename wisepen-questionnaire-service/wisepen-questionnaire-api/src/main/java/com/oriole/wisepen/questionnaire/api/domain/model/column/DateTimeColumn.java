@@ -6,7 +6,9 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Data
 @NoArgsConstructor
@@ -42,6 +44,9 @@ public class DateTimeColumn extends TableColumn {
     private LocalDateTime parseDateTime(Object value) {
         if (value instanceof LocalDateTime dateTime) {
             return dateTime;
+        }
+        if (value instanceof Number timestamp) {
+            return LocalDateTime.ofInstant(Instant.ofEpochMilli(timestamp.longValue()), ZoneId.systemDefault());
         }
         if (value instanceof CharSequence text) {
             try {

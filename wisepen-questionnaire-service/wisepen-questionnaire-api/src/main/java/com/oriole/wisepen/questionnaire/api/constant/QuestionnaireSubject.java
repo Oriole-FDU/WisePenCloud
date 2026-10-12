@@ -7,8 +7,9 @@ import java.util.Locale;
 public enum QuestionnaireSubject implements IBusinessSubject {
     TABLE,
     TABLE_VERSION,
-    QUESTIONNAIRE_VIEW,
+    SUBMISSION_POLICY,
     TABLE_COLUMN,
+    QUESTIONNAIRE,
     SUBMISSION;
 
     @Override

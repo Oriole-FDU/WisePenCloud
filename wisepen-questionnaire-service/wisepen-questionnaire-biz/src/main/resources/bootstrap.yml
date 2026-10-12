@@ -35,3 +35,16 @@ wisepen:
     title: 表格问卷服务 API
     version: 1.0.0
     description: WisePen 表格定义、问卷视图与填写数据接口
+
+springwolf:
+  plugin:
+    kafka:
+      scanner:
+        kafka-listener:
+          enabled: false
+  docket:
+    base-package: com.oriole.wisepen.questionnaire
+    info:
+      title: 问卷服务 Kafka Events
+      version: 1.0.0
+      description: 问卷资源物理删除相关 Kafka 消息契约
