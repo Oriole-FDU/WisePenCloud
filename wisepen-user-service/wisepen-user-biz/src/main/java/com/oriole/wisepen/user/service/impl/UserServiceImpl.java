@@ -296,6 +296,30 @@ public class UserServiceImpl implements IUserService {
         userMapper.updateById(userEntity);
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void issueAdminAccount(String username) {
+        UserEntity userEntity = userMapper.selectOne(Wrappers.<UserEntity>lambdaQuery()
+                .eq(UserEntity::getUsername, username));
+        if (userEntity == null || userEntity.getUserStatus() != UserStatus.NORMAL) {
+            throw new ServiceException(UserError.ADMIN_ACCOUNT_ISSUE_TARGET_INVALID);
+        }
+        if (userEntity.getIdentityType() == IdentityType.ADMIN) {
+            return;
+        }
+
+        int updatedRows = userMapper.update(null, Wrappers.<UserEntity>lambdaUpdate()
+                .eq(UserEntity::getUserId, userEntity.getUserId())
+                .eq(UserEntity::getUserStatus, UserStatus.NORMAL)
+                .eq(UserEntity::getIdentityType, userEntity.getIdentityType())
+                .set(UserEntity::getIdentityType, IdentityType.ADMIN));
+        if (updatedRows != 1) {
+            throw new ServiceException(UserError.ADMIN_ACCOUNT_ISSUE_TARGET_INVALID);
+        }
+        redisCacheManager.deleteSessionsByUserId(userEntity.getUserId());
+        log.info("admin account issued. userId={} username={}", userEntity.getUserId(), username);
+    }
+
     public void updateUserInfoAdmin(UserInfoAdminUpdateRequest req) {
         Long userId = req.getUserId();
         UserEntity userEntity = userMapper.selectById(userId);

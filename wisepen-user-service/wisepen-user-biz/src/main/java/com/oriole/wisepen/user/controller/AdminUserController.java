@@ -13,6 +13,7 @@ import com.oriole.wisepen.user.domain.entity.UserProfileEntity;
 import com.oriole.wisepen.user.service.IUserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -99,6 +100,24 @@ public class AdminUserController {
     @Log(title = "管理员更新用户信息", businessType = BusinessType.UPDATE)
     public R<Void> updateUserInfo(@RequestBody UserInfoAdminUpdateRequest req) {
         userService.updateUserInfoAdmin(req);
+        return R.ok();
+    }
+
+    @Operation(
+            summary = "签发管理员账号",
+            description = """
+                    - 用途：将已有用户账号提升为管理端管理员。
+                    - 请求：username 为目标用户的精确用户名。
+                    - 约束：当前操作者必须具备管理员身份；目标账号必须存在且状态为 NORMAL。
+                    - 处理：将目标账号身份设为 ADMIN 并清除其已有登录会话，要求目标用户重新登录；目标账号已是管理员时按成功处理；不创建账号、不修改密码或其他资料。
+                    - 失败：当前操作者不是管理员 -> PermissionError.UNAUTHORIZED；目标账号不存在或状态不是 NORMAL -> UserError.ADMIN_ACCOUNT_ISSUE_TARGET_INVALID。
+                    - 响应：成功时返回空结果。
+                    """
+    )
+    @PostMapping("/issueAdminAccount")
+    @Log(title = "签发管理员账号", businessType = BusinessType.UPDATE)
+    public R<Void> issueAdminAccount(@Valid @RequestBody AdminAccountIssueRequest req) {
+        userService.issueAdminAccount(req.getUsername());
         return R.ok();
     }
 
