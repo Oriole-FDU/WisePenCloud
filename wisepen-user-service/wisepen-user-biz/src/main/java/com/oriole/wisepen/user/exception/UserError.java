@@ -23,6 +23,7 @@ public enum UserError implements IResult {
     USERNAME_ALREADY_EXISTS(3211, new ResultKey(BusinessDomain.USER, UserSubject.USER, ErrorReason.ALREADY_EXISTS), "用户名已存在"),
     CAMPUS_NO_ALREADY_EXISTS(3212, new ResultKey(BusinessDomain.USER, UserSubject.USER, ErrorReason.ALREADY_EXISTS), "学号已存在"),
     ADMIN_ACCOUNT_ISSUE_TARGET_INVALID(3213, new ResultKey(BusinessDomain.USER, UserSubject.USER, ErrorReason.STATE_INVALID), "目标账号不存在或状态不符合管理员签发条件"),
+    TEACHER_ACCOUNT_ISSUE_TARGET_INVALID(3214, new ResultKey(BusinessDomain.USER, UserSubject.USER, ErrorReason.STATE_INVALID), "目标账号不存在或状态不符合教师签发条件"),
     USER_PASSWORD_RESET_EXPIRED(3221,  new ResultKey(BusinessDomain.USER, UserSubject.USER, ErrorReason.EXPIRED),"重置密码链接已过期"),
     USER_PASSWORD_RESET_EMAIL_SEND_FAILED(3231, new ResultKey(BusinessDomain.USER, UserSubject.USER, ErrorReason.FAILED),"重置密码邮件发送失败"),
 

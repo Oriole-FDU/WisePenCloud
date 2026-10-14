@@ -320,6 +320,33 @@ public class UserServiceImpl implements IUserService {
         log.info("admin account issued. userId={} username={}", userEntity.getUserId(), username);
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void issueTeacherAccount(String username) {
+        UserEntity userEntity = userMapper.selectOne(Wrappers.<UserEntity>lambdaQuery()
+                .eq(UserEntity::getUsername, username));
+        if (userEntity == null || userEntity.getUserStatus() != UserStatus.NORMAL) {
+            throw new ServiceException(UserError.TEACHER_ACCOUNT_ISSUE_TARGET_INVALID);
+        }
+        if (userEntity.getIdentityType() == IdentityType.TEACHER) {
+            return;
+        }
+        if (userEntity.getIdentityType() != IdentityType.STUDENT) {
+            throw new ServiceException(UserError.TEACHER_ACCOUNT_ISSUE_TARGET_INVALID);
+        }
+
+        int updatedRows = userMapper.update(null, Wrappers.<UserEntity>lambdaUpdate()
+                .eq(UserEntity::getUserId, userEntity.getUserId())
+                .eq(UserEntity::getUserStatus, UserStatus.NORMAL)
+                .eq(UserEntity::getIdentityType, IdentityType.STUDENT)
+                .set(UserEntity::getIdentityType, IdentityType.TEACHER));
+        if (updatedRows != 1) {
+            throw new ServiceException(UserError.TEACHER_ACCOUNT_ISSUE_TARGET_INVALID);
+        }
+        redisCacheManager.deleteSessionsByUserId(userEntity.getUserId());
+        log.info("teacher account issued. userId={} username={}", userEntity.getUserId(), username);
+    }
+
     public void updateUserInfoAdmin(UserInfoAdminUpdateRequest req) {
         Long userId = req.getUserId();
         UserEntity userEntity = userMapper.selectById(userId);

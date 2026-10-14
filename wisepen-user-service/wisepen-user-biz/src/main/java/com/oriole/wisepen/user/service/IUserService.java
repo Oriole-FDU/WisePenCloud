@@ -38,6 +38,7 @@ public interface IUserService {
 
     // 仅限管理员使用
     void issueAdminAccount(String username);
+    void issueTeacherAccount(String username);
     void resetPasswordAdmin(AuthPwdAdminResetRequest req);
     void updateUserInfoAdmin(UserInfoAdminUpdateRequest req);
     void updateProfileAdmin(UserProfileAdminUpdateRequest req);
