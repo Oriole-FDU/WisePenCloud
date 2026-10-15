@@ -3,11 +3,14 @@ package com.oriole.wisepen.user.controller;
 import cn.hutool.core.util.StrUtil;
 import com.oriole.wisepen.common.core.context.SecurityContextHolder;
 import com.oriole.wisepen.common.core.domain.R;
+import com.oriole.wisepen.common.core.domain.enums.BusinessType;
+import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.security.annotation.CheckLogin;
 import com.oriole.wisepen.user.api.config.UserProperties;
 import com.oriole.wisepen.user.api.domain.dto.req.AuthLoginRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.AuthRegisterRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.AuthPwdResetRequest;
+import com.oriole.wisepen.user.api.domain.dto.req.AuthPwdChangeRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.AuthPwdResetVerifyRequest;
 import com.oriole.wisepen.user.service.AuthService;
 import com.oriole.wisepen.user.service.IUserService;
@@ -21,7 +24,7 @@ import org.springframework.web.bind.annotation.*;
 
 import static com.oriole.wisepen.common.core.constant.SecurityConstants.AUTHORIZATION_TOKEN;
 
-@Tag(name = "用户认证", description = "用户登录、登出、注册与密码重置")
+@Tag(name = "用户认证", description = "用户登录、登出、注册与密码管理")
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
@@ -138,6 +141,26 @@ public class AuthController {
     @PostMapping("/resetPassword")
     public R<Void> resetPassword(@Valid @RequestBody AuthPwdResetRequest req) {
         userService.resetPassword(req);
+        return R.ok();
+    }
+
+    @Operation(
+            summary = "修改用户密码",
+            description = """
+                    - 用途：供已登录用户验证旧密码并设置新密码。
+                    - 请求：oldPassword 为旧密码；newPassword 为符合密码规则的新密码。
+                    - 约束：当前用户必须已登录；目标用户 ID 从认证上下文读取，不接受请求指定。
+                    - 处理：校验当前密码和新旧密码差异，更新密码密文并删除该用户全部登录会话；响应同时清除当前浏览器认证 Cookie。
+                    - 失败：当前密码错误 -> UserError.AUTH_CURRENT_PASSWORD_INVALID；新旧密码相同 -> UserError.USER_PASSWORD_UNCHANGED。
+                    - 响应：成功时返回空结果。
+                    """
+    )
+    @CheckLogin
+    @PostMapping("/changePassword")
+    @Log(title = "用户修改密码", businessType = BusinessType.UPDATE, isSaveRequestData = false, isSaveResponseData = false)
+    public R<Void> changePassword(@Valid @RequestBody AuthPwdChangeRequest req, HttpServletResponse response) {
+        userService.changePassword(SecurityContextHolder.getUserId(), req);
+        response.addCookie(buildAuthCookie(null, 0));
         return R.ok();
     }
 

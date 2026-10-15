@@ -242,6 +242,20 @@ public class UserServiceImpl implements IUserService {
         log.info("password reset. userId={} mode=self", userId);
     }
 
+    @Override
+    public void changePassword(Long userId, AuthPwdChangeRequest req) {
+        UserEntity user = userMapper.selectById(userId);
+        if (user == null || !BCrypt.checkpw(req.getOldPassword(), user.getPassword())) {
+            throw new ServiceException(UserError.AUTH_CURRENT_PASSWORD_INVALID);
+        }
+        if (BCrypt.checkpw(req.getNewPassword(), user.getPassword())) {
+            throw new ServiceException(UserError.USER_PASSWORD_UNCHANGED);
+        }
+
+        updatePasswordByUserId(userId, req.getNewPassword());
+        log.info("password changed. userId={}", userId);
+    }
+
     // 修改密码
     private void updatePasswordByUserId(Long userId, String newPassword) {
         UserEntity user = UserEntity.builder()

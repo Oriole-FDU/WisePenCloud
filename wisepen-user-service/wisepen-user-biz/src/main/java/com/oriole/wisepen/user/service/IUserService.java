@@ -30,6 +30,8 @@ public interface IUserService {
     void sendResetMail(AuthPwdResetVerifyRequest req);
     // 重置密码
     void resetPassword(AuthPwdResetRequest req);
+    // 修改密码
+    void changePassword(Long userId, AuthPwdChangeRequest req);
 
     // 更新用户信息
     void updateUserInfo(Long userId, UserInfoUpdateRequest req);

@@ -21,6 +21,7 @@ public interface UserValidationMsg {
      */
     String PASSWORD_INVALID = "密码长度必须大于8位且包含字母和数字";
     String PASSWORD_EMPTY = "密码不能为空";
+    String CURRENT_PASSWORD_EMPTY = "旧密码不能为空";
     String RESET_PWD_TOKEN_EMPTY = "重置密码的令牌不能为空";
 
     /**

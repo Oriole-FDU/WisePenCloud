@@ -18,12 +18,14 @@ public enum UserError implements IResult {
     // 认证相关异常
     AUTH_USERNAME_OR_PASSWORD_INVALID(3111, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.INVALID),"用户名或密码错误"),
     AUTH_USER_LOCKED(3121, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.LOCKED), "账号已禁用"),
+    AUTH_CURRENT_PASSWORD_INVALID(3131, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.INVALID), "旧密码错误"),
 
     // 用户相关异常
     USERNAME_ALREADY_EXISTS(3211, new ResultKey(BusinessDomain.USER, UserSubject.USER, ErrorReason.ALREADY_EXISTS), "用户名已存在"),
     CAMPUS_NO_ALREADY_EXISTS(3212, new ResultKey(BusinessDomain.USER, UserSubject.USER, ErrorReason.ALREADY_EXISTS), "学号已存在"),
     USER_PASSWORD_RESET_EXPIRED(3221,  new ResultKey(BusinessDomain.USER, UserSubject.USER, ErrorReason.EXPIRED),"重置密码链接已过期"),
     USER_PASSWORD_RESET_EMAIL_SEND_FAILED(3231, new ResultKey(BusinessDomain.USER, UserSubject.USER, ErrorReason.FAILED),"重置密码邮件发送失败"),
+    USER_PASSWORD_UNCHANGED(3241, new ResultKey(BusinessDomain.USER, UserSubject.USER, ErrorReason.CONFLICT), "新密码不能与当前密码相同"),
 
     // 用户验证相关异常
     CANNOT_OPERATE_BEFORE_AUTH_VERIFICATION(3311, new ResultKey(BusinessDomain.USER, UserSubject.AUTH_VERIFICATION, ErrorReason.STATE_INVALID),"未完成身份验证的账号，不能进行该操作"),
