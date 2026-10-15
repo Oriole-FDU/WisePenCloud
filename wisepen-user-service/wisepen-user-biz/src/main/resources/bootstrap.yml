@@ -34,6 +34,11 @@ wisepen:
   user:
     api-domain: ${WISEPEN_USER_API_DOMAIN:}
     auth-cookie-domain: ${WISEPEN_USER_AUTH_COOKIE_DOMAIN:}
+  campus-identity:
+    providers:
+      FUDAN_UIS:
+        enabled: ${WISEPEN_CAMPUS_IDENTITY_FUDAN_UIS_ENABLED:true}
+        service-name: ${WISEPEN_CAMPUS_IDENTITY_FUDAN_UIS_SERVICE_NAME:wisepen-fudan-extension-service}
   user-task:
     rules:
       STUDENT_VERIFICATION:

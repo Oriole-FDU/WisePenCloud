@@ -262,7 +262,6 @@ public class UserServiceImpl implements IUserService {
 
         UserVerificationStrategy strategy = strategyFactory.getStrategy(userEntity.getVerificationMode());
         List<String> readonlyFields = strategy.getReadonlyFields();
-        readonlyFields.add("inviteCode");
 
         CopyOptions copyOptions = CopyOptions.create()
                 .setIgnoreNullValue(true)

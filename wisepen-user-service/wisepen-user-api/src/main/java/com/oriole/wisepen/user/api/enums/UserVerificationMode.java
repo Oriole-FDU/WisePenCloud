@@ -9,7 +9,7 @@ import lombok.Getter;
 @AllArgsConstructor
 public enum UserVerificationMode {
     EDU_EMAIL(1, "EDU_EMAIL"),
-    FDU_UIS_SYS(2, "FDU_UIS_SYS");
+    CAMPUS_IDENTITY_PROVIDER(2, "CAMPUS_IDENTITY_PROVIDER");
 
     private final int code;
 

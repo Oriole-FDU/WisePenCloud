@@ -3,10 +3,10 @@ package com.oriole.wisepen.extension.fudan.consumer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.microsoft.playwright.*;
 import com.microsoft.playwright.options.LoadState;
+import com.oriole.wisepen.campus.extension.api.enums.CampusIdentityTaskState;
 import com.oriole.wisepen.extension.fudan.constant.MqTopicConstants;
 import com.oriole.wisepen.extension.fudan.domain.dto.FudanUISTaskResultDTO;
 import com.oriole.wisepen.extension.fudan.domain.mq.FudanUISAuthRequestMessage;
-import com.oriole.wisepen.extension.fudan.enums.FudanUISTaskState;
 import io.github.springwolf.core.asyncapi.annotations.AsyncListener;
 import io.github.springwolf.core.asyncapi.annotations.AsyncMessage;
 import io.github.springwolf.core.asyncapi.annotations.AsyncOperation;
@@ -45,14 +45,14 @@ public class UISAuthRequestConsumer {
         FudanUISAuthRequestMessage msg = objectMapper.readValue(payload, FudanUISAuthRequestMessage.class);
         log.info("uis auth request received. topic={} userId={} account={}",
                 MqTopicConstants.FUDAN_UIS_AUTH_REQ, msg.getUserId(), msg.getAccount());
-        runScraper(msg.getUserId(), msg.getAccount(), msg.getPassword());
+        run(msg.getUserId(), msg.getTaskId(), msg.getAccount(), msg.getPassword());
         log.debug("uis auth request consumed. topic={} userId={}",
                 MqTopicConstants.FUDAN_UIS_AUTH_REQ, msg.getUserId());
     }
 
-    private void runScraper(Long uid, String account, String password) {
-        redisCacheManager.setUisTaskStatus(uid, FudanUISTaskResultDTO.of(FudanUISTaskState.PENDING));
-        log.info("uis auth task changed. userId={} from=QUEUED to=PENDING", uid);
+    private void run(Long userId, String taskId, String account, String password) {
+        redisCacheManager.setUisTaskStatus(taskId, FudanUISTaskResultDTO.of(userId, taskId, CampusIdentityTaskState.PENDING));
+        log.info("uis auth task changed. userId={} taskId={} from=QUEUED to=PENDING", userId, taskId);
 
         try (Playwright playwright = Playwright.create()) {
             Browser browser = playwright.chromium().launch(new BrowserType.LaunchOptions()
@@ -71,15 +71,16 @@ public class UISAuthRequestConsumer {
 
             String base64Image = extractQrBase64(qrResponse.text());
             if (base64Image == null) {
-                redisCacheManager.setUisTaskStatus(uid, FudanUISTaskResultDTO.of(FudanUISTaskState.FAILED_AUTH));
-                log.warn("uis auth task changed. userId={} from=PENDING to=FAILED_AUTH reason=\"qr code missing\"", uid);
+                redisCacheManager.setUisTaskStatus(taskId, FudanUISTaskResultDTO.of(userId, taskId, CampusIdentityTaskState.FAILED,
+                        "UIS QR Code Missing, please try again / 复旦UIS系统未成功加载二次验证所需的二维码，请重试"));
+                log.warn("uis auth task changed. userId={} taskId={} from=PENDING to=FAILED_AUTH reason=\"qr code missing\"", userId, taskId);
                 return;
             }
 
-            FudanUISTaskResultDTO waitingDto = FudanUISTaskResultDTO.of(FudanUISTaskState.WAITING_SCAN);
-            waitingDto.setQrBase64(base64Image);
-            redisCacheManager.setUisTaskStatus(uid, waitingDto);
-            log.debug("uis auth task changed. userId={} from=PENDING to=WAITING_SCAN", uid);
+            FudanUISTaskResultDTO resultDTO = FudanUISTaskResultDTO.of(userId, taskId, CampusIdentityTaskState.CHALLENGE_REQUIRED);
+            resultDTO.setQrBase64(base64Image);
+            redisCacheManager.setUisTaskStatus(taskId, resultDTO);
+            log.debug("uis auth task changed. userId={} taskId={} from=PENDING to=CHALLENGE_REQUIRED", userId, taskId);
 
             try {
                 page.waitForURL(Pattern.compile(".*my\\.fudan\\.edu\\.cn.*"),
@@ -89,19 +90,21 @@ public class UISAuthRequestConsumer {
                 Map<String, String> infoMap = parseStudentInfo(page);
                 infoMap.put("学号", account);
 
-                FudanUISTaskResultDTO successDto = FudanUISTaskResultDTO.of(FudanUISTaskState.SUCCESS);
+                FudanUISTaskResultDTO successDto = FudanUISTaskResultDTO.of(userId, taskId, CampusIdentityTaskState.SUCCESS);
                 successDto.setProfile(infoMap);
-                redisCacheManager.setUisTaskStatus(uid, successDto);
-                log.info("uis auth task changed. userId={} from=WAITING_SCAN to=SUCCESS", uid);
+                redisCacheManager.setUisTaskStatus(taskId, successDto);
+                log.info("uis auth task changed. userId={} taskId={} from=CHALLENGE_REQUIRED to=SUCCESS", userId, taskId);
 
             } catch (TimeoutError e) {
-                redisCacheManager.setUisTaskStatus(uid, FudanUISTaskResultDTO.of(FudanUISTaskState.FAILED_TIMEOUT));
-                log.error("uis auth task changed. userId={} from=WAITING_SCAN to=FAILED_TIMEOUT", uid, e);
+                redisCacheManager.setUisTaskStatus(taskId, FudanUISTaskResultDTO.of(userId, taskId, CampusIdentityTaskState.EXPIRED,
+                        "UIS verification has timed out, please try again / 复旦UIS身份认证超时，请重试"));
+                log.error("uis auth task changed. userId={} taskId={} from=CHALLENGE_REQUIRED to=EXPIRED", userId, taskId, e);
             }
 
         } catch (Exception e) {
-            redisCacheManager.setUisTaskStatus(uid, FudanUISTaskResultDTO.of(FudanUISTaskState.FAILED_ERROR));
-            log.error("uis auth task changed. userId={} to=FAILED_ERROR", uid, e);
+            redisCacheManager.setUisTaskStatus(taskId, FudanUISTaskResultDTO.of(userId, taskId, CampusIdentityTaskState.FAILED,
+                    "UIS verification has failed, please try again / 复旦UIS身份认证遇到意外错误，请重试 | " + e.getMessage()));
+            log.error("uis auth task changed. userId={} taskId={} to=FAILED_ERROR", userId, taskId, e);
         }
     }
 

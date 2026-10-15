@@ -14,6 +14,7 @@
 
     <modules>
         <module>wisepen-common</module>
+        <module>wisepen-campus-extension-api</module>
         <module>wisepen-user-service</module>
         <module>wisepen-system-service</module>
         <module>wisepen-common-log</module>

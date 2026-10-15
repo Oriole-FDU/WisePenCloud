@@ -3,7 +3,6 @@ package com.oriole.wisepen.user.strategy.impl;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.oriole.wisepen.common.core.domain.enums.IdentityType;
 import com.oriole.wisepen.common.core.domain.enums.UserStatus;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.system.api.domain.dto.MailSendDTO;
@@ -28,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -58,10 +58,7 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
         return UserVerificationMode.EDU_EMAIL; // 策略标识
     }
 
-    @Override
-    public void initiate(Long userId, Map<String, Object> payload) {
-        String email = StrUtil.blankToDefault((String) payload.get("email"), "").trim().toLowerCase(Locale.ROOT);
-
+    public void initiateEmailVerification(Long userId, String email) {
         if (StrUtil.isBlank(email) || !EMAIL_PATTERN.matcher(email).matches()) {
             log.warn("email verification skipped. email={} userId={} reason=\"invalid email format\"", email, userId);
             throw new ServiceException(UserError.VERIFICATION_EMAIL_INVALID);
@@ -110,10 +107,9 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
         }
     }
 
-    @Override
     @Transactional(rollbackFor = Exception.class)
-    public VerificationResultDTO verify(Map<String, Object> payload) {
-        ImmutablePair<Long, String> verifyInfo = redisCacheManager.getEmailVerificationUser((String) payload.get("token"));
+    public VerificationResultDTO completeEmailVerification(String token) {
+        ImmutablePair<Long, String> verifyInfo = redisCacheManager.getEmailVerificationUser(token);
         if (verifyInfo == null) {
             throw new ServiceException(UserError.VERIFICATION_EMAIL_TOKEN_EXPIRED);
         }
@@ -163,7 +159,7 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
 
     @Override
     public List<String> getReadonlyFields() {
-        return Arrays.asList("username", "email", "userStatus", "university", "inviteCode");
+        return new ArrayList<>(Arrays.asList("username", "email", "userStatus", "university", "inviteCode"));
     }
 
     private void validateEmailVerificationState(UserEntity userEntity, Long userId, String email) {

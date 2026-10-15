@@ -45,6 +45,6 @@ springwolf:
   docket:
     base-package: com.oriole.wisepen.extension.fudan
     info:
-      title: 复旦扩展服务 Kafka Events
+      title: 复旦扩展服务 Kafka Events (内部)
       version: 1.0.0
       description: 复旦 UIS 认证请求相关 Kafka 消息契约

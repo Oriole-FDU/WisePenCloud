@@ -1,19 +1,29 @@
 package com.oriole.wisepen.user.controller;
 
+import cn.hutool.core.util.StrUtil;
 import com.oriole.wisepen.common.core.context.SecurityContextHolder;
 import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.log.annotation.Log;
+import com.oriole.wisepen.campus.extension.api.domain.dto.CampusIdentityProviderDescriptorDTO;
+import com.oriole.wisepen.campus.extension.api.domain.dto.CampusIdentityTaskResultDTO;
+import com.oriole.wisepen.campus.extension.api.enums.CampusIdentityTaskState;
+import com.oriole.wisepen.campus.extension.api.enums.LoginChallengeType;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.security.annotation.CheckLogin;
 import com.oriole.wisepen.common.security.annotation.CheckRole;
+import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.user.api.domain.dto.req.UserInfoUpdateRequest;
+import com.oriole.wisepen.user.api.domain.dto.req.CampusIdentityLoginChallengeSubmitRequest;
+import com.oriole.wisepen.user.api.domain.dto.req.CampusIdentityVerifyInitiateRequest;
 import com.oriole.wisepen.user.api.domain.dto.res.UserDetailInfoResponse;
 import com.oriole.wisepen.user.api.domain.dto.res.UserSearchUserResponse;
 import com.oriole.wisepen.user.api.domain.dto.VerificationResultDTO;
 import com.oriole.wisepen.user.api.domain.dto.req.UserProfileUpdateRequest;
 import com.oriole.wisepen.user.api.enums.UserVerificationMode;
+import com.oriole.wisepen.user.exception.UserError;
 import com.oriole.wisepen.user.service.IUserService;
-import com.oriole.wisepen.user.strategy.VerificationStrategyFactory;
+import com.oriole.wisepen.user.strategy.impl.CampusIdentityVerificationStrategy;
+import com.oriole.wisepen.user.strategy.impl.EmailVerificationStrategy;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
@@ -26,6 +36,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Tag(name = "用户资料", description = "用户资料查询、更新与身份验证")
@@ -36,7 +47,9 @@ import java.util.Map;
 public class UserController {
 
     private final IUserService userService;
-    private final VerificationStrategyFactory verificationStrategyFactory;
+
+    private final EmailVerificationStrategy emailVerificationStrategy;
+    private final CampusIdentityVerificationStrategy campusIdentityVerificationStrategy;
 
     @Operation(
             summary = "获取当前用户信息",
@@ -150,10 +163,8 @@ public class UserController {
     @PostMapping("/verify/initiateEmailVerify")
     @Log(title = "发起邮箱验证", businessType = BusinessType.OTHER)
     public R<Void> initiateEmailVerify(@RequestParam("email") String email) {
-        Map<String,Object> map = new HashMap<>();
-        map.put("email", email);
-        verificationStrategyFactory.getStrategy(UserVerificationMode.EDU_EMAIL)
-                .initiate(SecurityContextHolder.getUserId(), map);
+        email = StrUtil.blankToDefault(email, "").trim().toLowerCase(Locale.ROOT);
+        emailVerificationStrategy.initiateEmailVerification(SecurityContextHolder.getUserId(), email);
         return R.ok();
     }
 
@@ -171,20 +182,111 @@ public class UserController {
     @GetMapping("/verify/checkEmailVerify")
     @Log(title = "邮箱验证回调", businessType = BusinessType.OTHER)
     public R<Void> checkEmailVerify(@RequestParam("token") String token) {
-        Map<String,Object> map = new HashMap<>();
-        map.put("token", token);
-        verificationStrategyFactory.getStrategy(UserVerificationMode.EDU_EMAIL).verify(map);
+        emailVerificationStrategy.completeEmailVerification(token);
         return R.ok();
     }
 
     @Operation(
+            summary = "查询校园身份认证 Provider",
+            description = """
+                    - 用途：查询当前可用的校园身份认证 Provider。
+                    - 请求：无需请求参数。
+                    - 约束：当前用户必须已登录。
+                    - 处理：读取用户服务配置的 Provider，并向扩展服务获取展示描述。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；Provider 不存在或扩展服务不可用 -> UserError.VERIFICATION_CAMPUS_IDENTITY_PROVIDER_NOT_FOUND。
+                    - 响应：返回 Provider 展示信息、所属学校和所需输入。
+                    """
+    )
+    @CheckLogin
+    @GetMapping("/verify/listCampusIdentityProviders")
+    public R<List<CampusIdentityProviderDescriptorDTO>> listCampusIdentityProviders() {
+        return R.ok(campusIdentityVerificationStrategy.listProviders());
+    }
+
+    @Operation(
+            summary = "发起校园身份认证",
+            description = """
+                    - 用途：当前用户通过指定校园身份认证 Provider 发起校内身份认证流程。
+                    - 请求：providerCode 指定 Provider；payload 透传该 Provider 所需输入。
+                    - 约束：当前用户必须已登录且仍处于未完成身份认证状态。
+                    - 处理：将请求转交校园身份认证扩展服务；不在本接口直接完成用户认证落库。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；账号状态不允许认证 -> UserError.VERIFICATION_CAMPUS_IDENTITY_STATE_INVALID；扩展请求失败 -> UserError.VERIFICATION_CAMPUS_IDENTITY_REQUEST_FAILED。
+                    - 响应：返回认证任务当前状态；需要扫码或验证码时返回 loginChallenge。
+                    """
+    )
+    @CheckLogin
+    @PostMapping("/verify/initiateCampusIdentityVerify")
+    @Log(title = "发起校园身份认证", businessType = BusinessType.OTHER, isSaveRequestData = false)
+    public R<CampusIdentityTaskResultDTO> initiateCampusIdentityVerify(
+            @Validated @RequestBody CampusIdentityVerifyInitiateRequest req) {
+        CampusIdentityTaskResultDTO dto = campusIdentityVerificationStrategy.initiateCampusIdentityVerification(
+                SecurityContextHolder.getUserId(),
+                req.getProviderCode(),
+                req.getPayload()
+        );
+        return R.ok(dto);
+    }
+
+    @Operation(
+            summary = "提交校园身份认证登录 Challenge",
+            description = """
+                    - 用途：当前用户在校园身份认证流程中提交验证码、二次验证等 Challenge 响应。
+                    - 请求：providerCode 指定 Provider；taskId、challengeId 和 payload 来自当前认证任务。
+                    - 约束：当前用户必须已登录且仍处于未完成身份认证状态。
+                    - 处理：将 Challenge 响应转交校园身份认证扩展服务。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；账号状态不允许认证 -> UserError.VERIFICATION_CAMPUS_IDENTITY_STATE_INVALID；扩展请求失败 -> UserError.VERIFICATION_CAMPUS_IDENTITY_REQUEST_FAILED。
+                    - 响应：返回认证任务当前状态。
+                    """
+    )
+    @CheckLogin
+    @PostMapping("/verify/submitCampusIdentityLoginChallenge")
+    @Log(title = "提交校园身份认证登录Challenge", businessType = BusinessType.OTHER, isSaveRequestData = false)
+    public R<CampusIdentityTaskResultDTO> submitCampusIdentityLoginChallenge(
+            @Validated @RequestBody CampusIdentityLoginChallengeSubmitRequest req) {
+        CampusIdentityTaskResultDTO dto = campusIdentityVerificationStrategy.submitLoginChallenge(
+                SecurityContextHolder.getUserId(),
+                req.getProviderCode(),
+                req.getTaskId(),
+                req.getChallengeId(),
+                req.getPayload()
+        );
+        return R.ok(dto);
+    }
+
+    @Operation(
+            summary = "检查校园身份认证状态",
+            description = """
+                    - 用途：查询当前用户校园身份认证任务状态，并在成功时完成用户认证落库。
+                    - 请求：providerCode 指定 Provider；taskId 指定一次具体认证尝试。
+                    - 约束：当前用户必须已登录且仍处于未完成身份认证状态。
+                    - 处理：按 taskId 查询扩展服务任务状态；成功时根据标准身份 claims 更新用户资料、认证状态和奖励。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；任务失败或资料缺失 -> UserError.VERIFICATION_CAMPUS_IDENTITY_FAILED；学工号已被其他账号绑定 -> UserError.VERIFICATION_CAMPUS_NO_ALREADY_EXISTS。
+                    - 响应：返回认证任务当前状态。
+                    """
+    )
+    @CheckLogin
+    @GetMapping("/verify/checkCampusIdentityVerify")
+    @Log(title = "检查校园身份认证状态", businessType = BusinessType.OTHER, isSaveResponseData = false)
+    public R<CampusIdentityTaskResultDTO> checkCampusIdentityVerify(
+            @RequestParam("providerCode") @NotBlank String providerCode,
+            @RequestParam("taskId") @NotBlank String taskId) {
+        CampusIdentityTaskResultDTO dto = campusIdentityVerificationStrategy.checkCampusIdentity(
+                SecurityContextHolder.getUserId(),
+                providerCode,
+                taskId
+        );
+        return R.ok(dto);
+    }
+
+    @Deprecated
+    @Operation(
             summary = "发起复旦 UIS 认证",
             description = """
-                    - 用途：当前用户通过复旦 UIS 账号密码发起校内身份认证流程。
+                    - 用途：兼容旧前端入口，当前用户通过复旦 UIS 账号密码发起校园身份认证流程。
                     - 请求：uisAccount 为 UIS 账号；uisPassword 为 UIS 密码。
-                    - 约束：当前用户必须已登录；UIS 凭据需通过复旦扩展认证策略校验。
-                    - 处理：将 UIS 凭据和当前 userId 交给复旦 UIS 认证策略发起认证任务；不在本接口直接返回最终认证资料。
-                    - 失败：未登录 -> PermissionError.NOT_LOGIN；账号状态不允许 UIS 认证 -> UserError.VERIFICATION_FUDAN_UIS_STATE_INVALID；UIS 认证请求发送失败 -> UserError.VERIFICATION_FUDAN_UIS_REQUEST_FAILED。
+                    - 约束：当前用户必须已登录且仍处于未完成身份认证状态。
+                    - 处理：将 UIS 凭据映射为 FUDAN_UIS Provider 输入，并复用校园身份认证通用流程；不在本接口直接返回最终认证资料。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；账号状态不允许认证 -> UserError.VERIFICATION_CAMPUS_IDENTITY_STATE_INVALID；扩展请求失败 -> UserError.VERIFICATION_CAMPUS_IDENTITY_REQUEST_FAILED。
                     - 响应：成功受理时返回空结果，认证进度通过状态检查接口查询。
                     """
     )
@@ -195,21 +297,23 @@ public class UserController {
             @RequestParam("uisAccount") @NotBlank String uisAccount,
             @RequestParam("uisPassword") @NotBlank String uisPassword) {
         Map<String,Object> map = new HashMap<>();
-        map.put("uisAccount", uisAccount);
-        map.put("uisPassword", uisPassword);
-        verificationStrategyFactory.getStrategy(UserVerificationMode.FDU_UIS_SYS)
-                .initiate(SecurityContextHolder.getUserId(), map);
+        map.put("account", uisAccount);
+        map.put("password", uisPassword);
+        campusIdentityVerificationStrategy.initiateCampusIdentityVerification(
+                SecurityContextHolder.getUserId(), "FUDAN_UIS", map
+        );
         return R.ok();
     }
 
+    @Deprecated
     @Operation(
             summary = "检查复旦 UIS 认证状态",
             description = """
-                    - 用途：查询当前用户复旦 UIS 认证任务的处理结果。
+                    - 用途：兼容旧前端入口，查询当前用户复旦 UIS 认证任务的处理结果。
                     - 请求：无需请求参数，目标用户来自当前认证上下文。
-                    - 约束：当前用户必须已登录，并且已发起过复旦 UIS 认证流程。
-                    - 处理：调用复旦 UIS 认证策略校验当前用户任务状态，并在认证成功时根据 UIS 资料更新用户身份和认证结果。
-                    - 失败：未登录 -> PermissionError.NOT_LOGIN；账号状态不允许 UIS 认证 -> UserError.VERIFICATION_FUDAN_UIS_STATE_INVALID；UIS 任务不存在、状态异常或认证资料缺失 -> UserError.VERIFICATION_FUDAN_UIS_FAILED；学工号已被其他账号绑定 -> UserError.VERIFICATION_CAMPUS_NO_ALREADY_EXISTS。
+                    - 约束：当前用户必须已登录，并且已发起过 FUDAN_UIS 校园身份认证流程。
+                    - 处理：复用校园身份认证通用流程查询任务状态，并在认证成功时根据标准身份资料更新用户身份和认证结果。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；账号状态不允许认证 -> UserError.VERIFICATION_CAMPUS_IDENTITY_STATE_INVALID；任务失败或资料缺失 -> UserError.VERIFICATION_CAMPUS_IDENTITY_FAILED；学工号已被其他账号绑定 -> UserError.VERIFICATION_CAMPUS_NO_ALREADY_EXISTS。
                     - 响应：返回认证结果信息。
                     """
     )
@@ -217,9 +321,36 @@ public class UserController {
     @GetMapping("/verify/checkFudanUISVerify")
     @Log(title = "检查复旦UIS认证状态", businessType = BusinessType.OTHER, isSaveResponseData = false)
     public R<VerificationResultDTO> checkFudanUISVerify() {
-        Map<String,Object> map = new HashMap<>();
-        map.put("userId", SecurityContextHolder.getUserId());
-        VerificationResultDTO dto = verificationStrategyFactory.getStrategy(UserVerificationMode.FDU_UIS_SYS).verify(map);
-        return R.ok(dto);
+        CampusIdentityTaskResultDTO dto = campusIdentityVerificationStrategy.checkCampusIdentity(
+                SecurityContextHolder.getUserId(), "FUDAN_UIS", null
+        );
+        return R.ok(toLegacyFudanUISVerificationResult(dto));
+    }
+
+    /** 将标准校园身份任务结果转换为旧复旦前端仍使用的 VerificationResultDTO。 */
+    private VerificationResultDTO toLegacyFudanUISVerificationResult(CampusIdentityTaskResultDTO taskResult) {
+        if (taskResult.getState() == CampusIdentityTaskState.QUEUED
+                || taskResult.getState() == CampusIdentityTaskState.PENDING) {
+            return VerificationResultDTO.pending();
+        }
+        if (taskResult.getState() == CampusIdentityTaskState.CHALLENGE_REQUIRED) {
+            String actionPayload = null;
+            if (taskResult.getChallenge() != null && taskResult.getChallenge().getType() == LoginChallengeType.QR_SCAN) {
+                List<String> base64Images = taskResult.getChallenge().getBase64Images();
+                if (base64Images != null && !base64Images.isEmpty()) {
+                    actionPayload = base64Images.getFirst();
+                }
+            }
+            return VerificationResultDTO.builder()
+                    .completed(false)
+                    .requireAction(true)
+                    .actionPayload(actionPayload)
+                    .message(taskResult.getMessage())
+                    .build();
+        }
+        if (taskResult.getState() == CampusIdentityTaskState.SUCCESS) {
+            return VerificationResultDTO.success();
+        }
+        throw new ServiceException(UserError.VERIFICATION_CAMPUS_IDENTITY_FAILED, taskResult.getMessage());
     }
 }

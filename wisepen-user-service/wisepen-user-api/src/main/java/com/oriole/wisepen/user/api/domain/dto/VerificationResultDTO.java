@@ -5,7 +5,8 @@ import lombok.Data;
 
 @Data
 @Builder
-public class VerificationResultDTO {
+@Deprecated
+public class VerificationResultDTO { // 即将弃用
     // 验证是否彻底完成
     private boolean completed;
     // 是否需要前端继续进行某项交互（如扫码）

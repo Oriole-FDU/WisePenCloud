@@ -12,7 +12,6 @@
     <artifactId>wisepen-fudan-extension-service</artifactId>
     <packaging>pom</packaging>
     <modules>
-        <module>wisepen-fudan-extension-api</module>
         <module>wisepen-fudan-extension-biz</module>
     </modules>
 
