@@ -8,6 +8,7 @@ public enum BusinessDomain {
     SYSTEM,
     RESOURCE,
     DOCUMENT,
+    MEDIA,
     NOTE,
     AI_RESOURCE,
     STORAGE,
