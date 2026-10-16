@@ -20,7 +20,8 @@ public enum StorageSceneEnum {
     PRIVATE_DOC(4, "PRIVATE_DOC", "private/docs"),      // 文档，如 PDF、Word，永远在私有域
     PRIVATE_SKILL_ASSET(5, "PRIVATE_SKILL_ASSET", "private/skills"), // Skill 文档与脚本等私有资产
     PRIVATE_AGENT_ASSET(6, "PRIVATE_AGENT_ASSET", "private/agents"), // Agent 文档与工具等私有资产
-    PRIVATE_AI_ATTACHMENT(7, "PRIVATE_AI_ATTACHMENT", "private/ai/attachments"); // AI 对话临时附件
+    PRIVATE_AI_ATTACHMENT(7, "PRIVATE_AI_ATTACHMENT", "private/ai/attachments"), // AI 对话临时附件
+    PRIVATE_GENERIC_RESOURCE(8, "PRIVATE_GENERIC_RESOURCE", "private/generic-resources"); // 无预览通用资源文件
 
     private final int code;
 
