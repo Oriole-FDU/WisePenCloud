@@ -53,7 +53,6 @@ public class InputDefinitionDTO implements Serializable {
      * 校园身份认证输入项的可选值
      */
     @Data
-    @Builder
     @NoArgsConstructor
     @AllArgsConstructor
     public class InputOptionDTO implements Serializable {
