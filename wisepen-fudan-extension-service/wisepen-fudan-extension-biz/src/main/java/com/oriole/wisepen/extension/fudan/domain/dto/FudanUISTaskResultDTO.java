@@ -3,6 +3,7 @@ package com.oriole.wisepen.extension.fudan.domain.dto;
 import com.oriole.wisepen.campus.extension.api.enums.CampusIdentityTaskState;
 import lombok.Data;
 
+import java.time.LocalDateTime;
 import java.util.Map;
 
 /**
@@ -24,7 +25,13 @@ public class FudanUISTaskResultDTO {
     /** 面向扩展服务日志和内部诊断的状态描述 */
     private String message;
 
-     /** 复旦登录页面生成的二维码 Base64 内容，仅在等待扫码状态下存在 */
+    /** 登录 Challenge 的稳定标识，仅在等待扫码状态下存在 */
+    private String challengeId;
+
+    /** 登录 Challenge 的固定过期时间，仅在等待扫码状态下存在 */
+    private LocalDateTime challengeExpireAt;
+
+    /** 复旦登录页面生成的二维码 Base64 内容，仅在等待扫码状态下存在 */
     private String qrBase64;
 
     /** UIS 登录成功后解析出的原始资料，键名保持复旦页面字段原文 */

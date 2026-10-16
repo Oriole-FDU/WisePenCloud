@@ -3,12 +3,17 @@ package com.oriole.wisepen.extension.fudan.service;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.oriole.wisepen.campus.extension.api.domain.dto.ChallengeArtifactDTO;
 import com.oriole.wisepen.campus.extension.api.domain.dto.CampusIdentityProviderDescriptorDTO;
 import com.oriole.wisepen.campus.extension.api.domain.dto.CampusIdentityTaskResultDTO;
+import com.oriole.wisepen.campus.extension.api.domain.dto.InputDefinitionDTO;
 import com.oriole.wisepen.campus.extension.api.domain.dto.LoginChallengeDTO;
 import com.oriole.wisepen.campus.extension.api.domain.dto.VerifiedIdentityClaimsDTO;
 import com.oriole.wisepen.campus.extension.api.domain.dto.req.CampusIdentityInitiateRequest;
 import com.oriole.wisepen.campus.extension.api.enums.CampusIdentityTaskState;
+import com.oriole.wisepen.campus.extension.api.enums.ChallengeArtifactEncoding;
+import com.oriole.wisepen.campus.extension.api.enums.ChallengeCompletionMode;
+import com.oriole.wisepen.campus.extension.api.enums.InputControlType;
 import com.oriole.wisepen.campus.extension.api.enums.LoginChallengeType;
 import com.oriole.wisepen.common.core.domain.enums.IdentityType;
 import com.oriole.wisepen.common.core.exception.ServiceException;
@@ -53,7 +58,24 @@ public class FudanUISAuthTaskService {
                 .providerCode(FudanExtensionConstants.CAMPUS_EXTENSION_CODE)
                 .displayName("复旦 UIS 认证")
                 .universityName(UNIVERSITY_NAME)
-                .requiredInputs(List.of("account", "password"))
+                .initiateInputs(List.of(
+                        InputDefinitionDTO.builder()
+                                .name("account")
+                                .label("UIS 账号")
+                                .controlType(InputControlType.TEXT)
+                                .required(true)
+                                .sensitive(false)
+                                .options(List.of())
+                                .build(),
+                        InputDefinitionDTO.builder()
+                                .name("password")
+                                .label("UIS 密码")
+                                .controlType(InputControlType.PASSWORD)
+                                .required(true)
+                                .sensitive(true)
+                                .options(List.of())
+                                .build()
+                ))
                 .supportedChallenges(List.of(LoginChallengeType.QR_SCAN))
                 .build();
     }
@@ -71,12 +93,12 @@ public class FudanUISAuthTaskService {
 
         Long userId = request.getUserId();
         String taskId = IdUtil.fastSimpleUUID();
-        Map<String, Object> payload = request.getPayload();
-        if (payload == null) {
-            throw new ServiceException(FudanExtensionError.UIS_REQUEST_INVALID, "payload 不能为空");
+        Map<String, String> inputs = request.getInputs();
+        if (inputs == null) {
+            throw new ServiceException(FudanExtensionError.UIS_REQUEST_INVALID, "inputs 不能为空");
         }
-        String account = requireCredential(payload, "account").trim();
-        String password = requireCredential(payload, "password");
+        String account = requireCredential(inputs, "account").trim();
+        String password = requireCredential(inputs, "password");
         if (account.isEmpty() || password.isBlank()) {
             throw new ServiceException(FudanExtensionError.UIS_REQUEST_INVALID, "账号和密码不能为空");
         }
@@ -103,10 +125,10 @@ public class FudanUISAuthTaskService {
         return taskId;
     }
 
-    private String requireCredential(Map<String, Object> payload, String fieldName) {
-        Object value = payload.get(fieldName);
-        if (!(value instanceof String credential)) {
-            throw new ServiceException(FudanExtensionError.UIS_REQUEST_INVALID, fieldName + " 必须是字符串");
+    private String requireCredential(Map<String, String> inputs, String fieldName) {
+        String credential = inputs.get(fieldName);
+        if (credential == null) {
+            throw new ServiceException(FudanExtensionError.UIS_REQUEST_INVALID, fieldName + " 不能为空");
         }
         return credential;
     }
@@ -126,9 +148,17 @@ public class FudanUISAuthTaskService {
         LoginChallengeDTO challengeDTO = null;
         if (taskResult.getState() == CampusIdentityTaskState.CHALLENGE_REQUIRED) {
             challengeDTO = LoginChallengeDTO.builder()
-                    .challengeId(IdUtil.fastSimpleUUID())
+                    .challengeId(taskResult.getChallengeId())
                     .type(LoginChallengeType.QR_SCAN)
-                    .base64Images(List.of(taskResult.getQrBase64()))
+                    .completionMode(ChallengeCompletionMode.OUT_OF_BAND)
+                    .inputs(List.of())
+                    .artifacts(List.of(ChallengeArtifactDTO.builder()
+                            .name("qrCode")
+                            .mediaType("image/png")
+                            .encoding(ChallengeArtifactEncoding.BASE64)
+                            .content(taskResult.getQrBase64())
+                            .build()))
+                    .expireAt(taskResult.getChallengeExpireAt())
                     .build();
         }
 

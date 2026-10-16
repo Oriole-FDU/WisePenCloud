@@ -82,14 +82,14 @@ public class CampusIdentityVerificationStrategy implements UserVerificationStrat
     }
 
 
-    public CampusIdentityTaskResultDTO initiateCampusIdentityVerification(Long userId, String providerCode, Map<String, Object> payload) {
+    public CampusIdentityTaskResultDTO initiateCampusIdentityVerification(Long userId, String providerCode, Map<String, String> inputs) {
         UserEntity currentUser = userMapper.selectById(userId);
         validateCampusIdentityVerificationState(currentUser, userId, providerCode);
 
         CampusIdentityInitiateRequest request = CampusIdentityInitiateRequest.builder()
                 .userId(userId)
                 .providerCode(providerCode)
-                .payload(payload)
+                .inputs(inputs)
                 .build();
         RemoteIdentityService provider = providerRegistry.require(providerCode);
         return requireRemoteData(
@@ -99,7 +99,7 @@ public class CampusIdentityVerificationStrategy implements UserVerificationStrat
     }
 
     public CampusIdentityTaskResultDTO submitLoginChallenge(Long userId, String providerCode, String taskId,
-                                                            String challengeId, Map<String, Object> payload) {
+                                                            String challengeId, Map<String, String> answers) {
         UserEntity currentUser = userMapper.selectById(userId);
         validateCampusIdentityVerificationState(currentUser, userId, providerCode);
 
@@ -108,7 +108,7 @@ public class CampusIdentityVerificationStrategy implements UserVerificationStrat
                 .providerCode(providerCode)
                 .taskId(taskId)
                 .challengeId(challengeId)
-                .payload(payload)
+                .answers(answers)
                 .build();
         RemoteIdentityService provider = providerRegistry.require(providerCode);
         return requireRemoteData(

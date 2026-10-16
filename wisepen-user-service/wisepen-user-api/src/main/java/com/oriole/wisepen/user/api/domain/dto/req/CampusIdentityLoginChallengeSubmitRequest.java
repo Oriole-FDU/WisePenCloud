@@ -1,6 +1,7 @@
 package com.oriole.wisepen.user.api.domain.dto.req;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.util.Map;
@@ -24,5 +25,6 @@ public class CampusIdentityLoginChallengeSubmitRequest {
     private String challengeId;
 
     /** 用户对挑战的响应，例如验证码 */
-    private Map<String, Object> payload;
+    @NotNull
+    private Map<String, String> answers;
 }

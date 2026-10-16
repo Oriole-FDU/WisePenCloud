@@ -1,6 +1,7 @@
 package com.oriole.wisepen.user.api.domain.dto.req;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.util.Map;
@@ -16,5 +17,6 @@ public class CampusIdentityVerifyInitiateRequest {
     private String providerCode;
 
     /** Provider 所需输入，例如 account/password */
-    private Map<String, Object> payload;
+    @NotNull
+    private Map<String, String> inputs;
 }

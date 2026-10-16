@@ -40,5 +40,6 @@ public class CampusIdentityChallengeSubmitRequest implements Serializable {
     private String challengeId;
 
     /** 用户对挑战的响应 */
-    private Map<String, Object> payload;
+    @NotNull
+    private Map<String, String> answers;
 }

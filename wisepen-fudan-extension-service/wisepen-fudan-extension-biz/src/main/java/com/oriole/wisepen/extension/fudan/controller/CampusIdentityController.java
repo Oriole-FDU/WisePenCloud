@@ -6,6 +6,8 @@ import com.oriole.wisepen.campus.extension.api.domain.dto.req.CampusIdentityChal
 import com.oriole.wisepen.campus.extension.api.domain.dto.req.CampusIdentityInitiateRequest;
 import com.oriole.wisepen.campus.extension.api.feign.RemoteIdentityService;
 import com.oriole.wisepen.common.core.domain.R;
+import com.oriole.wisepen.common.core.exception.ServiceException;
+import com.oriole.wisepen.extension.fudan.exception.FudanExtensionError;
 import com.oriole.wisepen.extension.fudan.service.FudanUISAuthTaskService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -42,7 +44,7 @@ public class CampusIdentityController implements RemoteIdentityService {
             summary = "发起复旦 UIS 校园身份认证任务",
             description = """
                     - 用途：受理一次复旦 UIS 校园身份认证，并启动扩展服务内部的异步浏览器任务。
-                    - 请求：userId 指定 WisePen 用户；providerCode 必须为 FUDAN_UIS；payload 携带 account 和 password。
+                    - 请求：userId 指定 WisePen 用户；providerCode 必须为 FUDAN_UIS；inputs 携带 account 和 password。
                     - 约束：调用方必须通过内部服务调用边界访问本接口；UIS 凭据只在复旦扩展服务内部使用，不写入任务快照。
                     - 处理：校验请求后保存 PENDING 状态并异步执行 UIS 登录；不会把密码写入 Redis 或标准身份 claims。
                     - 失败：发生未处理异常 -> CommonError.INTERNAL_ERROR。
@@ -56,19 +58,22 @@ public class CampusIdentityController implements RemoteIdentityService {
     }
 
     @Operation(
-            summary = "提交复旦 UIS 登录 Challenge (空实现)",
+            summary = "提交复旦 UIS 登录 Challenge",
             description = """
-                    - 用途：接收复旦 UIS 登录 Challenge 的同步请求，并返回认证任务最新状态。复旦 UIS 目前仅考虑支持扫描认证，因此此处实现为空实现。
+                    - 用途：拒绝对复旦 UIS 扫码 Challenge 的同步提交。
                     - 请求：userId、providerCode、taskId 和 challengeId 必须来自当前任务。
-                    - 约束：调用方必须通过内部服务调用边界访问本接口；任务和 Challenge 标识必须匹配当前用户。
-                    - 处理：校验任务与 Challenge 标识后完成校园认证业务。复旦 UIS 目前仅考虑支持扫描认证，因此此处实现为空实现。
-                    - 失败：发生未处理异常 -> CommonError.INTERNAL_ERROR。
-                    - 响应：返回校园身份任务状态。
+                    - 约束：复旦 UIS Challenge 的完成方式为 OUT_OF_BAND，客户端应轮询任务状态。
+                    - 处理：始终返回 UIS_REQUEST_INVALID，提示调用方无需提交扫码结果。
+                    - 失败：同步提交扫码 Challenge -> FudanExtensionError.UIS_REQUEST_INVALID。
+                    - 响应：无成功响应。
                     """
     )
     @PostMapping("/submitLoginChallenge")
     public R<CampusIdentityTaskResultDTO> submitLoginChallenge(@Valid @RequestBody CampusIdentityChallengeSubmitRequest request) {
-        return checkVerifyTaskStatus(request.getTaskId(), request.getUserId());
+        throw new ServiceException(
+                FudanExtensionError.UIS_REQUEST_INVALID,
+                "复旦 UIS 二维码 Challenge 应通过轮询完成，无需提交"
+        );
     }
 
     @Operation(

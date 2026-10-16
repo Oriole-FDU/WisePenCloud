@@ -6,6 +6,7 @@ import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.campus.extension.api.domain.dto.CampusIdentityProviderDescriptorDTO;
 import com.oriole.wisepen.campus.extension.api.domain.dto.CampusIdentityTaskResultDTO;
+import com.oriole.wisepen.campus.extension.api.enums.ChallengeArtifactEncoding;
 import com.oriole.wisepen.campus.extension.api.enums.CampusIdentityTaskState;
 import com.oriole.wisepen.campus.extension.api.enums.LoginChallengeType;
 import com.oriole.wisepen.common.core.domain.R;
@@ -207,7 +208,7 @@ public class UserController {
             summary = "发起校园身份认证",
             description = """
                     - 用途：当前用户通过指定校园身份认证 Provider 发起校内身份认证流程。
-                    - 请求：providerCode 指定 Provider；payload 透传该 Provider 所需输入。
+                    - 请求：providerCode 指定 Provider；inputs 传递该 Provider 声明的字符串输入。
                     - 约束：当前用户必须已登录且仍处于未完成身份认证状态。
                     - 处理：将请求转交校园身份认证扩展服务；不在本接口直接完成用户认证落库。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN；账号状态不允许认证 -> UserError.VERIFICATION_CAMPUS_IDENTITY_STATE_INVALID；扩展请求失败 -> UserError.VERIFICATION_CAMPUS_IDENTITY_REQUEST_FAILED。
@@ -222,7 +223,7 @@ public class UserController {
         CampusIdentityTaskResultDTO dto = campusIdentityVerificationStrategy.initiateCampusIdentityVerification(
                 SecurityContextHolder.getUserId(),
                 req.getProviderCode(),
-                req.getPayload()
+                req.getInputs()
         );
         return R.ok(dto);
     }
@@ -231,7 +232,7 @@ public class UserController {
             summary = "提交校园身份认证登录 Challenge",
             description = """
                     - 用途：当前用户在校园身份认证流程中提交验证码、二次验证等 Challenge 响应。
-                    - 请求：providerCode 指定 Provider；taskId、challengeId 和 payload 来自当前认证任务。
+                    - 请求：providerCode 指定 Provider；taskId、challengeId 来自当前认证任务，answers 提交字符串答案。
                     - 约束：当前用户必须已登录且仍处于未完成身份认证状态。
                     - 处理：将 Challenge 响应转交校园身份认证扩展服务。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN；账号状态不允许认证 -> UserError.VERIFICATION_CAMPUS_IDENTITY_STATE_INVALID；扩展请求失败 -> UserError.VERIFICATION_CAMPUS_IDENTITY_REQUEST_FAILED。
@@ -248,7 +249,7 @@ public class UserController {
                 req.getProviderCode(),
                 req.getTaskId(),
                 req.getChallengeId(),
-                req.getPayload()
+                req.getAnswers()
         );
         return R.ok(dto);
     }
@@ -296,7 +297,7 @@ public class UserController {
     public R<Void> initiateFudanUISVerify(
             @RequestParam("uisAccount") @NotBlank String uisAccount,
             @RequestParam("uisPassword") @NotBlank String uisPassword) {
-        Map<String,Object> map = new HashMap<>();
+        Map<String, String> map = new HashMap<>();
         map.put("account", uisAccount);
         map.put("password", uisPassword);
         campusIdentityVerificationStrategy.initiateCampusIdentityVerification(
@@ -336,9 +337,13 @@ public class UserController {
         if (taskResult.getState() == CampusIdentityTaskState.CHALLENGE_REQUIRED) {
             String actionPayload = null;
             if (taskResult.getChallenge() != null && taskResult.getChallenge().getType() == LoginChallengeType.QR_SCAN) {
-                List<String> base64Images = taskResult.getChallenge().getBase64Images();
-                if (base64Images != null && !base64Images.isEmpty()) {
-                    actionPayload = base64Images.getFirst();
+                if (taskResult.getChallenge().getArtifacts() != null) {
+                    actionPayload = taskResult.getChallenge().getArtifacts().stream()
+                            .filter(artifact -> "qrCode".equals(artifact.getName()))
+                            .filter(artifact -> artifact.getEncoding() == ChallengeArtifactEncoding.BASE64)
+                            .map(artifact -> artifact.getContent())
+                            .findFirst()
+                            .orElse(null);
                 }
             }
             return VerificationResultDTO.builder()

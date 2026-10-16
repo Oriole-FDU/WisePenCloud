@@ -1,9 +1,11 @@
 package com.oriole.wisepen.extension.fudan.consumer;
 
+import cn.hutool.core.util.IdUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.microsoft.playwright.*;
 import com.microsoft.playwright.options.LoadState;
 import com.oriole.wisepen.campus.extension.api.enums.CampusIdentityTaskState;
+import com.oriole.wisepen.extension.fudan.cache.RedisCacheManager;
 import com.oriole.wisepen.extension.fudan.constant.MqTopicConstants;
 import com.oriole.wisepen.extension.fudan.domain.dto.FudanUISTaskResultDTO;
 import com.oriole.wisepen.extension.fudan.domain.mq.FudanUISAuthRequestMessage;
@@ -16,13 +18,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.oriole.wisepen.extension.fudan.cache.RedisCacheManager;
+import static com.oriole.wisepen.extension.fudan.constant.FudanExtensionConstants.UIS_CHALLENGE_DURATION_SECONDS;
 
 @Slf4j
 @Component
@@ -78,13 +81,15 @@ public class UISAuthRequestConsumer {
             }
 
             FudanUISTaskResultDTO resultDTO = FudanUISTaskResultDTO.of(userId, taskId, CampusIdentityTaskState.CHALLENGE_REQUIRED);
+            resultDTO.setChallengeId(IdUtil.fastSimpleUUID());
+            resultDTO.setChallengeExpireAt(LocalDateTime.now().plusSeconds(UIS_CHALLENGE_DURATION_SECONDS));
             resultDTO.setQrBase64(base64Image);
             redisCacheManager.setUisTaskStatus(taskId, resultDTO);
             log.debug("uis auth task changed. userId={} taskId={} from=PENDING to=CHALLENGE_REQUIRED", userId, taskId);
 
             try {
                 page.waitForURL(Pattern.compile(".*my\\.fudan\\.edu\\.cn.*"),
-                        new Page.WaitForURLOptions().setTimeout(120_000));
+                        new Page.WaitForURLOptions().setTimeout(UIS_CHALLENGE_DURATION_SECONDS * 1_000));
 
                 page.waitForLoadState(LoadState.NETWORKIDLE);
                 Map<String, String> infoMap = parseStudentInfo(page);

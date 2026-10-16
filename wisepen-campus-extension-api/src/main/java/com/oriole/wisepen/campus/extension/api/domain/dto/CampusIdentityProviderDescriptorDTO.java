@@ -28,11 +28,11 @@ public class CampusIdentityProviderDescriptorDTO implements Serializable {
     /** 展示给前端的人类可读名称 */
     private String displayName;
 
-    /** 学校中文展示名称（认证成功后写入用户资料 */
+    /** 学校中文展示名称（认证成功后写入用户资料） */
     private String universityName;
 
-    /** 发起认证时该 Provider 需要的输入字段，例如 account、password */
-    private List<String> requiredInputs;
+    /** 发起认证时该 Provider 需要的结构化输入 */
+    private List<InputDefinitionDTO> initiateInputs;
 
     /** 该 Provider 可能返回的登录挑战类型，例如扫码或验证码 */
     private List<LoginChallengeType> supportedChallenges;

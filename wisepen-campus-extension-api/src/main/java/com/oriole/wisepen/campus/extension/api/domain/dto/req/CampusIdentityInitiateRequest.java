@@ -31,6 +31,6 @@ public class CampusIdentityInitiateRequest implements Serializable {
     @NotBlank
     private String providerCode;
 
-    /** Provider 所需输入（字段名由 Provider 描述中的 requiredInputs 约定） */
-    private Map<String, Object> payload;
+    /** Provider 所需输入 */
+    private Map<String, String> inputs;
 }

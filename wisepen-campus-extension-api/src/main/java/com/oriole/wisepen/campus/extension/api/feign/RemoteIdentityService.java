@@ -37,7 +37,7 @@ public interface RemoteIdentityService {
             summary = "发起校园身份认证任务",
             description = """
                     - 用途：受理一次校园身份认证。
-                    - 请求：userId 指定 WisePen 用户；providerCode 为当前服务声明的 CAMPUS_EXTENSION_CODE；payload 携带校园身份认证 Provider 支持的输入项。
+                    - 请求：userId 指定 WisePen 用户；providerCode 为当前服务声明的 CAMPUS_EXTENSION_CODE；inputs 携带校园身份认证 Provider 支持的字符串输入项。
                     - 约束：调用方必须通过内部服务调用边界访问本接口。
                     - 处理：初始化校园认证业务。
                     - 失败：发生未处理异常 -> CommonError.INTERNAL_ERROR。
@@ -51,7 +51,7 @@ public interface RemoteIdentityService {
             summary = "提交登录 Challenge（可选）",
             description = """
                     - 用途：接收登录 Challenge 的同步请求，并返回认证任务最新状态。
-                    - 请求：userId、providerCode、taskId 和 challengeId 必须来自当前任务。
+                    - 请求：userId、providerCode、taskId 和 challengeId 必须来自当前任务；answers 携带用户提交的字符串答案。
                     - 约束：调用方必须通过内部服务调用边界访问本接口；任务和 Challenge 标识必须匹配当前用户。
                     - 处理：校验任务与 Challenge 标识后完成校园认证业务。
                     - 失败：发生未处理异常 -> CommonError.INTERNAL_ERROR。
