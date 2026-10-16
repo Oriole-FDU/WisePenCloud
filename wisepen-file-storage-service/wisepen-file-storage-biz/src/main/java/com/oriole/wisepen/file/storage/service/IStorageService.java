@@ -62,5 +62,7 @@ public interface IStorageService {
 
     StorageRecordDTO getFileRecord(String objectKey);
 
+    List<StorageRecordDTO> getUploadRecords(List<String> objectKeys);
+
     StorageRecordDTO compensateStatus(StorageRecordEntity record);
 }

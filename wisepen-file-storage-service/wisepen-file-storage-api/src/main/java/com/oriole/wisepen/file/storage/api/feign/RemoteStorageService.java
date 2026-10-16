@@ -59,4 +59,8 @@ public interface RemoteStorageService {
      */
     @GetMapping("/getFileRecord")
     R<StorageRecordDTO> getFileRecord(@RequestParam("objectKey") String objectKey);
+
+    /** 批量查询上传状态；未返回的对象键已不存在，UPLOADING 不表示失败。 */
+    @PostMapping("/getUploadRecords")
+    R<List<StorageRecordDTO>> getUploadRecords(@RequestBody List<String> objectKeys);
 }

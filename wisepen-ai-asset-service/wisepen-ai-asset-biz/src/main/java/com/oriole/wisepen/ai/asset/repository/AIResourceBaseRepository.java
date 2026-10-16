@@ -19,6 +19,6 @@ public interface AIResourceBaseRepository<T extends AIResourceBaseEntity<T>> ext
     void deleteByResourceIdIn(List<String> resourceIds);
 
     @Query("{ '_id': ?0 }")
-    @Update("{ '$set': { 'version': ?1, 'updateTime': ?2 } }")
+    @Update("{ '$max': { 'version': ?1 }, '$set': { 'updateTime': ?2 } }")
     void updateVersionByResourceId(String resourceId, Integer version, LocalDateTime updateTime);
 }

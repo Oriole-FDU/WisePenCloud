@@ -1,5 +1,6 @@
 package com.oriole.wisepen.ai.asset.domain.entity;
 
+import com.oriole.wisepen.ai.asset.domain.base.AssetInfoBase;
 import com.oriole.wisepen.ai.asset.domain.base.VersionBundleBase;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -10,6 +11,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @EqualsAndHashCode(callSuper = true)
 @Data
@@ -21,6 +23,12 @@ public abstract class VersionBundleBaseEntity<T extends VersionBundleBaseEntity<
     private String id;
 
     private String resourceId;
+
+    // 上传成功前仅保存候选文件，assets 继续指向最后一次成功的内容。
+    private List<AssetInfoBase> pendingAssets;
+
+    // 条件更新使用的修订号；旧文档缺省为 null，首次更新时由 MongoDB 原子递增。
+    private Long revision;
 
     @CreatedDate
     private LocalDateTime createTime;

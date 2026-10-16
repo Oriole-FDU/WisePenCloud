@@ -4,6 +4,7 @@ import com.oriole.wisepen.ai.asset.domain.entity.AIResourceBaseEntity;
 import com.oriole.wisepen.ai.asset.domain.entity.VersionBundleBaseEntity;
 import com.oriole.wisepen.ai.asset.domain.dto.req.AssetDeleteRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.req.AssetUploadInitRequest;
+import com.oriole.wisepen.ai.asset.domain.dto.req.AssetUploadCancelRequest;
 import com.oriole.wisepen.ai.asset.domain.dto.res.AssetUploadInitResponse;
 import com.oriole.wisepen.file.storage.api.domain.mq.FileUploadedMessage;
 
@@ -18,6 +19,8 @@ public interface IVersionService<VT extends VersionBundleBaseEntity<VT>> {
     VT getVersionBundle(String resourceId, Integer version);
 
     AssetUploadInitResponse initUploadAssets(AssetUploadInitRequest req);
+
+    void cancelUploadAssets(AssetUploadCancelRequest req);
 
     void deleteAssets(AssetDeleteRequest req);
 

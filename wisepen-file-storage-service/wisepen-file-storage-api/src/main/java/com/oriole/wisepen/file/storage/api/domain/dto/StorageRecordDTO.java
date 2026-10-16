@@ -1,6 +1,7 @@
 package com.oriole.wisepen.file.storage.api.domain.dto;
 
 import com.oriole.wisepen.file.storage.api.domain.base.StorageRecordBase;
+import com.oriole.wisepen.file.storage.api.enums.StorageStatusEnum;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -21,4 +22,5 @@ public class StorageRecordDTO extends StorageRecordBase implements Serializable 
 
     private Long fileId;
     private String domain;
+    private StorageStatusEnum status;
 }

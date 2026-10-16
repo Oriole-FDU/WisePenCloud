@@ -10,6 +10,9 @@ import com.oriole.wisepen.file.storage.api.enums.StorageSceneEnum;
 import com.oriole.wisepen.file.storage.service.IStorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -101,8 +104,8 @@ public class InternalStorageController {
             description = """
                     - 用途：供业务服务或异步消费者标记一批对象存储文件为已删除。
                     - 请求：请求体为 objectKey 列表。
-                    - 约束：调用方必须通过内部服务调用边界；至少一个目标文件记录应存在且未删除。
-                    - 处理：批量将匹配的存储记录状态更新为 DELETED；当前实现只更新记录状态，不直接调用云厂商物理删除。
+                    - 约束：调用方必须通过内部服务调用边界。
+                    - 处理：批量将匹配的存储记录状态更新为 DELETED；已删除或不存在时幂等成功；当前实现只更新记录状态，不直接调用云厂商物理删除。
                     - 失败：数据库更新发生未处理异常 -> CommonError.INTERNAL_ERROR。
                     - 响应：成功时返回空结果。
                     """
@@ -130,5 +133,22 @@ public class InternalStorageController {
     @GetMapping("/getFileRecord")
     public R<StorageRecordDTO> getFileRecord(@RequestParam("objectKey") String objectKey) {
         return R.ok(storageService.getFileRecord(objectKey));
+    }
+
+    @Operation(
+            summary = "内部批量查询上传状态",
+            description = """
+                    - 用途：供业务服务区分仍在上传的候选和已失效的上传，以恢复失败上传后的草稿状态。
+                    - 请求：请求体为非空 objectKey 列表，各对象键不能为空。
+                    - 约束：调用方必须通过内部服务调用边界。
+                    - 处理：批量查询记录；UPLOADING 记录会检查云端并补偿已成功上传的对象；仍无对象时保留 UPLOADING；过期判断和清理继续由现有存储定时任务负责。
+                    - 失败：存储配置不支持 -> FileStorageError.CANNOT_SUPPORT_STORAGE_PROVIDER；云端状态读取失败 -> FileStorageError.STORAGE_PROVIDER_READ_FILE_FAILED。
+                    - 响应：返回各现存记录的 objectKey、status 和 size；未返回的对象键表示记录不存在，DELETED 表示已删除，UPLOADING 不能视为失败；查询异常不会转换为空列表。
+                    """
+    )
+    @PostMapping("/getUploadRecords")
+    public R<List<StorageRecordDTO>> getUploadRecords(
+            @Validated @RequestBody @NotEmpty @Size(max = 100) List<@NotBlank String> objectKeys) {
+        return R.ok(storageService.getUploadRecords(objectKeys));
     }
 }

@@ -14,16 +14,20 @@ import com.oriole.wisepen.file.storage.api.feign.RemoteStorageService;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.time.LocalDateTime;
 
 
 @Service
 public class AgentVersionServiceImpl extends VersionServiceImpl<AgentVersionBundleEntity, AgentEntity> {
+
+    private final AgentVersionBundleRepository agentVersionBundleRepository;
 
     public AgentVersionServiceImpl(AgentVersionBundleRepository agentVersionBundleRepository,
                                    AgentRepository agentRepository,
                                    RemoteStorageService remoteStorageService,
                                    AIAssetEventPublisher eventPublisher) {
         super(agentVersionBundleRepository, agentRepository, remoteStorageService, eventPublisher);
+        this.agentVersionBundleRepository = agentVersionBundleRepository;
     }
 
     @Override
@@ -45,7 +49,9 @@ public class AgentVersionServiceImpl extends VersionServiceImpl<AgentVersionBund
         AgentVersionBundleEntity draft = this.versionBundleBaseRepository.findByResourceIdAndVersion(req.getResourceId(), req.getDraftVersion())
                 .orElseThrow(() -> new ServiceException(AIResourceError.AI_RESOURCE_VERSION_NOT_FOUND));
         if (draft.getStatus() != VersionStatus.DRAFT) throw new ServiceException(AIResourceError.CANNOT_OPERATE_NON_DRAFT_AI_RESOURCE_VERSION);
-        draft.setSpec(req.getSpec());
-        versionBundleBaseRepository.save(draft);
+        // 只更新配置，避免整份文档保存覆盖并发上传结果。
+        if (agentVersionBundleRepository.updateDraftSpec(draft.getId(), req.getSpec(), LocalDateTime.now()) == 0) {
+            throw new ServiceException(AIResourceError.CANNOT_OPERATE_NON_DRAFT_AI_RESOURCE_VERSION);
+        }
     }
 }

@@ -162,7 +162,7 @@ public class AgentController {
                     - 用途：查询智能体资产指定版本或当前已发布版本的运行配置与文件快照。
                     - 请求：resourceId 指定智能体资产；version 为空时使用智能体主档当前发布版本。
                     - 约束：当前用户必须是资源所有者；智能体资产和目标版本必须存在。
-                    - 处理：确定目标版本后读取版本记录、运行配置 spec 及其资产文件列表；不生成下载地址，不改变草稿或发布状态。
+                    - 处理：读取版本、运行配置 spec 及资产文件列表；不查询存储状态、不改变草稿或发布状态。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN；当前用户不是资源所有者 -> AIResourceError.AI_RESOURCE_PERMISSION_DENIED；资源不存在 -> AIResourceError.AI_RESOURCE_NOT_FOUND；版本不存在 -> AIResourceError.AI_RESOURCE_VERSION_NOT_FOUND。
                     - 响应：返回智能体版本包信息、运行配置和资产文件元数据。
                     """
@@ -179,9 +179,9 @@ public class AgentController {
             description = """
                     - 用途：将智能体资产的当前草稿版本确认为正式发布版本。
                     - 请求：resourceId 指定智能体资产。
-                    - 约束：当前用户必须是资源所有者；目标版本必须是 DRAFT；运行配置中的系统提示词不能为空；所有草稿资产都必须处于可用状态。
-                    - 处理：将草稿版本标记为 PUBLISHED，更新智能体主档当前版本号，并创建下一版草稿；不复制文件，也不修改已发布版本内容。
-                    - 失败：未登录 -> PermissionError.NOT_LOGIN；当前用户不是资源所有者 -> AIResourceError.AI_RESOURCE_PERMISSION_DENIED；资源不存在 -> AIResourceError.AI_RESOURCE_NOT_FOUND；版本不存在 -> AIResourceError.AI_RESOURCE_VERSION_NOT_FOUND；版本不是草稿 -> AIResourceError.CANNOT_OPERATE_NON_DRAFT_AI_RESOURCE_VERSION；系统提示词为空 -> AIResourceError.AI_RESOURCE_CORE_ASSET_NOT_FOUND；存在上传中的资产 -> AIResourceError.AI_RESOURCE_ASSET_NOT_READY。
+                    - 约束：当前用户必须是资源所有者；待发布版本须为 DRAFT，或上次发布中断后尚未推进主档的 PUBLISHED 版本；系统提示词不能为空；不能残留待上传候选。
+                    - 处理：先补偿已成功上传并清除存储端已失效候选，确认无待上传候选，再按修订号冻结版本；确保下一版草稿存在后推进主档版本号；中断后重试继续完成，不覆盖已有下一版草稿。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；当前用户不是资源所有者 -> AIResourceError.AI_RESOURCE_PERMISSION_DENIED；资源不存在 -> AIResourceError.AI_RESOURCE_NOT_FOUND；版本不存在 -> AIResourceError.AI_RESOURCE_VERSION_NOT_FOUND；版本不是草稿 -> AIResourceError.CANNOT_OPERATE_NON_DRAFT_AI_RESOURCE_VERSION；系统提示词为空 -> AIResourceError.AI_RESOURCE_CORE_ASSET_NOT_FOUND；存在上传中的资产 -> AIResourceError.AI_RESOURCE_ASSET_NOT_READY；待上传文件存储状态查询失败 -> CommonError.INTERNAL_ERROR。
                     - 响应：成功时返回空结果。
                     """
     )
@@ -199,7 +199,7 @@ public class AgentController {
                     - 用途：为智能体资产草稿版本新增或替换一批资产文件，并申请对象存储上传凭证。
                     - 请求：resourceId 指定智能体资产；draftVersion 指定草稿版本；assets 中的 path、name、assetResourceType、md5、expectedSize 描述待上传文件。
                     - 约束：当前用户必须是资源所有者；目标版本必须是 DRAFT；path 必须以 / 开头且不能包含非法目录跳转；name 不能包含路径分隔符；资产列表不能为空。
-                    - 处理：在草稿版本中查找或创建资产条目，向文件存储服务申请上传 URL 或秒传，更新资产 objectKey、大小和上传状态；被替换且不再被任何版本引用的旧文件会发布删除事件；不发布草稿版本。
+                    - 处理：向文件存储服务申请上传 URL，将候选文件保存在草稿的待上传列表中；原文件保持可用，上传成功回调后才替换并回收不再被引用的旧对象；秒传可立即替换；不发布草稿版本。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN；当前用户不是资源所有者 -> AIResourceError.AI_RESOURCE_PERMISSION_DENIED；版本不存在 -> AIResourceError.AI_RESOURCE_VERSION_NOT_FOUND；版本不是草稿 -> AIResourceError.CANNOT_OPERATE_NON_DRAFT_AI_RESOURCE_VERSION；资产路径非法 -> AIResourceError.AI_RESOURCE_ASSET_PATH_INVALID；存储上传凭证申请失败 -> AIResourceError.AI_RESOURCE_ASSET_UPLOAD_URL_APPLY_FAILED。
                     - 响应：返回每个资产的 assetId、路径、文件名、objectKey、上传凭证和是否秒传。
                     """
@@ -228,6 +228,25 @@ public class AgentController {
     public R<Void> deleteAgentAssets(@Validated @RequestBody AssetDeleteRequest request) {
         assertAgentOwner(request.getResourceId());
         agentVersionService.deleteAssets(request);
+        return R.ok();
+    }
+
+    @Operation(
+            summary = "取消智能体文件上传",
+            description = """
+                    - 用途：清理本次失败或放弃的上传，保留最后一次成功保存的文件。
+                    - 请求：resourceId 指定智能体资产；draftVersion 指定草稿版本；objectKeys 为上传凭证返回的对象键列表。
+                    - 约束：当前用户必须是资源所有者；目标版本必须是 DRAFT；objectKeys 不能为空。
+                    - 处理：仅移除匹配的待上传候选并回收无引用对象；已成功替换的文件和后续重试使用的对象均不受影响；重复取消无副作用。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；当前用户不是资源所有者 -> AIResourceError.AI_RESOURCE_PERMISSION_DENIED；版本不存在 -> AIResourceError.AI_RESOURCE_VERSION_NOT_FOUND；版本不是草稿 -> AIResourceError.CANNOT_OPERATE_NON_DRAFT_AI_RESOURCE_VERSION。
+                    - 响应：成功时返回空结果。
+                    """
+    )
+    @Log(title = "取消 Agent 文件上传", businessType = BusinessType.UPDATE)
+    @PostMapping("/cancelUploadAgentAssets")
+    public R<Void> cancelUploadAgentAssets(@Validated @RequestBody AssetUploadCancelRequest request) {
+        assertAgentOwner(request.getResourceId());
+        agentVersionService.cancelUploadAssets(request);
         return R.ok();
     }
 

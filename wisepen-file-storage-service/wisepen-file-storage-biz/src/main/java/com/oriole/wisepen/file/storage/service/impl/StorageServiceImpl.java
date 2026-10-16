@@ -212,6 +212,7 @@ public class StorageServiceImpl implements IStorageService {
 
     @Override
     public void deleteFiles(List<String> objectKeys) {
+        if (objectKeys.isEmpty()) return;
         int updateCount = storageRecordMapper.update(null,
                 Wrappers.<StorageRecordEntity>lambdaUpdate()
                         .set(StorageRecordEntity::getStatus, StorageStatusEnum.DELETED)
@@ -219,10 +220,7 @@ public class StorageServiceImpl implements IStorageService {
                         .ne(StorageRecordEntity::getStatus, StorageStatusEnum.DELETED)
         );
 
-        if (updateCount == 0) {
-            throw new ServiceException(FileStorageError.FILE_RECORD_NOT_FOUND);
-        }
-
+        // 取消、过期清理及消息重投可能重复删除同一对象；已删除或不存在时仍视为完成。
         log.info("storage records deleted. mode=soft count={} objectKeys={}", updateCount, summarizeIds(objectKeys));
     }
 
@@ -313,6 +311,21 @@ public class StorageServiceImpl implements IStorageService {
             return dto;
         }
         return this.compensateStatus(record);
+    }
+
+    @Override
+    public List<StorageRecordDTO> getUploadRecords(List<String> objectKeys) {
+        if (objectKeys.isEmpty()) return List.of();
+        // 一次查询全部候选；只有上传中记录需要逐对象向存储厂商确认，不能把暂未落盘当作失效。
+        return storageRecordMapper.selectList(Wrappers.<StorageRecordEntity>lambdaQuery()
+                        .in(StorageRecordEntity::getObjectKey, objectKeys)).stream()
+                .map(record -> {
+                    if (record.getStatus() == StorageStatusEnum.UPLOADING) {
+                        StorageRecordDTO recovered = compensateStatus(record);
+                        if (recovered != null) return recovered;
+                    }
+                    return BeanUtil.copyProperties(record, StorageRecordDTO.class);
+                }).toList();
     }
 
     @Override
