@@ -13,6 +13,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
+import com.oriole.wisepen.common.core.domain.enums.BusinessType;
+import com.oriole.wisepen.common.log.annotation.Log;
 
 import java.util.List;
 
@@ -23,6 +27,38 @@ import java.util.List;
 public class InternalStorageController {
 
     private final IStorageService storageService;
+
+    @Operation(summary = "内部上传文档图片", description = """
+            - 用途：同步保存文档转换生成的正文图片。
+            - 请求：file 为图片；bizTag 为 documentId/assets/images；fileName 为固定图片名；configId 可选。
+            - 约束：仅内部服务调用；场景固定为 PRIVATE_DOC_ASSET；文件受现有小文件大小限制；已删除记录不能恢复。
+            - 处理：上传到文档版本目录并登记 AVAILABLE，同名图片正常覆盖，不发送上传回调事件。
+            - 失败：路径无效 -> CommonError.REQUEST_PARAM_INVALID；文件过大 -> FileStorageError.FILE_SIZE_ABOVE_UPPER_BOUND；已删除 -> FileStorageError.FILE_RECORD_NOT_FOUND。
+            - 响应：返回可立即读取的存储记录及 objectKey。
+            """)
+    @Log(title = "上传文档图片", businessType = BusinessType.INSERT, isSaveRequestData = false, isSaveResponseData = false)
+    @PostMapping(value = "/uploadDocumentAsset", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public R<StorageRecordDTO> uploadDocumentAsset(@RequestPart("file") MultipartFile file,
+                                                    @RequestParam("bizTag") String bizTag,
+                                                    @RequestParam("fileName") String fileName,
+                                                    @RequestParam(value = "configId", required = false) Long configId) {
+        return R.ok(storageService.uploadDocumentAsset(file, bizTag, fileName, configId));
+    }
+
+    @Operation(summary = "内部查询文档图片文件标识", description = """
+            - 用途：按文档版本目录收集正文图片的 objectKey，供调用方发布文件删除消息。
+            - 请求：请求体为完整 private/docs/{documentId}/ 前缀列表；afterObjectKey 可选，续查时传上一页最后一个 key；size 为每页数量。
+            - 约束：仅内部服务调用；不接受更宽泛的目录或通配符；size 必须在 1 至 500 之间。
+            - 处理：只查询 PRIVATE_DOC_ASSET 场景中未软删除的存储记录，按 objectKey 升序返回游标之后的结果；不访问 OSS 或修改记录。
+            - 失败：目录或每页数量无效 -> CommonError.REQUEST_PARAM_INVALID。
+            - 响应：至多 size 个正文图片的 key；空前缀列表或无后续匹配记录时返回空列表。
+            """)
+    @PostMapping("/listDocumentAssetObjectKeysByPrefixes")
+    public R<List<String>> listDocumentAssetObjectKeysByPrefixes(@RequestBody List<String> prefixes,
+            @RequestParam(value = "afterObjectKey", required = false) String afterObjectKey,
+            @RequestParam("size") int size) {
+        return R.ok(storageService.listDocumentAssetObjectKeysByPrefixes(prefixes, afterObjectKey, size));
+    }
 
     /**
      * 初始化上传（颁发 PUT URL 或触发秒传）

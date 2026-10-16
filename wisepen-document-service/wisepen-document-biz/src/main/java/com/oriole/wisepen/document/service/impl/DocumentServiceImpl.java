@@ -30,6 +30,8 @@ import com.oriole.wisepen.document.repository.DocumentPdfMetaRepository;
 import com.oriole.wisepen.document.repository.DocumentInfoRepository;
 import com.oriole.wisepen.document.repository.DocumentVersionRepository;
 import com.oriole.wisepen.document.service.IDocumentService;
+import com.oriole.wisepen.document.service.IDocumentAssetService;
+import com.oriole.wisepen.document.util.MarkdownImages;
 import com.oriole.wisepen.document.service.IOnlyOfficeEditService;
 import com.oriole.wisepen.file.storage.api.domain.dto.CopyReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.StorageRecordDTO;
@@ -37,6 +39,7 @@ import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitRespDTO;
 import com.oriole.wisepen.file.storage.api.enums.StorageSceneEnum;
 import com.oriole.wisepen.file.storage.api.feign.RemoteStorageService;
+import com.oriole.wisepen.file.storage.api.util.DocumentAssetKey;
 import com.oriole.wisepen.resource.domain.dto.ResourceCreateReqDTO;
 import com.oriole.wisepen.resource.enums.ResourceType;
 import com.oriole.wisepen.resource.feign.RemoteResourceService;
@@ -74,6 +77,7 @@ public class DocumentServiceImpl implements IDocumentService {
 
     private final RemoteStorageService remoteStorageService;
     private final RemoteResourceService remoteResourceService;
+    private final IDocumentAssetService documentAssetService;
 
     public DocumentServiceImpl(@Lazy IOnlyOfficeEditService onlyOfficeEditService,
                                DocumentInfoRepository documentInfoRepository,
@@ -82,7 +86,8 @@ public class DocumentServiceImpl implements IDocumentService {
                                DocumentPdfMetaRepository documentPdfMetaRepository,
                                KafkaDocumentEventPublisher eventPublisher,
                                RemoteStorageService remoteStorageService,
-                               RemoteResourceService remoteResourceService) {
+                               RemoteResourceService remoteResourceService,
+                               IDocumentAssetService documentAssetService) {
         this.onlyOfficeEditService = onlyOfficeEditService;
         this.documentInfoRepository = documentInfoRepository;
         this.documentVersionRepository = documentVersionRepository;
@@ -91,6 +96,7 @@ public class DocumentServiceImpl implements IDocumentService {
         this.eventPublisher = eventPublisher;
         this.remoteStorageService = remoteStorageService;
         this.remoteResourceService = remoteResourceService;
+        this.documentAssetService = documentAssetService;
     }
 
     @Override
@@ -321,6 +327,27 @@ public class DocumentServiceImpl implements IDocumentService {
             }
         }
 
+        // 版本目录内的正文引用图片
+        if (!documentIds.isEmpty()) {
+            List<String> prefixes = documentIds.stream()
+                    .map(DocumentAssetKey::prefix)
+                    .toList();
+            String afterObjectKey = null;
+
+            while (true) {
+                var response = remoteStorageService.listDocumentAssetObjectKeysByPrefixes(prefixes, afterObjectKey, 500);
+                if (response == null || !Integer.valueOf(200).equals(response.getCode()) || response.getData() == null) {
+                    throw new ServiceException(DocumentError.DOCUMENT_STORAGE_STATUS_GET_FAILED);
+                }
+
+                List<String> objectKeys = response.getData();
+                if (objectKeys.isEmpty()) break;
+
+                allObjectKeys.addAll(objectKeys);
+                afterObjectKey = objectKeys.getLast();
+            }
+        }
+
         // 发送 OSS 文件删除消息
         if (!allObjectKeys.isEmpty()) {
             eventPublisher.publishFileDeleteEvent(allObjectKeys);
@@ -536,6 +563,7 @@ public class DocumentServiceImpl implements IDocumentService {
                     .bizTag(targetDocumentId)
                     .build()).getData();
             copiedObjectKeys.add(copied.getObjectKey());
+            String copiedSourceKey = copied.getObjectKey();
 
             // 复制 Preview Object
             copied = remoteStorageService.copyFile(CopyReqDTO.builder()
@@ -544,6 +572,7 @@ public class DocumentServiceImpl implements IDocumentService {
                     .bizTag(targetDocumentId)
                     .build()).getData();
             copiedObjectKeys.add(copied.getObjectKey());
+            String copiedPreviewPdfKey = copied.getObjectKey();
 
             // 复制 文档内容
             DocumentContentEntity sourceContent = documentContentRepository.findById(sourceVersion.getDocumentId())
@@ -551,6 +580,8 @@ public class DocumentServiceImpl implements IDocumentService {
             DocumentContentEntity targetContent = BeanUtil.copyProperties(sourceContent, DocumentContentEntity.class, "createTime");
             targetContent.setDocumentId(targetDocumentId);
             targetContent.setVersion(1);
+            targetContent.setMarkdown(documentAssetService.copyMarkdownAssets(sourceContent.getMarkdown(),
+                    sourceVersion.getDocumentId(), targetDocumentId, copiedObjectKeys));
             documentContentRepository.save(targetContent);
 
             // 复制 Pdf Meta 信息
@@ -565,8 +596,8 @@ public class DocumentServiceImpl implements IDocumentService {
             DocumentVersionEntity targetVersion = DocumentVersionEntity.builder()
                     .documentId(targetDocumentId)
                     .version(1)
-                    .sourceObjectKey(copiedObjectKeys.getFirst())
-                    .previewObjectKey(copiedObjectKeys.getLast())
+                    .sourceObjectKey(copiedSourceKey)
+                    .previewObjectKey(copiedPreviewPdfKey)
                     .uploadMeta(sourceVersion.getUploadMeta())
                     .documentStatus(new DocumentStatus(DocumentStatusEnum.READY))
                     .maxPreviewPages(sourceVersion.getMaxPreviewPages())
@@ -623,6 +654,6 @@ public class DocumentServiceImpl implements IDocumentService {
     }
 
     private static String getSearchText(DocumentContentEntity contentEntity) {
-        return contentEntity.getMarkdown() != null ? contentEntity.getMarkdown() : contentEntity.getRawText();
+        return contentEntity.getMarkdown() != null ? MarkdownImages.withoutInlineData(contentEntity.getMarkdown()) : contentEntity.getRawText();
     }
 }
