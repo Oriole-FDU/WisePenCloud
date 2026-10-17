@@ -36,6 +36,8 @@ public enum ResourceType {
     SKILL(31, "SKILL", "skill"),
     /** 无扩展名的 Agent，由 AI资产 服务管理 */
     AGENT(32, "AGENT", "agent"),
+    /** 无扩展名的问卷，由问卷服务管理 */
+    QUESTIONNAIRE(33, "QUESTIONNAIRE", "questionnaire"),
 
     /** 未知资源，兜底 */
     UNKNOWN(99, "UNKNOWN", "unknown");
