@@ -12,7 +12,7 @@ import com.oriole.wisepen.document.domain.entity.DocumentPdfMetaEntity;
 import com.oriole.wisepen.document.exception.DocumentError;
 import com.oriole.wisepen.document.service.IDocumentFileService;
 import com.oriole.wisepen.document.service.IDocumentService;
-import com.oriole.wisepen.document.util.MarkdownPageBreakInjector;
+import com.oriole.wisepen.document.service.IDocumentAssetService;
 import com.oriole.wisepen.document.util.OnlyOfficeConversionClient;
 import com.oriole.wisepen.document.util.WatermarkPreProcessor;
 import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitReqDTO;
@@ -59,7 +59,7 @@ public class DocumentConversionAndParseConsumer {
 
     private final DocumentProperties documentProperties;
     private final WatermarkPreProcessor watermarkPreProcessor;
-    private final MarkdownPageBreakInjector markdownPageBreakInjector;
+    private final IDocumentAssetService documentAssetService;
 
     @KafkaListener(topics = TOPIC_DOCUMENT_PARSE, groupId = "wisepen-document-parse-group")
     @AsyncListener(operation = @AsyncOperation(
@@ -145,8 +145,8 @@ public class DocumentConversionAndParseConsumer {
                 content = DocumentContentEntity.builder().markdown(markdown).build();
             }
 
-            if (ResourceType.DOC == msg.getFileType() || ResourceType.DOCX == msg.getFileType() && StrUtil.isNotBlank(content.getMarkdown())) {
-                content.setMarkdown(markdownPageBreakInjector.inject(content.getMarkdown(), pdfFile, msg.getDocumentId()));
+            if ((ResourceType.DOC == msg.getFileType() || ResourceType.DOCX == msg.getFileType()) && StrUtil.isNotBlank(content.getMarkdown())) {
+                content.setMarkdown(documentAssetService.processMarkdown(content.getMarkdown(), pdfFile, msg.getDocumentId()));
             }
 
             // 预埋空水印占位 Form XObject（/WisepenWM），生成 hooked PDF（预览PDF）

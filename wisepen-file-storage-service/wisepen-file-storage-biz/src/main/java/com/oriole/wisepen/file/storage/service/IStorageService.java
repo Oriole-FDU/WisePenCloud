@@ -31,6 +31,10 @@ public interface IStorageService {
      */
     StorageRecordDTO uploadSmallFileProxy(MultipartFile file, StorageSceneEnum scene, String bizTag);
 
+    StorageRecordDTO uploadDocumentAsset(MultipartFile file, String bizTag, String fileName, Long configId);
+
+    List<String> listDocumentAssetObjectKeysByPrefixes(List<String> prefixes, String afterObjectKey, int size);
+
     /**
      * 获取带自定义响应头的单文件的私有下载链接
      *

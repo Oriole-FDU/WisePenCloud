@@ -9,6 +9,8 @@ import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitRespDTO;
 import com.oriole.wisepen.file.storage.api.enums.StorageSceneEnum;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -30,6 +32,19 @@ public interface RemoteStorageService {
      */
     @PostMapping("/copy")
     R<StorageRecordDTO> copyFile(@RequestBody CopyReqDTO req);
+
+    /** 同步上传文档派生图片，成功后存储记录即可读取，无上传回调。 */
+    @PostMapping(value = "/uploadDocumentAsset", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    R<StorageRecordDTO> uploadDocumentAsset(@RequestPart("file") MultipartFile file,
+                                            @RequestParam("bizTag") String bizTag,
+                                            @RequestParam("fileName") String fileName,
+                                            @RequestParam(value = "configId", required = false) Long configId);
+
+    /** 按完整文档版本前缀分页查询未删除的正文图片 key。 */
+    @PostMapping("/listDocumentAssetObjectKeysByPrefixes")
+    R<List<String>> listDocumentAssetObjectKeysByPrefixes(@RequestBody List<String> prefixes,
+            @RequestParam(value = "afterObjectKey", required = false) String afterObjectKey,
+            @RequestParam("size") int size);
 
     /**
      * 获取单文件的防盗链下载 URL
