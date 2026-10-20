@@ -23,6 +23,7 @@ import com.oriole.wisepen.user.domain.entity.GroupMemberEntity;
 import com.oriole.wisepen.user.exception.UserError;
 import com.oriole.wisepen.user.mapper.GroupMapper;
 import com.oriole.wisepen.user.mapper.GroupMemberMapper;
+import com.oriole.wisepen.user.mapper.model.GroupMemberCount;
 import com.oriole.wisepen.user.service.IDisplayService;
 import com.oriole.wisepen.resource.feign.RemoteResourceService;
 import com.oriole.wisepen.user.service.IGroupMemberService;
@@ -140,11 +141,15 @@ public class GroupServiceImpl implements IGroupService {
         PageR<GroupItemInfoResponse> pageR = new PageR<>(resultPage.getTotal(), page, size);
         List<GroupEntity> groups = resultPage.getRecords();
         Set<Long> ownerIds = groups.stream().map(GroupEntity::getOwnerId).collect(Collectors.toSet());
+        Map<Long, Integer> memberCountMap = getMemberCountMap(groups.stream()
+                .map(GroupEntity::getGroupId)
+                .toList());
         Map<Long, UserDisplayBase> ownerMap = displayService.getUserDisplayInfoByIds(ownerIds);
 
         List<GroupItemInfoResponse> responses = groups.stream().map(g -> {
             GroupItemInfoResponse resp = BeanUtil.copyProperties(g, GroupItemInfoResponse.class);
             resp.setOwnerInfo(ownerMap.get(g.getOwnerId()));
+            resp.setMemberCount(memberCountMap.getOrDefault(g.getGroupId(), 0));
             return resp;
         }).collect(Collectors.toList());
 
@@ -165,6 +170,7 @@ public class GroupServiceImpl implements IGroupService {
         GroupEntity group = getGroupInfoById(groupId);
         GroupItemInfoResponse resp = BeanUtil.copyProperties(group, GroupItemInfoResponse.class);
         resp.setOwnerInfo(displayService.getUserDisplayInfoByIds(Set.of(group.getOwnerId())).get(group.getOwnerId()));
+        resp.setMemberCount(getMemberCountMap(List.of(groupId)).getOrDefault(groupId, 0));
         return resp;
     }
 
@@ -173,6 +179,18 @@ public class GroupServiceImpl implements IGroupService {
         GroupEntity group = getGroupInfoById(groupId);
         GroupDetailInfoResponse resp = BeanUtil.copyProperties(group, GroupDetailInfoResponse.class);
         resp.setOwnerInfo(displayService.getUserDisplayInfoByIds(Set.of(group.getOwnerId())).get(group.getOwnerId()));
+        resp.setMemberCount(getMemberCountMap(List.of(groupId)).getOrDefault(groupId, 0));
         return resp;
+    }
+
+    private Map<Long, Integer> getMemberCountMap(Collection<Long> groupIds) {
+        if (groupIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return groupMemberMapper.selectMemberCounts(groupIds).stream()
+                .collect(Collectors.toMap(
+                        GroupMemberCount::getGroupId,
+                        count -> Math.toIntExact(count.getMemberCount())
+                ));
     }
 }

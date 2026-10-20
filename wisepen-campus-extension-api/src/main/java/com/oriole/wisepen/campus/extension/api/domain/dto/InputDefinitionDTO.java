@@ -1,6 +1,7 @@
 package com.oriole.wisepen.campus.extension.api.domain.dto;
 
 import com.oriole.wisepen.campus.extension.api.enums.InputControlType;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -23,31 +24,41 @@ public class InputDefinitionDTO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /** 输入值在 inputs 或 answers 中使用的键 */
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "输入值的键")
     private String name;
 
     /** 直接展示给用户的标签 */
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "直接展示给用户的标签")
     private String label;
 
     /** 前端建议使用的控件类型 */
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "前端建议使用的控件类型")
     private InputControlType controlType;
 
     /** 是否必须提供该输入 */
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "是否必须提供该输入")
     private boolean required;
 
     /** 是否包含密码等敏感信息 */
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "是否包含密码等敏感信息")
     private boolean sensitive;
 
     /** 字符串值的最小长度；不限制时为空 */
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true, description = "字符串值的最小长度")
     private Integer minLength;
 
     /** 字符串值的最大长度；不限制时为空 */
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true, description = "字符串值的最大长度")
     private Integer maxLength;
 
     /** 字符串值需要匹配的正则表达式；不限制时为空 */
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true, description = "字符串值需要匹配的正则表达式")
     private String pattern;
 
     /** SELECT 控件的可选值；其他控件通常为空列表 */
-    private List<InputOptionDTO> options;
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "控件的可选值")
+    @Builder.Default
+    private List<InputOptionDTO> options = List.of();
 
     /**
      * 校园身份认证输入项的可选值
@@ -61,9 +72,11 @@ public class InputDefinitionDTO implements Serializable {
         private static final long serialVersionUID = 1L;
 
         /** 提交给 Provider 的字符串值 */
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "提交给 Provider 的字符串值")
         private String value;
 
         /** 直接展示给用户的标签 */
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "直接展示给用户的标签")
         private String label;
     }
 }

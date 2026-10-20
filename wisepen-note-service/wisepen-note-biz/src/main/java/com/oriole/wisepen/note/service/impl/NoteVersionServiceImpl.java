@@ -147,7 +147,7 @@ public class NoteVersionServiceImpl implements INoteVersionService {
                 .resourceId(resourceId)
                 .fullSnapshot(fullSnapshotBase64)
                 .version(currentVersion)
-                .deltas(deltasBase64.isEmpty() ? null : deltasBase64)
+                .deltas(deltasBase64)
                 .build();
     }
 

@@ -1,6 +1,7 @@
 package com.oriole.wisepen.campus.extension.api.domain.dto;
 
 import com.oriole.wisepen.campus.extension.api.enums.ChallengeArtifactEncoding;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -22,14 +23,18 @@ public class ChallengeArtifactDTO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /** 当前 Challenge 内稳定的物料名称 */
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "当前 Challenge 内稳定的物料名称")
     private String name;
 
     /** 物料的 MIME 类型 */
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "物料的 MIME 类型")
     private String mediaType;
 
     /** content 使用的编码 */
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "物料内容使用的编码")
     private ChallengeArtifactEncoding encoding;
 
     /** 按 encoding 编码后的物料内容 */
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "按 encoding 编码后的物料内容")
     private String content;
 }
