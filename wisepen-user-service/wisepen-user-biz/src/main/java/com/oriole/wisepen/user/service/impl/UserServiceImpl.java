@@ -20,6 +20,8 @@ import com.oriole.wisepen.user.api.config.UserProperties;
 import com.oriole.wisepen.user.api.domain.base.UserInfoBase;
 import com.oriole.wisepen.user.api.domain.base.UserProfileBase;
 import com.oriole.wisepen.user.api.domain.dto.req.*;
+import com.oriole.wisepen.user.api.domain.dto.res.UserAdminDetailResponse;
+import com.oriole.wisepen.user.api.domain.dto.res.UserAdminListItemResponse;
 import com.oriole.wisepen.user.api.domain.dto.res.UserDetailInfoResponse;
 import com.oriole.wisepen.user.api.domain.dto.res.UserSearchUserResponse;
 import com.oriole.wisepen.user.cache.RedisCacheManager;
@@ -357,7 +359,7 @@ public class UserServiceImpl implements IUserService {
     }
 
     @Override
-    public PageR<UserEntity> getUserListAdmin(int page, int size, String keyword, UserStatus userStatus,
+    public PageR<UserAdminListItemResponse> getUserListAdmin(int page, int size, String keyword, UserStatus userStatus,
             IdentityType identityType) {
         page = Math.max(1, page);
         size = Math.max(1, size);
@@ -384,16 +386,20 @@ public class UserServiceImpl implements IUserService {
 
         Page<UserEntity> result = userMapper.selectPage(new Page<>(page, size), queryWrapper);
 
-        List<UserEntity> records = result.getRecords();
-        for (UserEntity userEntity : records) {
-            userEntity.setPassword(null);
-        }
-        PageR<UserEntity> pageR = new PageR<>(result.getTotal(), page, size);
+        List<UserAdminListItemResponse> records = result.getRecords().stream()
+                .map(userEntity -> BeanUtil.copyProperties(userEntity, UserAdminListItemResponse.class))
+                .toList();
+        PageR<UserAdminListItemResponse> pageR = new PageR<>(result.getTotal(), page, size);
         pageR.addAll(records);
         return pageR;
     }
 
-    public UserProfileEntity getUserDetailInfoAdmin(Long userId) {
-        return userProfileMapper.selectById(userId);
+    @Override
+    public UserAdminDetailResponse getUserDetailInfoAdmin(Long userId) {
+        UserProfileEntity userProfileEntity = userProfileMapper.selectById(userId);
+        if (userProfileEntity == null) {
+            return null;
+        }
+        return BeanUtil.copyProperties(userProfileEntity, UserAdminDetailResponse.class);
     }
 }
