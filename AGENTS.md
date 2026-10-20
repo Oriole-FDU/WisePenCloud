@@ -16,6 +16,7 @@
 - 日志级别、logfmt、`@Slf4j`、`@Log`、敏感信息：读 `docs/agents/logging-guideline.md`。
 - 错误码、`ServiceException`、`CommonError`、各服务 `*Error`：读 `docs/agents/error-code-guideline.md`。
 - `@Tag`、`@Operation.summary`、`@Operation.description`：读 `docs/agents/openapi-guideline.md`。
+- API 契约、wire 类型、required/nullable、`R` / `PageR`、枚举和 breaking change：读 `docs/agents/api-contract-guideline.md`。
 - 构建、测试、无法编译时的替代检查：读 `docs/agents/verification.md`。
 
 ## 最高优先级红线
