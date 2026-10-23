@@ -12,6 +12,7 @@ public enum BusinessDomain {
     AI_RESOURCE,
     WEB_APP,
     STORAGE,
+    QUESTIONNAIRE,
     FUDAN_EXTENSION;
 
     public String key() {
