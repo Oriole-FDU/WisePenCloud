@@ -23,4 +23,7 @@ public class CopyReqDTO implements Serializable {
     private StorageSceneEnum scene;
 
     private String bizTag;
+
+    /** 可选固定目标文件名；未传时沿用现有随机命名。 */
+    private String targetFileName;
 }

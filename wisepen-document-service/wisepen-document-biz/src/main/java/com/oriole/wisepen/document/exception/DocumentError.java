@@ -32,6 +32,8 @@ public enum DocumentError implements IResult {
     DOCUMENT_DOWNLOAD_FAILED(6146, new ResultKey(BusinessDomain.DOCUMENT, DocumentSubject.DOCUMENT, ErrorReason.FAILED),"文档下载失败"),
     DOCUMENT_EDIT_SAVE_FAILED(6155, new ResultKey(BusinessDomain.DOCUMENT, DocumentSubject.DOCUMENT, ErrorReason.FAILED),"文档编辑保存失败"),
     DOCUMENT_VERSION_DUPLICATED(6161, new ResultKey(BusinessDomain.DOCUMENT, DocumentSubject.DOCUMENT, ErrorReason.CONFLICT), "文档版本冲突"),
+    DOCUMENT_IMAGE_NOT_FOUND(6171, new ResultKey(BusinessDomain.DOCUMENT, DocumentSubject.DOCUMENT, ErrorReason.NOT_FOUND), "文档图片不存在或未被该版本引用"),
+    DOCUMENT_IMAGE_UPLOAD_FAILED(6172, new ResultKey(BusinessDomain.DOCUMENT, DocumentSubject.DOCUMENT, ErrorReason.FAILED), "文档图片上传失败"),
 
     // 文档预览相关异常
     DOCUMENT_PREVIEW_NOT_READY(6211, new ResultKey(BusinessDomain.DOCUMENT, DocumentSubject.DOCUMENT_PREVIEW, ErrorReason.STATE_INVALID),"文档尚未就绪，不能预览"),

@@ -10,6 +10,7 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.http.HttpUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.oriole.wisepen.common.core.constant.CommonError;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.file.storage.api.domain.base.StorageRecordBase;
 import com.oriole.wisepen.file.storage.api.domain.base.UploadUrlBase;
@@ -37,6 +38,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -138,6 +140,13 @@ public class StorageServiceImpl implements IStorageService {
         // 根据请求的 Scene 和 BizTag 重新构建 ObjectKey
         String extension = FileUtil.extName(sourceRecord.getObjectKey()).toLowerCase();
         String targetObjectKey = buildObjectKey(req.getScene().getPrefix(), req.getBizTag(), extension);
+        if (StrUtil.isNotBlank(req.getTargetFileName())) {
+            // 指定固定目标文件名时复用同一套拼接逻辑，文件名不再随机生成
+            targetObjectKey = buildObjectKeyWithName(req.getScene().getPrefix(), req.getBizTag(), req.getTargetFileName());
+        }
+        if (targetObjectKey.equals(sourceRecord.getObjectKey())) {
+            throw new ServiceException(CommonError.REQUEST_PARAM_INVALID, "复制目标不能与源文件相同");
+        }
 
         try {
             provider.copyObject(sourceRecord.getObjectKey(), targetObjectKey);
@@ -222,6 +231,88 @@ public class StorageServiceImpl implements IStorageService {
     }
 
     @Override
+    public StorageRecordDTO uploadSmallFileWithName(MultipartFile file, StorageSceneEnum scene, String bizTag, String fileName, Long configId) {
+        if (file.getSize() > storageProperties.getMaxSmallFileSize()) {
+            throw new ServiceException(FileStorageError.FILE_SIZE_ABOVE_UPPER_BOUND);
+        }
+        if (StrUtil.isBlank(fileName)) {
+            throw new ServiceException(CommonError.REQUEST_PARAM_INVALID, "文件名不能为空");
+        }
+
+        String objectKey = buildObjectKeyWithName(scene.getPrefix(), bizTag, fileName);
+        StorageRecordEntity existing = findExistingRecord(objectKey);
+        StorageProvider provider = storageManager.getProvider(
+                existing == null ? configId : existing.getConfigId());
+        byte[] content;
+        try {
+            content = file.getBytes();
+        } catch (IOException e) {
+            throw new ServiceException(FileStorageError.STORAGE_PROVIDER_UPLOAD_FILE_FAILED);
+        }
+        provider.uploadSmallFile(content, objectKey);
+
+        StorageRecordEntity record = StorageRecordEntity.builder()
+                .scene(scene)
+                .objectKey(objectKey)
+                .size(file.getSize())
+                .configId(provider.getConfigId())
+                .status(StorageStatusEnum.AVAILABLE)
+                .build();
+        if (existing != null) {
+            record.setFileId(existing.getFileId());
+        }
+        saveAvailableRecord(record);
+
+        StorageRecordDTO dto = BeanUtil.copyProperties(record, StorageRecordDTO.class);
+        dto.setDomain(provider.getDomain());
+        return dto;
+    }
+
+    private StorageRecordEntity findExistingRecord(String objectKey) {
+        StorageRecordEntity existing = storageRecordMapper.selectOne(Wrappers.<StorageRecordEntity>lambdaQuery()
+                .eq(StorageRecordEntity::getObjectKey, objectKey).last("LIMIT 1"));
+        if (existing != null && existing.getStatus() == StorageStatusEnum.DELETED) {
+            throw new ServiceException(FileStorageError.FILE_RECORD_NOT_FOUND);
+        }
+        return existing;
+    }
+
+    /** 固定 key 复用原记录；条件更新防止已软删除的记录被迟到上传复活。 */
+    private void saveAvailableRecord(StorageRecordEntity record) {
+        if (record.getFileId() == null) {
+            storageRecordMapper.insert(record);
+        } else {
+            int updated = storageRecordMapper.update(null, Wrappers.<StorageRecordEntity>lambdaUpdate()
+                    .eq(StorageRecordEntity::getFileId, record.getFileId())
+                    .ne(StorageRecordEntity::getStatus, StorageStatusEnum.DELETED)
+                    .set(StorageRecordEntity::getStatus, StorageStatusEnum.AVAILABLE)
+                    .set(StorageRecordEntity::getSize, record.getSize())
+                    .set(StorageRecordEntity::getUpdateTime, LocalDateTime.now()));
+            if (updated == 0) throw new ServiceException(FileStorageError.FILE_RECORD_NOT_FOUND);
+        }
+    }
+
+    @Override
+    public List<String> listObjectKeysByPrefixes(List<String> prefixes, String afterObjectKey, int size) {
+        if (size < 1 || size > 500) {
+            throw new ServiceException(CommonError.REQUEST_PARAM_INVALID, "每页数量必须在1至500之间");
+        }
+        if (prefixes == null || prefixes.isEmpty()) return List.of();
+        List<String> cleanPrefixes = prefixes.stream().filter(StrUtil::isNotBlank).distinct().toList();
+        if (cleanPrefixes.isEmpty()) return List.of();
+        return storageRecordMapper.selectList(Wrappers.<StorageRecordEntity>lambdaQuery()
+                .select(StorageRecordEntity::getObjectKey)
+                .ne(StorageRecordEntity::getStatus, StorageStatusEnum.DELETED)
+                .and(query -> cleanPrefixes.forEach(prefix -> query.or().likeRight(StorageRecordEntity::getObjectKey, prefix)))
+                .gt(StrUtil.isNotBlank(afterObjectKey), StorageRecordEntity::getObjectKey, afterObjectKey)
+                .orderByAsc(StorageRecordEntity::getObjectKey)
+                .last("LIMIT " + size))
+                .stream()
+                .map(StorageRecordEntity::getObjectKey)
+                .toList();
+    }
+
+    @Override
     public byte[] getSmallFileContent(String objectKey) {
         StorageRecordEntity record = getStorageRecordWithCompensateStatus(objectKey);
         if (record.getSize() != null && record.getSize() > storageProperties.getMaxSmallFileSize()) {
@@ -284,13 +375,16 @@ public class StorageServiceImpl implements IStorageService {
                         .last("LIMIT 1")
         );
 
+        if (record == null) throw new ServiceException(FileStorageError.FILE_RECORD_NOT_FOUND);
         StorageProvider provider = storageManager.getProvider(record.getConfigId());
 
         if (!provider.verifyCallbackSignature(request, rawBody)) {
             throw new ServiceException(FileStorageError.STORAGE_PROVIDER_CALLBACK_SIGNATURE_INVALID);
         }
 
-        if (StorageStatusEnum.AVAILABLE.equals(record.getStatus())) {
+        // DEBUG 修改前为：if (StorageStatusEnum.AVAILABLE.equals(record.getStatus())) { 跳过 }
+        // 仅处理上传中的记录；已完成或已软删除的记录不允许被迟到回调改写状态。
+        if (!StorageStatusEnum.UPLOADING.equals(record.getStatus())) {
             log.debug("storage callback skipped. objectKey={} status={}", objectKey, record.getStatus());
             return;
         }
@@ -317,6 +411,16 @@ public class StorageServiceImpl implements IStorageService {
 
         // 场景后缀 + 时间戳 / 业务Tag + 文件名
         // 例如 public/images/user/2026/1/1/XXXX.png private/images/note/XXXX/XXXX.png
+        return Stream.of(scenePrefix, cleanBizTag, fileName)
+                .filter(StrUtil::isNotBlank)
+                .collect(Collectors.joining("/"));
+    }
+
+    /** 固定文件名入口：拼接规则与 buildObjectKey 一致，仅文件名由调用方指定。 */
+    private String buildObjectKeyWithName(String scenePrefix, String bizTag, String fileName) {
+        String cleanBizTag = StrUtil.isNotBlank(bizTag)
+                ? bizTag.replaceAll("^/+", "").replaceAll("/+$", "")
+                : DateTimeFormatter.ofPattern("yyyy/MM/dd").format(LocalDateTime.now());
         return Stream.of(scenePrefix, cleanBizTag, fileName)
                 .filter(StrUtil::isNotBlank)
                 .collect(Collectors.joining("/"));

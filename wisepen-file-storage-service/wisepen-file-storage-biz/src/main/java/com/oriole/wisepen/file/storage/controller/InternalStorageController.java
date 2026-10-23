@@ -16,6 +16,8 @@ import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -27,6 +29,38 @@ import java.util.List;
 public class InternalStorageController {
 
     private final IStorageService storageService;
+
+    @Operation(summary = "内部按固定文件名上传小文件", description = """
+            - 用途：供业务微服务同步上传小文件并立即获得可用存储记录。
+            - 请求：file 为文件内容；scene 决定存储前缀；bizTag 决定业务目录；fileName 为固定目标文件名；configId 可指定存储配置。
+            - 约束：仅内部服务调用；文件受小文件上传上限限制；同名记录已存在时覆盖文件并复用记录，已删除记录不能恢复。
+            - 处理：按固定文件名上传到对象存储并登记 AVAILABLE 存储记录；不发送上传回调事件，不参与秒传判定。
+            - 失败：文件过大 -> FileStorageError.FILE_SIZE_ABOVE_UPPER_BOUND；已删除 -> FileStorageError.FILE_RECORD_NOT_FOUND。
+            - 响应：返回可立即读取的存储记录及 objectKey。
+            """)
+    @PostMapping(value = "/uploadSmallFileWithName", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public R<StorageRecordDTO> uploadSmallFileWithName(@RequestPart("file") MultipartFile file,
+                                               @RequestParam("scene") StorageSceneEnum scene,
+                                               @RequestParam("bizTag") String bizTag,
+                                               @RequestParam("fileName") String fileName,
+                                               @RequestParam(value = "configId", required = false) Long configId) {
+        return R.ok(storageService.uploadSmallFileWithName(file, scene, bizTag, fileName, configId));
+    }
+
+    @Operation(summary = "内部按前缀查询文件标识", description = """
+            - 用途：供业务微服务按目录前缀收集未删除文件的 objectKey。
+            - 请求：请求体为目录前缀列表；afterObjectKey 可选，续查时传上一页最后一个 key；size 为每页数量。
+            - 约束：仅内部服务调用；size 必须在 1 至 500 之间。
+            - 处理：只查询未软删除的存储记录，按 objectKey 升序返回游标之后的结果；不访问对象存储、不修改记录。
+            - 失败：每页数量无效 -> CommonError.REQUEST_PARAM_INVALID。
+            - 响应：至多 size 个 objectKey；空前缀列表或无后续匹配记录时返回空列表。
+            """)
+    @PostMapping("/listObjectKeysByPrefixes")
+    public R<List<String>> listObjectKeysByPrefixes(@RequestBody List<String> prefixes,
+                                                    @RequestParam(value = "afterObjectKey", required = false) String afterObjectKey,
+                                                    @RequestParam("size") int size) {
+        return R.ok(storageService.listObjectKeysByPrefixes(prefixes, afterObjectKey, size));
+    }
 
     /**
      * 初始化上传（颁发 PUT URL 或触发秒传）

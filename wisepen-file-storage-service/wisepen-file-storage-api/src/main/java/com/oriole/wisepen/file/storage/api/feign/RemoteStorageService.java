@@ -9,6 +9,8 @@ import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitRespDTO;
 import com.oriole.wisepen.file.storage.api.enums.StorageSceneEnum;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -30,6 +32,20 @@ public interface RemoteStorageService {
      */
     @PostMapping("/copy")
     R<StorageRecordDTO> copyFile(@RequestBody CopyReqDTO req);
+
+    /** 同步上传小文件并生成固定文件名的存储记录，成功后即可读取，无上传回调。 */
+    @PostMapping(value = "/uploadSmallFileWithName", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    R<StorageRecordDTO> uploadSmallFileWithName(@RequestPart("file") MultipartFile file,
+                                        @RequestParam("scene") StorageSceneEnum scene,
+                                        @RequestParam("bizTag") String bizTag,
+                                        @RequestParam("fileName") String fileName,
+                                        @RequestParam(value = "configId", required = false) Long configId);
+
+    /** 按前缀游标分页查询未删除的存储记录 objectKey。 */
+    @PostMapping("/listObjectKeysByPrefixes")
+    R<List<String>> listObjectKeysByPrefixes(@RequestBody List<String> prefixes,
+            @RequestParam(value = "afterObjectKey", required = false) String afterObjectKey,
+            @RequestParam("size") int size);
 
     /**
      * 由内部业务服务代理上传小文件内容
