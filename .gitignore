@@ -10,7 +10,9 @@ logs/
 dev.properties
 
 # 开发文档与本地测试
-docs
+docs/*
+!docs/agents/
+!docs/agents/**
 AGENTS.md
 .local-tests/
 
