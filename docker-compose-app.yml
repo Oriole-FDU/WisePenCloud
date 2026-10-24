@@ -79,6 +79,8 @@ services:
       - OTEL_SERVICE_NAME=wisepen-resource-service
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
       - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      # 显式启用 OTLP 日志导出，避免 Java Agent 使用空日志处理器。
+      - OTEL_LOGS_EXPORTER=otlp
       - SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS=
       - NACOS_USERNAME=${NACOS_USERNAME}
       - NACOS_PASSWORD=${NACOS_PASSWORD}
