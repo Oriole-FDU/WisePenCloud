@@ -65,9 +65,12 @@ public class ResourceItemResponseAssembler {
 
         // 先处理权限过滤问题
         Map<String, List<ResourceAction>> actionsMap = new HashMap<>();
+        Map<String, ResourceAccessRole> accessRoleMap = new HashMap<>();
         entities = entities.stream().filter(entity->{
-            List<ResourceAction> actions = ResourceAction.permissionCodeToActions(resolveAccess(entity, currentUserId, groupRoles, targetVersion, checkMarketTargetVersion).getActionsMask());
+            ResolvedResourceAccess access = resolveAccess(entity, currentUserId, groupRoles, targetVersion, checkMarketTargetVersion);
+            List<ResourceAction> actions = ResourceAction.permissionCodeToActions(access.getActionsMask());
             actionsMap.put(entity.getResourceId(), actions);
+            accessRoleMap.put(entity.getResourceId(), access.getResourceAccessRole());
             return new HashSet<>(actions).containsAll(requiredResourceActions);
         }).toList();
 
@@ -90,6 +93,7 @@ public class ResourceItemResponseAssembler {
 
             // 获取已解析的 CurrentActions
             response.setCurrentActions(actionsMap.get(entity.getResourceId()));
+            response.setResourceAccessRole(accessRoleMap.get(entity.getResourceId()));
             // 解析 OwnerInfo
             response.setOwnerInfo(resolveOwnerInfo(entity, ownerInfoMap));
             // 解析按组分隔的 Tag 绑定
@@ -317,14 +321,16 @@ public class ResourceItemResponseAssembler {
 
     private UserDisplayBase resolveOwnerInfo(ResourceItemEntity entity, Map<Long, UserDisplayBase> ownerInfoMap) {
         Long owner = Long.valueOf(entity.getOwnerId());
-        UserDisplayBase ownerInfo = ownerInfoMap.get(owner);
-        return ownerInfo == null ? new UserDisplayBase("UNKNOWN") : ownerInfo;
+        return ownerInfoMap.get(owner);
     }
 
     private Map<String, TagInfoBase> resolveTags(List<String> tagIds, Map<String, TagInfoBase> tagMap) {
         Map<String, TagInfoBase> tags = new LinkedHashMap<>();
         for (String tagId : tagIds) {
-            tags.put(tagId, tagMap.getOrDefault(tagId, TagInfoBase.builder().tagName("UNKNOWN").build()));
+            TagInfoBase tag = tagMap.get(tagId);
+            if (tag != null) {
+                tags.put(tagId, tag);
+            }
         }
         return tags;
     }

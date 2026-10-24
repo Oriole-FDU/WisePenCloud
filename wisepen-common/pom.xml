@@ -104,6 +104,12 @@
             <artifactId>spring-retry</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <!-- 业务方法 span 注解由 OTel Java Agent 运行时处理 -->
         <dependency>
             <groupId>io.opentelemetry.instrumentation</groupId>

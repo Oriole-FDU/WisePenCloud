@@ -471,7 +471,7 @@ public class ResourceServiceImpl implements IResourceService {
         Long owner = Long.valueOf(entity.getOwnerId());
         Map<Long, UserDisplayBase> ownerInfoMap = remoteUserService.getUserDisplayInfo(List.of(owner)).getData();
         UserDisplayBase ownerInfo = ownerInfoMap.get(owner);
-        response.setOwnerInfo(ownerInfo == null ? new UserDisplayBase("UNKNOWN") : ownerInfo);
+        response.setOwnerInfo(ownerInfo);
 
         return response;
     }

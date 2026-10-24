@@ -7,7 +7,6 @@ import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.document.api.constant.DocumentConstants;
-import com.oriole.wisepen.document.api.domain.base.DocumentVersionBase;
 import com.oriole.wisepen.document.api.domain.base.DocumentStatus;
 import com.oriole.wisepen.document.api.domain.base.DocumentUploadMeta;
 import com.oriole.wisepen.document.api.domain.dto.req.DocumentCreateRequest;
@@ -16,6 +15,7 @@ import com.oriole.wisepen.document.api.domain.dto.req.DocumentUploadInitRequest;
 import com.oriole.wisepen.document.api.domain.dto.res.DocumentSearchTextResponse;
 import com.oriole.wisepen.document.api.domain.dto.res.DocumentUploadInitResponse;
 import com.oriole.wisepen.document.api.domain.dto.res.DocumentVersionInfoResponse;
+import com.oriole.wisepen.document.api.domain.dto.res.PendingDocumentResponse;
 import com.oriole.wisepen.document.api.domain.mq.DocumentParseTaskMessage;
 import com.oriole.wisepen.document.api.domain.mq.DocumentReadyMessage;
 import com.oriole.wisepen.document.api.enums.DocumentStatusEnum;
@@ -51,6 +51,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -179,7 +180,7 @@ public class DocumentServiceImpl implements IDocumentService {
                     .documentName(request.getFilename())
                     .size(request.getExpectedSize())
                     .uploaderId(uploaderId)
-                    .uploaderGroupRoles(uploaderGroupRoles)
+                    .uploaderGroupRoles(uploaderGroupRoles == null ? Collections.emptyMap() : uploaderGroupRoles)
                     .mountTargetTagId(request.getMountTargetTagId())
                     .build();
 
@@ -234,7 +235,7 @@ public class DocumentServiceImpl implements IDocumentService {
     }
 
     @Override
-    public List<DocumentVersionBase> listPendingDocs(Long uploaderId) {
+    public List<PendingDocumentResponse> listPendingDocs(Long uploaderId) {
         List<DocumentVersionEntity> entities = documentVersionRepository.findByUploaderIdAndStatusIn(
                 uploaderId,
                 List.of(DocumentStatusEnum.UPLOADING,
@@ -245,7 +246,9 @@ public class DocumentServiceImpl implements IDocumentService {
                         DocumentStatusEnum.FAILED
                 )
         );
-        return new ArrayList<>(entities);
+        return entities.stream()
+                .map(entity -> BeanUtil.copyProperties(entity, PendingDocumentResponse.class))
+                .toList();
     }
 
     @Override

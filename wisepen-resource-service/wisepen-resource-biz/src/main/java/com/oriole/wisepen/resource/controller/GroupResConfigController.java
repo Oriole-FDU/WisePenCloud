@@ -11,6 +11,7 @@ import com.oriole.wisepen.resource.domain.dto.res.GroupResConfigResponse;
 import com.oriole.wisepen.resource.service.IGroupResService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -53,7 +54,7 @@ public class GroupResConfigController {
     )
     @Log(title = "修改小组资源配置", businessType = BusinessType.UPDATE)
     @PostMapping("/changeConfig")
-    public R<Void> upsertConfig(@RequestBody GroupResConfigUpdateRequest req) {
+    public R<Void> upsertConfig(@Valid @RequestBody GroupResConfigUpdateRequest req) {
         SecurityContextHolder.assertGroupRole(Long.parseLong(req.getGroupId()), GroupRoleType.OWNER, GroupRoleType.ADMIN);
         groupResService.upsertGroupResConfig(req);
         return R.ok();

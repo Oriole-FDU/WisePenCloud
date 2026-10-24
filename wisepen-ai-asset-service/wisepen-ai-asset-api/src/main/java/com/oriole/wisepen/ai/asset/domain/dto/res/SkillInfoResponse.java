@@ -5,12 +5,16 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 @Getter
 @Setter
 @NoArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 public class SkillInfoResponse extends AIResourceInfoBase {
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "资源 ID")
     private String resourceId;
+
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "Skill 版本包")
     private SkillVersionBundleInfoResponse skillVersionBundle;
 }

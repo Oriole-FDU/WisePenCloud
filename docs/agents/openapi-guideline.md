@@ -8,6 +8,7 @@
 - `@Operation.summary` 使用短中文动宾结构，在不看 path 的情况下也能识别接口动作和对象。
 - `@Operation.description` 写业务契约，必须说明请求如何被业务系统接受、处理和返回。
 - OpenAPI 契约统一维护在 Controller 上。Feign 接口不维护 `@Tag` / `@Operation` 文案，避免与 Controller 双写漂移。
+- 响应字段的 required/nullable、集合默认值和枚举 wire 值按 `docs/agents/api-contract-guideline.md` 执行；本文只约束 Controller 上的 OpenAPI 文案。
 - `operationId` 推荐新增接口使用英文小驼峰，但历史接口整改不强制补齐。
 
 ## 2. Tag 规则
