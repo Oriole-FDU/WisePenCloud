@@ -6,6 +6,7 @@ import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
+import com.oriole.wisepen.common.core.constant.CommonError;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.security.annotation.CheckRole;
@@ -15,14 +16,18 @@ import com.oriole.wisepen.document.api.domain.base.DocumentStatus;
 import com.oriole.wisepen.document.api.domain.dto.req.DocumentCreateRequest;
 import com.oriole.wisepen.document.api.domain.dto.req.DocumentForkRequest;
 import com.oriole.wisepen.document.api.domain.dto.req.DocumentUploadInitRequest;
+import com.oriole.wisepen.document.api.domain.dto.res.DocumentImageReferencesResponse;
+import com.oriole.wisepen.document.api.domain.dto.res.DocumentImageResolveResponse;
 import com.oriole.wisepen.document.api.domain.dto.res.DocumentInfoResponse;
 import com.oriole.wisepen.document.api.domain.dto.res.DocumentUploadInitResponse;
 import com.oriole.wisepen.document.api.domain.dto.res.DocumentVersionInfoResponse;
 import com.oriole.wisepen.document.api.enums.DocumentDownloadType;
 import com.oriole.wisepen.document.domain.entity.DocumentInfoEntity;
 import com.oriole.wisepen.document.domain.entity.DocumentVersionEntity;
+import com.oriole.wisepen.document.service.IDocumentAssetService;
 import com.oriole.wisepen.document.service.IDocumentPreviewService;
 import com.oriole.wisepen.document.service.IDocumentService;
+import com.oriole.wisepen.document.util.MarkdownAssetLinkCodec;
 import com.oriole.wisepen.resource.domain.dto.ResourceCheckPermissionReqDTO;
 import com.oriole.wisepen.resource.domain.dto.ResourceCheckPermissionResDTO;
 import com.oriole.wisepen.resource.domain.dto.ResourceInfoGetReqDTO;
@@ -61,6 +66,56 @@ public class DocumentController {
     private final IDocumentPreviewService documentPreviewService;
     private final RemoteResourceService remoteResourceService;
     private final RemoteUserService remoteUserService;
+    private final IDocumentAssetService documentAssetService;
+
+
+    @Operation(summary = "查询正文图片", description = """
+            - 用途：发现文档正文引用的图片，供按页或按需读取。
+            - 请求：resourceId 指定文档；targetVersion 为空时选定当前版本；pageNo 可选且从 1 开始。
+            - 约束：当前用户拥有实际选定版本的 VIEW 动作；文档已就绪。
+            - 处理：动态解析正文的平台图片链接和成对页标记；不逐图访问 OSS；未知页图片不进入指定页结果。
+            - 失败：无权访问 -> DocumentError.DOCUMENT_PERMISSION_DENIED；文档不存在 -> DocumentError.DOCUMENT_NOT_FOUND；未就绪 -> DocumentError.DOCUMENT_PREVIEW_NOT_READY。
+            - 响应：返回实际 documentId、version、图片 key、稳定链接、alt、可空推定页码和全文未知页图片数。
+            """)
+    @GetMapping("/getDocumentImageReferences")
+    public R<DocumentImageReferencesResponse> getDocumentImageReferences(@RequestParam String resourceId,
+            @RequestParam(value = "targetVersion", required = false) Integer targetVersion,
+            @RequestParam(value = "pageNo", required = false) Integer pageNo) {
+        DocumentVersionEntity version = documentService.getDocumentVersion(resourceId, targetVersion);
+        // 授权与读取使用同一选定版本，避免当前版本变化造成错配
+        ResourceCheckPermissionResDTO permission = remoteResourceService.checkResPermission(ResourceCheckPermissionReqDTO.builder()
+                .resourceId(resourceId).userId(SecurityContextHolder.getUserId()).groupRoles(SecurityContextHolder.getGroupRoleMap())
+                .targetVersion(version.getVersion()).build()).getData();
+        if (permission == null || permission.getAllowedActions() == null || !permission.getAllowedActions().contains(ResourceAction.VIEW)) {
+            throw new ServiceException(DOCUMENT_PERMISSION_DENIED);
+        }
+        return R.ok(documentAssetService.listImageReferences(version, pageNo));
+    }
+
+    @Operation(summary = "解析文档图片", description = """
+            - 用途：为按需读取的一张正文图片申请下载地址。
+            - 请求：resourceId、可选 targetVersion 和 assetRef；assetRef 为 wisepen-asset:/// 平台链接。
+            - 约束：当前用户拥有实际选定版本的 VIEW 动作；图片必须属于该版本并被正文引用。
+            - 处理：验证链接和引用后向存储服务申请限时 URL；不会把签名参数写回正文。
+            - 失败：无权访问 -> DocumentError.DOCUMENT_PERMISSION_DENIED；非法链接 -> CommonError.REQUEST_PARAM_INVALID；未引用图片 -> DocumentError.DOCUMENT_IMAGE_NOT_FOUND；下载地址不可用 -> DocumentError.DOCUMENT_DOWNLOAD_URL_APPLY_FAILED。
+            - 响应：返回实际 documentId、version、objectKey、downloadUrl 和 expiresInSeconds。
+            """)
+    @GetMapping("/resolveDocumentImage")
+    public R<DocumentImageResolveResponse> resolveDocumentImage(@RequestParam String resourceId,
+            @RequestParam(value = "targetVersion", required = false) Integer targetVersion,
+            @RequestParam String assetRef) {
+        if (!assetRef.startsWith(MarkdownAssetLinkCodec.SCHEME)) {
+            throw new ServiceException(CommonError.REQUEST_PARAM_INVALID, "请传入平台文档图片链接");
+        }
+        DocumentVersionEntity version = documentService.getDocumentVersion(resourceId, targetVersion);
+        ResourceCheckPermissionResDTO permission = remoteResourceService.checkResPermission(ResourceCheckPermissionReqDTO.builder()
+                .resourceId(resourceId).userId(SecurityContextHolder.getUserId()).groupRoles(SecurityContextHolder.getGroupRoleMap())
+                .targetVersion(version.getVersion()).build()).getData();
+        if (permission == null || permission.getAllowedActions() == null || !permission.getAllowedActions().contains(ResourceAction.VIEW)) {
+            throw new ServiceException(DOCUMENT_PERMISSION_DENIED);
+        }
+        return R.ok(documentAssetService.resolveImage(version, assetRef));
+    }
 
 
     @Operation(
