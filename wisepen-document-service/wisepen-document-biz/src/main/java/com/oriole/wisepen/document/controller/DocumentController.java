@@ -10,7 +10,6 @@ import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.document.api.constant.DocumentConstants;
-import com.oriole.wisepen.document.api.domain.base.DocumentVersionBase;
 import com.oriole.wisepen.document.api.domain.base.DocumentStatus;
 import com.oriole.wisepen.document.api.domain.dto.req.DocumentCreateRequest;
 import com.oriole.wisepen.document.api.domain.dto.req.DocumentForkRequest;
@@ -18,6 +17,7 @@ import com.oriole.wisepen.document.api.domain.dto.req.DocumentUploadInitRequest;
 import com.oriole.wisepen.document.api.domain.dto.res.DocumentInfoResponse;
 import com.oriole.wisepen.document.api.domain.dto.res.DocumentUploadInitResponse;
 import com.oriole.wisepen.document.api.domain.dto.res.DocumentVersionInfoResponse;
+import com.oriole.wisepen.document.api.domain.dto.res.PendingDocumentResponse;
 import com.oriole.wisepen.document.api.enums.DocumentDownloadType;
 import com.oriole.wisepen.document.domain.entity.DocumentInfoEntity;
 import com.oriole.wisepen.document.domain.entity.DocumentVersionEntity;
@@ -42,6 +42,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -148,7 +149,7 @@ public class DocumentController {
                     """
     )
     @GetMapping("/listPendingDocs")
-    public R<List<DocumentVersionBase>> listPendingDocs() {
+    public R<List<PendingDocumentResponse>> listPendingDocs() {
         Long uploaderId = SecurityContextHolder.getUserId();
         return R.ok(documentService.listPendingDocs(uploaderId));
     }
@@ -291,9 +292,12 @@ public class DocumentController {
             documentVersionInfo = BeanUtil.copyProperties(documentVersionEntity, DocumentVersionInfoResponse.class);
         }
 
-        Map<Long, UserDisplayBase> authorsDisplay = null;
+        Map<Long, UserDisplayBase> authorsDisplay = Collections.emptyMap();
         try {
-            authorsDisplay = remoteUserService.getUserDisplayInfo(documentInfo.getAuthors()).getData();
+            Map<Long, UserDisplayBase> remoteAuthorsDisplay = remoteUserService.getUserDisplayInfo(documentInfo.getAuthors()).getData();
+            if (remoteAuthorsDisplay != null) {
+                authorsDisplay = remoteAuthorsDisplay;
+            }
         } catch (Exception ignored){
         }
 

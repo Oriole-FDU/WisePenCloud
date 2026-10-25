@@ -62,7 +62,7 @@ public class WalletController {
                     """
     )
     @PostMapping("/redeemVoucher")
-    public R<Void> redeemVoucher(@RequestBody WalletRedeemVoucherRequest req) {
+    public R<Void> redeemVoucher(@Valid @RequestBody WalletRedeemVoucherRequest req) {
         Long userId = SecurityContextHolder.getUserId();
         walletService.redeemVoucher(userId, req.getVoucherCode());
         return R.ok();

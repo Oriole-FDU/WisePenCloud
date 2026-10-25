@@ -31,6 +31,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -125,7 +126,7 @@ public class UserController {
     @CheckRole
     @PutMapping("/changeUserProfile")
     @Log(title = "更新用户资料", businessType = BusinessType.UPDATE)
-    public R<Void> updateUserProfile(@RequestBody UserProfileUpdateRequest dto) {
+    public R<Void> updateUserProfile(@Valid @RequestBody UserProfileUpdateRequest dto) {
         userService.updateProfile(SecurityContextHolder.getUserId(), dto);
         return R.ok();
     }
@@ -144,7 +145,7 @@ public class UserController {
     @CheckRole
     @PutMapping("/changeUserInfo")
     @Log(title = "更新用户信息", businessType = BusinessType.UPDATE)
-    public R<Void> updateUserInfo(@RequestBody UserInfoUpdateRequest dto) {
+    public R<Void> updateUserInfo(@Valid @RequestBody UserInfoUpdateRequest dto) {
         userService.updateUserInfo(SecurityContextHolder.getUserId(), dto);
         return R.ok();
     }

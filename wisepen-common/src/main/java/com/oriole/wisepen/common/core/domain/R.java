@@ -1,5 +1,6 @@
 package com.oriole.wisepen.common.core.domain;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import java.io.Serializable;
 
@@ -10,9 +11,16 @@ import java.io.Serializable;
 @Data
 public class R<T> implements Serializable {
 
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, type = "number", format = "int32", description = "业务状态码")
     private Integer code;
+
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "业务结果标识")
     private String key;
+
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "业务结果说明")
     private String msg;
+
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true, description = "业务数据")
     private T data;
 
     private R(Integer code, String key, String msg, T data) {
@@ -25,11 +33,11 @@ public class R<T> implements Serializable {
     // ================== 成功响应 ==================
 
     public static <T> R<T> ok() {
-        return new R<>(200, null, null, null);
+        return new R<>(200, "SUCCESS", "操作成功", null);
     }
 
     public static <T> R<T> ok(T data) {
-        return new R<>(200, null, null, data);
+        return new R<>(200, "SUCCESS", "操作成功", data);
     }
 
     public static <T> R<T> ok(IResult result) {

@@ -35,6 +35,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -118,9 +119,12 @@ public class NoteController {
         )).getData();
         NoteInfoEntity noteInfo = noteService.getNoteInfo(resourceId);
 
-        Map<Long, UserDisplayBase> authorsDisplay = null;
+        Map<Long, UserDisplayBase> authorsDisplay = Collections.emptyMap();
         try {
-            authorsDisplay = remoteUserService.getUserDisplayInfo(noteInfo.getAuthors()).getData();
+            Map<Long, UserDisplayBase> remoteAuthorsDisplay = remoteUserService.getUserDisplayInfo(noteInfo.getAuthors()).getData();
+            if (remoteAuthorsDisplay != null) {
+                authorsDisplay = remoteAuthorsDisplay;
+            }
         } catch (Exception ignored){
         }
 

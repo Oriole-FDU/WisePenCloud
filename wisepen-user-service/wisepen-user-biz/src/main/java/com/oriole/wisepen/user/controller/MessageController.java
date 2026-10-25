@@ -66,8 +66,8 @@ public class MessageController {
     )
     @Log(title = "获取未读消息数", businessType = BusinessType.SELECT, isSaveResponseData = false)
     @GetMapping("/getUnreadMessageCount")
-    public R<Long> getUnreadMessageCount() {
-        return R.ok(messageService.getUnreadMessageCount(SecurityContextHolder.getUserId()));
+    public R<String> getUnreadMessageCount() {
+        return R.ok(messageService.getUnreadMessageCount(SecurityContextHolder.getUserId()).toString());
     }
 
     @Operation(
