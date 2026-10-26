@@ -13,11 +13,12 @@ import com.oriole.wisepen.user.domain.entity.UserProfileEntity;
 import com.oriole.wisepen.user.service.IUserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 
-@Tag(name = "管理员 - 用户", description = "管理员查询用户、维护用户状态、资料与密码")
+@Tag(name = "管理员 - 用户", description = "管理员创建用户、查询用户并维护用户状态、资料与密码")
 @RestController
 @RequestMapping("/admin/user")
 @RequiredArgsConstructor
@@ -25,6 +26,24 @@ import org.springframework.web.bind.annotation.*;
 public class AdminUserController {
 
     private final IUserService userService;
+
+    @Operation(
+            summary = "管理员新建用户",
+            description = """
+                    - 用途：管理员直接创建完整用户账号。
+                    - 请求：userId 可选，显式指定新用户 ID；username 为新账号用户名；nickname、avatar、identityType、realName、campusNo、email、mobile、verificationMode、verificationProviderCode、userStatus 为可选账号字段；profile 为可选用户资料。请求不接收密码、钱包数据或邀请码。
+                    - 约束：当前操作者必须具备管理员身份；username 必须符合用户规则且全局唯一；显式 userId 不能在用户表中已存在；用户服务必须已配置默认初始密码；学工号、邮箱、手机号和认证方式组合必须满足用户注册校验。
+                    - 处理：在同一事务中使用服务端默认密码创建账号；显式 userId 为空时由数据库生成，不为空时使用指定值。随后初始化资料和钱包，复用管理员账号更新和资料更新逻辑写入请求字段，不绑定邀请关系。未传 userStatus 但传入 verificationMode 时使用 NORMAL 状态。
+                    - 失败：当前操作者不是管理员 -> PermissionError.UNAUTHORIZED；默认密码未配置 -> UserError.USER_DEFAULT_PASSWORD_NOT_CONFIGURED；userId 重复 -> UserError.USER_ID_ALREADY_EXISTS；用户名重复 -> UserError.USERNAME_ALREADY_EXISTS；学工号冲突 -> UserError.CAMPUS_NO_ALREADY_EXISTS。
+                    - 响应：返回新创建用户的 userId。
+                    """
+    )
+    @PostMapping("/createUser")
+    @Log(title = "管理员新建用户", businessType = BusinessType.INSERT,
+            isSaveRequestData = false, isSaveResponseData = false)
+    public R<Long> createUser(@Valid @RequestBody UserRegisterReqDTO req) {
+        return R.ok(userService.createUserAdmin(req));
+    }
 
     @Operation(
             summary = "分页查询用户",

@@ -129,7 +129,10 @@ public class UserServiceImpl implements IUserService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void register(AuthRegisterRequest req) {
+    public Long register(AuthRegisterRequest req, Long requestedUserId) {
+        if (requestedUserId != null && userMapper.selectById(requestedUserId) != null) {
+            throw new ServiceException(UserError.USER_ID_ALREADY_EXISTS);
+        }
         // 校验用户名是否存在
         if (userMapper
                 .selectCount(Wrappers.<UserEntity>lambdaQuery().eq(UserEntity::getUsername, req.getUsername())) > 0) {
@@ -138,6 +141,7 @@ public class UserServiceImpl implements IUserService {
 
         // 新建未验证的学生用户
         UserEntity user = UserEntity.builder()
+                .userId(requestedUserId)
                 .username(req.getUsername())
                 .nickname(req.getUsername())
                 .identityType(IdentityType.STUDENT)
@@ -160,6 +164,40 @@ public class UserServiceImpl implements IUserService {
         userWalletsMapper.insert(userWallets);
 
         userInviteService.bindAtRegistration(user.getUserId(), req.getInviteCode());
+        return user.getUserId();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long createUserInternal(UserRegisterReqDTO req) {
+        String defaultPassword = userProperties.getDefaultPassword();
+        if (StrUtil.isBlank(defaultPassword)) {
+            throw new ServiceException(UserError.USER_DEFAULT_PASSWORD_NOT_CONFIGURED);
+        }
+
+        AuthRegisterRequest registerRequest = new AuthRegisterRequest();
+        registerRequest.setUsername(req.getUsername());
+        registerRequest.setPassword(defaultPassword);
+        return register(registerRequest, req.getUserId());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long createUserAdmin(UserRegisterReqDTO req) {
+        Long userId = createUserInternal(req);
+        UserInfoAdminUpdateRequest userInfoUpdate =
+                BeanUtil.copyProperties(req, UserInfoAdminUpdateRequest.class);
+        userInfoUpdate.setUserId(userId);
+        updateUserInfoAdmin(userInfoUpdate);
+
+        if (req.getProfile() != null) {
+            UserProfileAdminUpdateRequest profileUpdate =
+                    BeanUtil.copyProperties(req.getProfile(), UserProfileAdminUpdateRequest.class);
+            profileUpdate.setUserId(userId);
+            updateProfileAdmin(profileUpdate);
+        }
+
+        return userId;
     }
 
     @Override
@@ -299,7 +337,9 @@ public class UserServiceImpl implements IUserService {
     public void updateProfileAdmin(UserProfileAdminUpdateRequest req) {
         UserProfileEntity userProfileEntity = new UserProfileEntity();
         BeanUtil.copyProperties(req, userProfileEntity,
-                CopyOptions.create().setIgnoreProperties("inviteCode"));
+                CopyOptions.create()
+                        .setIgnoreNullValue(true)
+                        .setIgnoreProperties("inviteCode"));
         userProfileMapper.updateById(userProfileEntity);
     }
 
@@ -312,6 +352,9 @@ public class UserServiceImpl implements IUserService {
     public void updateUserInfoAdmin(UserInfoAdminUpdateRequest req) {
         Long userId = req.getUserId();
         UserEntity userEntity = userMapper.selectById(userId);
+        if (req.getUserStatus() == null && req.getVerificationMode() != null) {
+            req.setUserStatus(UserStatus.NORMAL);
+        }
         boolean authContextChanged = (req.getIdentityType() != null && !req.getIdentityType().equals(userEntity.getIdentityType()))
                 || (req.getUserStatus() != null && !req.getUserStatus().equals(userEntity.getUserStatus()));
 
@@ -349,7 +392,7 @@ public class UserServiceImpl implements IUserService {
             userProfileMapper.update(null, updateWrapper);
         }
 
-        BeanUtil.copyProperties(req, userEntity);
+        BeanUtil.copyProperties(req, userEntity, CopyOptions.create().setIgnoreNullValue(true));
         userMapper.updateById(userEntity);
         if (authContextChanged) {
             redisCacheManager.deleteSessionsByUserId(userId);
