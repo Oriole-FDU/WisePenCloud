@@ -41,10 +41,10 @@ public class AdminBatchTaskController {
             summary = "创建批量任务",
             description = """
                     - 用途：创建由 type 选择执行器、meta 表达业务参数的通用批量任务，并生成独立任务项。
-                    - 请求：type 指定任务执行器；name 是管理端展示名称；meta 由对应执行器校验。RESOURCE_FORK 首版接收一个 NOTE 或 DRAWIO 源资源、固定版本、目标用户列表和统一文件夹路径。
-                    - 约束：当前身份必须是平台管理员；type 必须存在对应执行器；meta 必须满足执行器契约；单任务项数不能超过服务配置上限。
-                    - 处理：执行器校验并规范化 meta、批量校验目标用户、拆分任务项，在一个本地事务中保存 CREATED 任务；每次请求创建独立任务，本接口不发起执行。
-                    - 失败：任务类型无执行器 -> SysError.BATCH_TASK_TYPE_UNSUPPORTED；meta 非法 -> SysError.BATCH_TASK_META_INVALID；源资源不存在 -> SysError.RESOURCE_FORK_SOURCE_NOT_FOUND；源资源类型暂不支持 -> SysError.RESOURCE_FORK_TYPE_UNSUPPORTED。
+                    - 请求：type 指定任务执行器；name 是管理端展示名称；meta 由对应执行器校验。RESOURCE_FORK 接收一个 NOTE 或 DRAWIO 源资源、固定版本、目标用户列表和统一文件夹路径。USER_REGISTER 使用 users 数组传入 userId、用户账号字段和可选 profile 资料；userId 可为空，未提供时由用户服务生成。不接受密码、邀请码、钱包、生成后的个人邀请码或时间字段。
+                    - 约束：当前身份必须是平台管理员；type 必须存在对应执行器；meta 必须满足执行器契约；单任务项数不能超过服务配置上限。USER_REGISTER 在创建任务时校验认证信息组合：有学工号时必须指定认证方式且账号不能为 UNIDENTIFIED；校园身份认证必须同时提供学工号和邮箱；邮箱认证必须提供邮箱。其余单个用户字段由用户服务在任务项执行时校验。
+                    - 处理：执行器按 users 拆分独立任务项，在一个本地事务中保存 CREATED 任务。任务项执行时通过用户服务内部接口创建基础用户，再依次调用内部账号信息和资料更新接口设置用户信息。每次请求创建独立任务，本接口不发起执行。
+                    - 失败：任务类型无执行器 -> SysError.BATCH_TASK_TYPE_UNSUPPORTED；meta 结构非法 -> SysError.BATCH_TASK_META_INVALID；USER_REGISTER 用户数超过上限 -> BatchTaskError.USER_REGISTER_BATCH_SIZE_EXCEEDED；源资源不存在 -> BatchTaskError.RESOURCE_FORK_SOURCE_NOT_FOUND；源资源类型暂不支持 -> BatchTaskError.RESOURCE_FORK_TYPE_UNSUPPORTED。
                     - 响应：返回任务ID。
                     """
     )
