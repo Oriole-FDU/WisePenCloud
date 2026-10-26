@@ -13,7 +13,7 @@ import java.lang.annotation.Target;
  *
  * @author Oriole
  */
-@Target({ElementType.FIELD, ElementType.PARAMETER})
+@Target({ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER})
 @Retention(RetentionPolicy.RUNTIME)
 @Constraint(validatedBy = ValidUsernameValidator.class)
 public @interface ValidUsername {
