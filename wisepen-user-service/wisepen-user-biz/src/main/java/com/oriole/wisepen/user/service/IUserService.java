@@ -25,6 +25,10 @@ public interface IUserService {
 
     // 注册
     void register(AuthRegisterRequest req);
+    // 查询默认密码是否可用于内部批量注册
+    boolean isDefaultPasswordConfigured();
+    // 使用服务配置的默认密码注册单个用户
+    Long registerWithDefaultPassword(UserDefaultPasswordRegisterRequest req);
 
     // 发送重置密码邮件
     void sendResetMail(AuthPwdResetVerifyRequest req);

@@ -3,8 +3,11 @@ package com.oriole.wisepen.user.api.feign;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.user.api.domain.base.GroupDisplayBase;
 import com.oriole.wisepen.user.api.domain.base.UserDisplayBase;
+import com.oriole.wisepen.user.api.domain.dto.req.UserDefaultPasswordRegisterRequest;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
@@ -21,5 +24,11 @@ public interface RemoteUserService {
 
     @GetMapping("/internal/group/member/listGroupMemberIds")
     R<List<Long>> listGroupMemberIds(@RequestParam("groupId") Long groupId);
+
+    @GetMapping("/internal/user/isDefaultPasswordConfigured")
+    R<Boolean> isDefaultPasswordConfigured();
+
+    @PostMapping("/internal/user/registerWithDefaultPassword")
+    R<Long> registerWithDefaultPassword(@RequestBody UserDefaultPasswordRegisterRequest request);
 
 }

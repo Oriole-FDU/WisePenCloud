@@ -55,11 +55,12 @@ public class ResourceForkBatchTaskExecutor implements BatchTaskExecutor {
         try {
             taskMeta = objectMapper.readValue(task.getMeta(), ResourceForkTaskMeta.class);
         } catch (JsonProcessingException e) {
-            throw new ServiceException(SysError.BATCH_TASK_META_INVALID);
+            throw new ServiceException(
+                    SysError.BATCH_TASK_META_INVALID, "RESOURCE_FORK meta 数据无法解析，请检查字段类型和枚举值");
         }
 
         if (taskMeta.getTargetUserIds() == null || taskMeta.getTargetUserIds().isEmpty()) {
-            throw new ServiceException(SysError.BATCH_TASK_META_INVALID);
+            throw new ServiceException(SysError.BATCH_TASK_META_INVALID, "targetUserIds 不能为空");
         }
 
         // 去除空 targetUserId
@@ -67,13 +68,17 @@ public class ResourceForkBatchTaskExecutor implements BatchTaskExecutor {
                 .filter(Objects::nonNull)
                 .collect(Collectors.collectingAndThen(
                         Collectors.toCollection(LinkedHashSet::new), ArrayList::new));
-        if (targetUserIds.isEmpty()) throw new ServiceException(SysError.BATCH_TASK_META_INVALID);
+        if (targetUserIds.isEmpty()) {
+            throw new ServiceException(SysError.BATCH_TASK_META_INVALID, "targetUserIds 不能为空");
+        }
 
         List<String> folderPath = new ArrayList<>();
         if (taskMeta.getTargetFolderPath() != null) {
             for (String segment : taskMeta.getTargetFolderPath()) {
                 // 校验路径非空，去除文本中多余空格
-                if (!StringUtils.hasText(segment)) throw new ServiceException(SysError.BATCH_TASK_META_INVALID);
+                if (!StringUtils.hasText(segment)) {
+                    throw new ServiceException(SysError.BATCH_TASK_META_INVALID, "targetFolderPath 不能包含空路径");
+                }
                 folderPath.add(segment.trim());
             }
         }
@@ -115,7 +120,9 @@ public class ResourceForkBatchTaskExecutor implements BatchTaskExecutor {
         if (currentVersion == null) throw new ServiceException(BatchTaskError.RESOURCE_FORK_SOURCE_NOT_FOUND);
         Integer sourceVersion = taskMeta.getSourceVersion() == null ? currentVersion : taskMeta.getSourceVersion();
         // 版本配置检查
-        if (sourceVersion > currentVersion) throw new ServiceException(SysError.BATCH_TASK_META_INVALID);
+        if (sourceVersion > currentVersion) {
+            throw new ServiceException(SysError.BATCH_TASK_META_INVALID, "sourceVersion 不能大于资源最新版本");
+        }
         taskMeta.setSourceVersion(sourceVersion);
 
         taskMeta.setTargetResourceName(StringUtils.hasText(taskMeta.getTargetResourceName())
@@ -139,14 +146,16 @@ public class ResourceForkBatchTaskExecutor implements BatchTaskExecutor {
             }
             return items;
         } catch (JsonProcessingException e) {
-            throw new ServiceException(SysError.BATCH_TASK_META_INVALID);
+            throw new ServiceException(SysError.BATCH_TASK_META_INVALID, "RESOURCE_FORK 任务项 meta 序列化出错");
         }
     }
 
     @Override
     public BatchTaskItemEntity executeItem(BatchTaskItemEntity taskItem) {
+        ResourceForkTaskMeta taskMeta;
         try {
-            ResourceForkTaskMeta taskMeta = objectMapper.readValue(taskItem.getMeta(), ResourceForkTaskMeta.class);
+            taskMeta = objectMapper.readValue(taskItem.getMeta(), ResourceForkTaskMeta.class);
+
             long targetUserId = taskMeta.getTargetUserIds().get(0);
 
             String targetTagId = null;
@@ -198,7 +207,7 @@ public class ResourceForkBatchTaskExecutor implements BatchTaskExecutor {
             taskItem.setResult(objectMapper.writeValueAsString(result));
             return taskItem;
         } catch (JsonProcessingException e) {
-            throw new ServiceException(SysError.BATCH_TASK_META_INVALID);
+            throw new ServiceException(SysError.BATCH_TASK_META_INVALID, "RESOURCE_FORK 任务项 meta 解析出错");
         }
     }
 }

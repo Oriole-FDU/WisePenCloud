@@ -19,6 +19,7 @@ import com.oriole.wisepen.system.api.feign.RemoteMailService;
 import com.oriole.wisepen.user.api.config.UserProperties;
 import com.oriole.wisepen.user.api.domain.base.UserInfoBase;
 import com.oriole.wisepen.user.api.domain.base.UserProfileBase;
+import com.oriole.wisepen.user.api.domain.base.UserRegistrationBase;
 import com.oriole.wisepen.user.api.domain.dto.req.*;
 import com.oriole.wisepen.user.api.domain.dto.res.UserDetailInfoResponse;
 import com.oriole.wisepen.user.api.domain.dto.res.UserSearchUserResponse;
@@ -36,6 +37,8 @@ import com.oriole.wisepen.user.mapper.UserMapper;
 import com.oriole.wisepen.user.mapper.UserProfileMapper;
 import com.oriole.wisepen.user.strategy.UserVerificationStrategy;
 import com.oriole.wisepen.user.strategy.VerificationStrategyFactory;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,6 +66,7 @@ public class UserServiceImpl implements IUserService {
     private final RemoteMailService remoteMailService;
 
     private final UserProperties userProperties;
+    private final Validator validator;
 
     @Autowired
     private VerificationStrategyFactory strategyFactory;
@@ -130,22 +134,64 @@ public class UserServiceImpl implements IUserService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void register(AuthRegisterRequest req) {
+        UserRegistrationBase userInfo = new UserRegistrationBase();
+        userInfo.setUsername(req.getUsername());
+        registerInternal(userInfo, req.getPassword(), req.getInviteCode());
+    }
+
+    @Override
+    public boolean isDefaultPasswordConfigured() {
+        return StrUtil.isNotBlank(userProperties.getDefaultPassword());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long registerWithDefaultPassword(UserDefaultPasswordRegisterRequest req) {
+        if (!isDefaultPasswordConfigured()) {
+            throw new ServiceException(UserError.USER_DEFAULT_PASSWORD_NOT_CONFIGURED);
+        }
+
+        Set<ConstraintViolation<UserDefaultPasswordRegisterRequest>> violations = validator.validate(req);
+        if (!violations.isEmpty()) {
+            String violationMessage = violations.iterator().next().getMessage();
+            throw new ServiceException(UserError.USER_REGISTRATION_INFO_INVALID, violationMessage);
+        }
+
+        return registerInternal(req, userProperties.getDefaultPassword(), req.getInviteCode()).getUserId();
+    }
+
+    private UserEntity registerInternal(UserRegistrationBase userInfo, String password, String inviteCode) {
+        if (userInfo.getUserId() != null && userMapper.selectById(userInfo.getUserId()) != null) {
+            throw new ServiceException(UserError.USER_ID_ALREADY_EXISTS);
+        }
         // 校验用户名是否存在
         if (userMapper
-                .selectCount(Wrappers.<UserEntity>lambdaQuery().eq(UserEntity::getUsername, req.getUsername())) > 0) {
+                .selectCount(Wrappers.<UserEntity>lambdaQuery().eq(UserEntity::getUsername, userInfo.getUsername())) > 0) {
             throw new ServiceException(UserError.USERNAME_ALREADY_EXISTS);
         }
 
-        // 新建未验证的学生用户
+        UserStatus userStatus = userInfo.getUserStatus();
+        if (userStatus == null) {
+            userStatus = userInfo.getVerificationMode() == null ? UserStatus.UNIDENTIFIED : UserStatus.NORMAL;
+        }
+
         UserEntity user = UserEntity.builder()
-                .username(req.getUsername())
-                .nickname(req.getUsername())
-                .identityType(IdentityType.STUDENT)
-                .userStatus(UserStatus.UNIDENTIFIED)
+                .userId(userInfo.getUserId())
+                .username(userInfo.getUsername())
+                .nickname(StrUtil.blankToDefault(userInfo.getNickname(), userInfo.getUsername()))
+                .avatar(userInfo.getAvatar())
+                .identityType(userInfo.getIdentityType() == null ? IdentityType.STUDENT : userInfo.getIdentityType())
+                .realName(userInfo.getRealName())
+                .campusNo(userInfo.getCampusNo())
+                .email(userInfo.getEmail())
+                .mobile(userInfo.getMobile())
+                .verificationMode(userInfo.getVerificationMode())
+                .verificationProviderCode(userInfo.getVerificationProviderCode())
+                .userStatus(userStatus)
                 .build();
 
         // 加密用户密码
-        user.setPassword(BCrypt.hashpw(req.getPassword()));
+        user.setPassword(BCrypt.hashpw(password));
         userMapper.insert(user);
 
         // 新建档案
@@ -153,13 +199,18 @@ public class UserServiceImpl implements IUserService {
                 .userId(user.getUserId())
                 .inviteCode(userInviteService.generateInviteCode())
                 .build();
+        if (userInfo.getProfile() != null) {
+            BeanUtil.copyProperties(userInfo.getProfile(), userProfile,
+                    CopyOptions.create().setIgnoreNullValue(true));
+        }
         userProfileMapper.insert(userProfile);
 
         UserWalletEntity userWallets = UserWalletEntity.builder().userId(user.getUserId())
                 .tokenBalance(0).tokenUsed(0).coinBalance(0).build();
         userWalletsMapper.insert(userWallets);
 
-        userInviteService.bindAtRegistration(user.getUserId(), req.getInviteCode());
+        userInviteService.bindAtRegistration(user.getUserId(), inviteCode);
+        return user;
     }
 
     @Override

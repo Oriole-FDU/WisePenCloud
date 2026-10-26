@@ -6,6 +6,7 @@ import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.user.api.domain.base.GroupDisplayBase;
 import com.oriole.wisepen.user.api.domain.base.UserDisplayBase;
 import com.oriole.wisepen.user.api.domain.dto.req.MessagePublishRequest;
+import com.oriole.wisepen.user.api.domain.dto.req.UserDefaultPasswordRegisterRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.WalletSettleCoinTradeRequest;
 import com.oriole.wisepen.user.api.feign.RemoteUserMessageService;
 import com.oriole.wisepen.user.api.feign.RemoteUserService;
@@ -13,6 +14,7 @@ import com.oriole.wisepen.user.api.feign.RemoteWalletService;
 import com.oriole.wisepen.user.service.IDisplayService;
 import com.oriole.wisepen.user.service.IGroupMemberService;
 import com.oriole.wisepen.user.service.IMessageService;
+import com.oriole.wisepen.user.service.IUserService;
 import com.oriole.wisepen.user.service.IWalletService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,7 +31,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-@Tag(name = "内部 - 用户", description = "供其他微服务查询用户与小组展示信息、发布站内消息并结算钱包交易")
+@Tag(name = "内部 - 用户", description = "供其他微服务注册用户、查询用户与小组展示信息、发布站内消息并结算钱包交易")
 @RestController
 @RequestMapping("/internal")
 @RequiredArgsConstructor
@@ -37,6 +39,7 @@ public class InternalController implements RemoteUserService, RemoteWalletServic
 
     private final IDisplayService displayService;
     private final IGroupMemberService groupMemberService;
+    private final IUserService userService;
     private final IWalletService walletService;
     private final IMessageService messageService;
 
@@ -89,6 +92,41 @@ public class InternalController implements RemoteUserService, RemoteWalletServic
     @GetMapping("/group/member/listGroupMemberIds")
     public R<List<Long>> listGroupMemberIds(@RequestParam("groupId") Long groupId) {
         return R.ok(groupMemberService.listGroupMemberIds(groupId));
+    }
+
+    @Override
+    @Operation(
+            summary = "内部检查默认密码配置",
+            description = """
+                    - 用途：供系统服务创建批量用户注册任务前确认用户服务可以生成默认初始密码。
+                    - 请求：无需请求参数。
+                    - 约束：调用方必须来自可信服务链路。
+                    - 处理：仅检查用户服务默认密码配置是否存在且非空；不读取、返回或记录密码内容。
+                    - 失败：无业务失败点。
+                    - 响应：返回默认密码是否已配置。
+                    """
+    )
+    @GetMapping("/user/isDefaultPasswordConfigured")
+    public R<Boolean> isDefaultPasswordConfigured() {
+        return R.ok(userService.isDefaultPasswordConfigured());
+    }
+
+    @Override
+    @Operation(
+            summary = "内部使用默认密码注册用户",
+            description = """
+                    - 用途：供系统服务逐项执行批量用户注册。
+                    - 请求：userId 可选；username 指定待注册用户名；nickname、avatar、identityType、realName、campusNo、email、mobile、verificationMode、verificationProviderCode、userStatus 和 profile 均为可选用户资料；inviteCode 可选，表示注册时使用的邀请码。请求不接收密码、钱包或生成后的个人邀请码。
+                    - 约束：调用方必须来自可信服务链路；username 必须符合用户名校验规则且尚未占用；用户服务必须已配置默认密码。指定 campusNo 时必须指定认证方式且不能为 UNIDENTIFIED；校园认证必须同时指定 campusNo 和 email；邮箱认证必须指定 email；已认证账号必须指定 verificationMode。
+                    - 处理：读取用户服务本地配置的默认密码并执行共享用户信息校验，复用单用户注册事务创建账号、密码密文、用户资料、钱包和邀请关系。未显式提供 userStatus 时，存在 verificationMode 时归一为 NORMAL，否则归一为 UNIDENTIFIED；不返回或记录默认密码。
+                    - 失败：默认密码未配置 -> UserError.USER_DEFAULT_PASSWORD_NOT_CONFIGURED；用户认证信息组合非法或字段格式非法 -> UserError.USER_REGISTRATION_INFO_INVALID；用户ID重复 -> UserError.USER_ID_ALREADY_EXISTS；用户名重复 -> UserError.USERNAME_ALREADY_EXISTS；邀请码不存在 -> UserError.INVITE_CODE_NOT_FOUND。
+                    - 响应：返回新创建用户的 userId。
+                    """
+    )
+    @PostMapping("/user/registerWithDefaultPassword")
+    public R<Long> registerWithDefaultPassword(
+            @RequestBody UserDefaultPasswordRegisterRequest request) {
+        return R.ok(userService.registerWithDefaultPassword(request));
     }
 
     @Override
