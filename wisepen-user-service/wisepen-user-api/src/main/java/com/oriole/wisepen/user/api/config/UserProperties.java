@@ -16,5 +16,6 @@ public class UserProperties {
 
     private String authCookieDomain;
 
+    /** 管理端创建用户时使用的默认密码，由 Nacos 配置 */
     private String defaultPassword;
 }
