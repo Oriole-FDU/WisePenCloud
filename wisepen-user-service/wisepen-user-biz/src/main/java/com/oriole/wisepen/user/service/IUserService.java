@@ -24,7 +24,7 @@ public interface IUserService {
     List<UserSearchUserResponse> listUserSearchSuggestions(Set<Long> groupIds, String keyword, Integer size);
 
     // 注册
-    void register(AuthRegisterRequest req);
+    Long register(AuthRegisterRequest req);
 
     // 发送重置密码邮件
     void sendResetMail(AuthPwdResetVerifyRequest req);
@@ -39,6 +39,7 @@ public interface IUserService {
     void updateProfile(Long userId, UserProfileUpdateRequest req);
 
     // 仅限管理员使用
+    Long createUserAdmin(UserRegisterReqDTO req);
     void resetPasswordAdmin(AuthPwdAdminResetRequest req);
     void updateUserInfoAdmin(UserInfoAdminUpdateRequest req);
     void updateProfileAdmin(UserProfileAdminUpdateRequest req);

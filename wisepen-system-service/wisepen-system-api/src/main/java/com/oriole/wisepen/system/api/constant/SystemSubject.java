@@ -8,6 +8,7 @@ public enum SystemSubject implements IBusinessSubject {
     MAIL,
     BATCH_TASK,
     BATCH_TASK_RESOURCE_FORK,
+    BATCH_TASK_USER_REGISTER,
     ;
 
     @Override
