@@ -1,8 +1,10 @@
 package com.oriole.wisepen.user.api.domain.dto.req;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.oriole.wisepen.user.api.constant.UserRegexPatterns;
 import com.oriole.wisepen.user.api.constant.UserValidationMsg;
 import com.oriole.wisepen.user.api.domain.base.UserInfoBase;
+import com.oriole.wisepen.user.api.domain.base.UserProfileBase;
 import com.oriole.wisepen.user.api.validation.ValidUserRegistration;
 import com.oriole.wisepen.user.api.validation.ValidUsername;
 import jakarta.validation.Valid;
@@ -17,7 +19,8 @@ import lombok.EqualsAndHashCode;
 public class UserRegisterReqDTO extends UserInfoBase {
 
     @Valid
-    private UserRegisterProfileDTO profile;
+    @JsonIgnoreProperties("inviteCode")
+    private UserProfileBase profile;
 
     @Override
     @NotBlank(message = UserValidationMsg.USERNAME_EMPTY)
