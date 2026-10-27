@@ -6,8 +6,6 @@ import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.user.api.domain.base.GroupDisplayBase;
 import com.oriole.wisepen.user.api.domain.base.UserDisplayBase;
 import com.oriole.wisepen.user.api.domain.dto.req.MessagePublishRequest;
-import com.oriole.wisepen.user.api.domain.dto.req.UserInfoAdminUpdateRequest;
-import com.oriole.wisepen.user.api.domain.dto.req.UserProfileAdminUpdateRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.UserRegisterReqDTO;
 import com.oriole.wisepen.user.api.domain.dto.req.WalletSettleCoinTradeRequest;
 import com.oriole.wisepen.user.api.feign.RemoteUserMessageService;
@@ -33,7 +31,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-@Tag(name = "内部 - 用户", description = "供其他微服务创建和维护用户、查询用户与小组展示信息、发布站内消息并结算钱包交易")
+@Tag(name = "内部 - 用户", description = "供其他微服务创建用户、查询用户与小组展示信息、发布站内消息并结算钱包交易")
 @RestController
 @RequestMapping("/internal")
 @RequiredArgsConstructor
@@ -101,10 +99,10 @@ public class InternalController implements RemoteUserService, RemoteWalletServic
             summary = "内部创建用户",
             description = """
                     - 用途：供系统服务执行已授权的用户创建任务。
-                    - 请求：userId 可选，username 指定新账号用户名；用户账号字段和 profile 用于后续资料设置。
-                    - 约束：调用方必须来自可信服务链路；username 必须符合用户规则且全局唯一；显式 userId 不能已存在；用户服务必须已配置默认初始密码。
-                    - 处理：仅创建基础账号、密码密文、用户资料行和钱包，不写账号扩展字段或资料详情；不绑定邀请关系。
-                    - 失败：默认密码未配置 -> UserError.USER_DEFAULT_PASSWORD_NOT_CONFIGURED；userId 重复 -> UserError.USER_ID_ALREADY_EXISTS；用户名重复 -> UserError.USERNAME_ALREADY_EXISTS。
+                    - 请求：username 指定新账号用户名；nickname、avatar、identityType、realName、campusNo、email、mobile、verificationMode、verificationProviderCode、userStatus 为可选账号字段；profile 为可选用户资料。
+                    - 约束：调用方必须来自可信服务链路；username 必须符合用户规则且全局唯一；用户服务必须已配置默认初始密码；学工号、邮箱、手机号和认证方式组合必须满足用户注册校验。
+                    - 处理：在同一事务中使用服务端默认密码创建账号，userId 由系统自动生成；随后初始化资料和钱包，复用管理员账号更新和资料更新逻辑写入请求字段，不绑定邀请关系。
+                    - 失败：默认密码未配置 -> UserError.USER_DEFAULT_PASSWORD_NOT_CONFIGURED；用户名重复 -> UserError.USERNAME_ALREADY_EXISTS；学工号冲突 -> UserError.CAMPUS_NO_ALREADY_EXISTS。
                     - 响应：返回新创建用户的 userId。
                     """
     )
@@ -112,47 +110,7 @@ public class InternalController implements RemoteUserService, RemoteWalletServic
             isSaveRequestData = false, isSaveResponseData = false)
     @PostMapping("/user/createUser")
     public R<Long> createUser(@RequestBody @Valid UserRegisterReqDTO req) {
-        return R.ok(userService.createUserInternal(req));
-    }
-
-    @Override
-    @Operation(
-            summary = "内部更新用户账号信息",
-            description = """
-                    - 用途：供系统服务为用户创建任务补充账号展示、认证和状态信息。
-                    - 请求：userId 指定目标用户；其余字段属于 sys_user 账号信息。
-                    - 约束：调用方必须来自可信服务链路；目标用户必须存在；用户名和正常状态学工号必须唯一。
-                    - 处理：复用管理员账号更新规则写入账号字段，并在未传 userStatus 但有 verificationMode 时设置为 NORMAL。
-                    - 失败：用户名重复 -> UserError.USERNAME_ALREADY_EXISTS；学工号冲突 -> UserError.CAMPUS_NO_ALREADY_EXISTS。
-                    - 响应：成功时返回空结果。
-                    """
-    )
-    @Log(title = "内部更新用户账号信息", businessType = BusinessType.UPDATE,
-            isSaveRequestData = false, isSaveResponseData = false)
-    @PostMapping("/user/changeUserInfo")
-    public R<Void> changeUserInfo(@RequestBody UserInfoAdminUpdateRequest req) {
-        userService.updateUserInfoAdmin(req);
-        return R.ok();
-    }
-
-    @Override
-    @Operation(
-            summary = "内部更新用户资料信息",
-            description = """
-                    - 用途：供系统服务为用户创建任务补充学籍、院系、专业、班级、学历和职称资料。
-                    - 请求：userId 指定目标用户；其余字段属于 sys_user_profile 资料信息。
-                    - 约束：调用方必须来自可信服务链路；目标用户资料记录必须存在。
-                    - 处理：复用管理员资料更新规则写入资料字段；忽略 inviteCode，不修改账号、状态、密码或钱包。
-                    - 失败：无业务失败点。
-                    - 响应：成功时返回空结果。
-                    """
-    )
-    @Log(title = "内部更新用户资料信息", businessType = BusinessType.UPDATE,
-            isSaveRequestData = false, isSaveResponseData = false)
-    @PostMapping("/user/changeUserProfile")
-    public R<Void> changeUserProfile(@RequestBody UserProfileAdminUpdateRequest req) {
-        userService.updateProfileAdmin(req);
-        return R.ok();
+        return R.ok(userService.createUserAdmin(req));
     }
 
     @Override

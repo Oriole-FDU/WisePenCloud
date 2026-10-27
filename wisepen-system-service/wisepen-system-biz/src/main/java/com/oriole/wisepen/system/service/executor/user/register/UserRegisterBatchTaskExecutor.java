@@ -1,11 +1,9 @@
 package com.oriole.wisepen.system.service.executor.user.register;
 
-import cn.hutool.core.bean.BeanUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.oriole.wisepen.common.core.domain.R;
-import com.oriole.wisepen.common.core.domain.enums.UserStatus;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.system.api.enums.BatchTaskItemStatus;
 import com.oriole.wisepen.system.api.enums.BatchTaskType;
@@ -14,17 +12,12 @@ import com.oriole.wisepen.system.domain.entity.BatchTaskItemEntity;
 import com.oriole.wisepen.system.excpetion.BatchTaskError;
 import com.oriole.wisepen.system.excpetion.SysError;
 import com.oriole.wisepen.system.service.batch.BatchTaskExecutor;
-import com.oriole.wisepen.user.api.constant.UserValidationMsg;
-import com.oriole.wisepen.user.api.domain.dto.req.UserInfoAdminUpdateRequest;
-import com.oriole.wisepen.user.api.domain.dto.req.UserProfileAdminUpdateRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.UserRegisterReqDTO;
-import com.oriole.wisepen.user.api.enums.UserVerificationMode;
 import com.oriole.wisepen.user.api.feign.RemoteUserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -64,7 +57,7 @@ public class UserRegisterBatchTaskExecutor implements BatchTaskExecutor {
             task.setMeta(objectMapper.writeValueAsString(taskMeta));
 
             List<BatchTaskItemEntity> items = new ArrayList<>(taskMeta.getUsers().size());
-            for (UserRegisterTaskMeta.UserMeta user : taskMeta.getUsers()) {
+            for (UserRegisterReqDTO user : taskMeta.getUsers()) {
                 UserRegisterTaskMeta itemMeta = new UserRegisterTaskMeta();
                 itemMeta.setUsers(List.of(user));
                 items.add(BatchTaskItemEntity.builder()
@@ -87,13 +80,7 @@ public class UserRegisterBatchTaskExecutor implements BatchTaskExecutor {
                 throw new ServiceException(SysError.BATCH_TASK_META_INVALID);
             }
 
-            UserRegisterTaskMeta.UserMeta user = taskMeta.getUsers().getFirst();
-            UserRegisterReqDTO registerRequest;
-            try {
-                registerRequest = objectMapper.convertValue(user, UserRegisterReqDTO.class);
-            } catch (IllegalArgumentException e) {
-                throw new ServiceException(SysError.BATCH_TASK_ITEM_EXECUTION_FAILED, e.getMessage());
-            }
+            UserRegisterReqDTO registerRequest = taskMeta.getUsers().getFirst();
 
             R<Long> createResponse = remoteUserService.createUser(registerRequest);
             ensureRemoteSuccess(createResponse);
@@ -102,21 +89,9 @@ public class UserRegisterBatchTaskExecutor implements BatchTaskExecutor {
                 throw new ServiceException(SysError.BATCH_TASK_ITEM_EXECUTION_FAILED);
             }
 
-            UserInfoAdminUpdateRequest userInfoUpdate =
-                    BeanUtil.copyProperties(registerRequest, UserInfoAdminUpdateRequest.class);
-            userInfoUpdate.setUserId(userId);
-            ensureRemoteSuccess(remoteUserService.changeUserInfo(userInfoUpdate));
-
-            if (registerRequest.getProfile() != null) {
-                UserProfileAdminUpdateRequest profileUpdate =
-                        BeanUtil.copyProperties(registerRequest.getProfile(), UserProfileAdminUpdateRequest.class);
-                profileUpdate.setUserId(userId);
-                ensureRemoteSuccess(remoteUserService.changeUserProfile(profileUpdate));
-            }
-
             ObjectNode result = objectMapper.createObjectNode()
                     .put("userId", userId)
-                    .put("username", user.getUsername());
+                    .put("username", registerRequest.getUsername());
             taskItem.setResult(objectMapper.writeValueAsString(result));
             return taskItem;
         } catch (JsonProcessingException e) {
