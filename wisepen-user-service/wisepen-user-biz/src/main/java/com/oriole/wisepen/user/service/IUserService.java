@@ -24,7 +24,7 @@ public interface IUserService {
     List<UserSearchUserResponse> listUserSearchSuggestions(Set<Long> groupIds, String keyword, Integer size);
 
     // 注册
-    Long register(AuthRegisterRequest req, Long requestedUserId);
+    Long register(AuthRegisterRequest req);
 
     // 发送重置密码邮件
     void sendResetMail(AuthPwdResetVerifyRequest req);

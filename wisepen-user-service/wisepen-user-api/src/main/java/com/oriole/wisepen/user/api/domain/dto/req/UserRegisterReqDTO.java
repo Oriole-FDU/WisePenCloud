@@ -16,8 +16,6 @@ import lombok.EqualsAndHashCode;
 @ValidUserRegistration
 public class UserRegisterReqDTO extends UserInfoBase {
 
-    private Long userId;
-
     @Valid
     private UserRegisterProfileDTO profile;
 
