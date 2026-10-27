@@ -38,8 +38,7 @@ public interface IUserService {
     // 更新用户Profile信息
     void updateProfile(Long userId, UserProfileUpdateRequest req);
 
-    // 管理端和内部服务使用
-    Long createUserInternal(UserRegisterReqDTO req);
+    // 仅限管理员使用
     Long createUserAdmin(UserRegisterReqDTO req);
     void resetPasswordAdmin(AuthPwdAdminResetRequest req);
     void updateUserInfoAdmin(UserInfoAdminUpdateRequest req);

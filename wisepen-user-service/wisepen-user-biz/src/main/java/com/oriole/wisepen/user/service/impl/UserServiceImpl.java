@@ -165,7 +165,7 @@ public class UserServiceImpl implements IUserService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Long createUserInternal(UserRegisterReqDTO req) {
+    public Long createUserAdmin(UserRegisterReqDTO req) {
         String defaultPassword = userProperties.getDefaultPassword();
         if (StrUtil.isBlank(defaultPassword)) {
             throw new ServiceException(UserError.USER_DEFAULT_PASSWORD_NOT_CONFIGURED);
@@ -174,13 +174,8 @@ public class UserServiceImpl implements IUserService {
         AuthRegisterRequest registerRequest = new AuthRegisterRequest();
         registerRequest.setUsername(req.getUsername());
         registerRequest.setPassword(defaultPassword);
-        return register(registerRequest);
-    }
+        Long userId = register(registerRequest);
 
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public Long createUserAdmin(UserRegisterReqDTO req) {
-        Long userId = createUserInternal(req);
         UserInfoAdminUpdateRequest userInfoUpdate =
                 BeanUtil.copyProperties(req, UserInfoAdminUpdateRequest.class);
         userInfoUpdate.setUserId(userId);
