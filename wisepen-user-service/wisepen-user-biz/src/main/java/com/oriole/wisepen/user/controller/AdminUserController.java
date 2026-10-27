@@ -8,8 +8,8 @@ import com.oriole.wisepen.common.core.domain.enums.UserStatus;
 import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.user.api.domain.dto.req.*;
-import com.oriole.wisepen.user.domain.entity.UserEntity;
-import com.oriole.wisepen.user.domain.entity.UserProfileEntity;
+import com.oriole.wisepen.user.api.domain.dto.res.UserAdminDetailResponse;
+import com.oriole.wisepen.user.api.domain.dto.res.UserAdminListItemResponse;
 import com.oriole.wisepen.user.service.IUserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "管理员 - 用户", description = "管理员查询用户、维护用户状态、资料与密码")
 @RestController
-@RequestMapping("/admin/user")
+@RequestMapping("/user/admin")
 @RequiredArgsConstructor
 @CheckRole(IdentityType.ADMIN)
 public class AdminUserController {
@@ -31,15 +31,15 @@ public class AdminUserController {
             description = """
                     - 用途：管理员按关键字、账号状态和身份类型筛选用户列表。
                     - 请求：keyword 支持真实姓名模糊匹配，或学工号、用户名、用户 ID 精确匹配；userStatus 和 identityType 为可选过滤条件；page 和 size 控制分页。
-                    - 约束：当前操作者必须具备管理员身份；keyword 作为用户 ID 匹配时需可转换为数字。
-                    - 处理：查询未逻辑删除用户并按创建时间倒序分页，返回前清空密码字段；不返回用户资料扩展详情。
+                    - 约束：当前操作者必须具备管理员身份；page 最小为 1，size 限制为 1 至 100。
+                    - 处理：查询未逻辑删除用户并按创建时间倒序分页，仅在 keyword 可转换为 Long 时增加用户 ID 匹配，返回专用列表 DTO。
                     - 失败：当前操作者不是管理员 -> PermissionError.UNAUTHORIZED。
                     - 响应：返回分页用户账号列表和总数。
                     """
     )
     @GetMapping("/getUserList")
     @Log(title = "管理员查询用户列表", businessType = BusinessType.SELECT)
-    public R<PageR<UserEntity>> getUserList(
+    public R<PageR<UserAdminListItemResponse>> getUserList(
             @RequestParam(value = "page", defaultValue = "1") int page,
             @RequestParam(value = "size", defaultValue = "20") int size,
             @RequestParam(required = false) String keyword,
@@ -50,19 +50,19 @@ public class AdminUserController {
     }
 
     @Operation(
-            summary = "获取用户资料详情",
+            summary = "获取用户详情",
             description = """
-                    - 用途：管理员查看指定用户的资料域详情。
+                    - 用途：管理员查看指定用户的账号、资料与当前认证摘要。
                     - 请求：userId 指定目标用户。
-                    - 约束：当前操作者必须具备管理员身份；目标用户资料记录必须存在。
-                    - 处理：读取 sys_user_profile 对应资料记录；不返回用户密码、钱包余额或小组成员信息。
+                    - 约束：当前操作者必须具备管理员身份。
+                    - 处理：聚合 sys_user 与 sys_user_profile 的账号及资料信息，认证方式和 Provider 编码平铺返回；钱包和流水通过独立接口加载。
                     - 失败：当前操作者不是管理员 -> PermissionError.UNAUTHORIZED。
-                    - 响应：返回目标用户资料实体。
+                    - 响应：返回目标用户账号、资料、认证摘要及账号创建和更新时间；账号或资料记录不存在时 data 为空。
                     """
     )
     @GetMapping("/getUserInfo")
     @Log(title = "管理员获取用户详情", businessType = BusinessType.SELECT)
-    public R<UserProfileEntity> getUserInfo(@RequestParam("userId") Long userId) {
+    public R<UserAdminDetailResponse> getUserInfo(@RequestParam("userId") Long userId) {
         return R.ok(userService.getUserDetailInfoAdmin(userId));
     }
 
