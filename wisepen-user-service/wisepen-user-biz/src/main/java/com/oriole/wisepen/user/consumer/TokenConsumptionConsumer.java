@@ -28,7 +28,7 @@ public class TokenConsumptionConsumer {
 	)
 	@AsyncListener(operation = @AsyncOperation(
 			channelName = TOPIC_TOKEN_CONSUMPTION,
-			description = "消费 Token 扣费事件，根据 traceId 对用户钱包执行 Token 消耗入账。",
+			description = "消费 Token 扣费事件，按首选小组、用户计费顺序和资源审批解析付款组，再完成小组优先、个人兜底的 Token 消耗入账。",
 			payloadType = TokenConsumptionMessage.class,
 			message = @AsyncMessage(name = "TokenConsumptionMessage", title = "Token 扣费事件")
 	))

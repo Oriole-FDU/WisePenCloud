@@ -9,12 +9,14 @@ import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.core.domain.enums.GroupType;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.user.api.domain.base.UserDisplayBase;
+import com.oriole.wisepen.user.api.domain.dto.req.GroupAiBillingPolicyUpdateRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupCreateRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupDeleteRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupMemberJoinRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupUpdateRequest;
 import com.oriole.wisepen.user.api.domain.dto.res.GroupDetailInfoResponse;
 import com.oriole.wisepen.user.api.domain.dto.res.GroupItemInfoResponse;
+import com.oriole.wisepen.user.api.enums.AiBillingPolicy;
 import com.oriole.wisepen.user.api.enums.GroupRoleFilter;
 import com.oriole.wisepen.user.api.enums.TokenTransferType;
 import com.oriole.wisepen.user.cache.RedisCacheManager;
@@ -72,6 +74,7 @@ public class GroupServiceImpl implements IGroupService {
                 .inviteCode(IdUtil.fastSimpleUUID().substring(0, 8))
                 .tokenUsed(0)
                 .tokenBalance(0)
+                .aiBillingPolicy(AiBillingPolicy.REVIEW_REQUIRED)
                 .build();
 
         BeanUtil.copyProperties(req, group, "ownerId", "inviteCode", "tokenUsed", "tokenBalance");
@@ -87,6 +90,17 @@ public class GroupServiceImpl implements IGroupService {
         group.setUpdateTime(LocalDateTime.now());
         int rows = groupMapper.updateById(group);
         if (rows == 0) {
+            throw new ServiceException(UserError.GROUP_NOT_EXIST);
+        }
+    }
+
+    @Override
+    public void updateAiBillingPolicy(GroupAiBillingPolicyUpdateRequest req) {
+        GroupEntity group = new GroupEntity();
+        group.setGroupId(req.getGroupId());
+        group.setAiBillingPolicy(req.getAiBillingPolicy());
+        group.setUpdateTime(LocalDateTime.now());
+        if (groupMapper.updateById(group) == 0) {
             throw new ServiceException(UserError.GROUP_NOT_EXIST);
         }
     }
@@ -172,6 +186,9 @@ public class GroupServiceImpl implements IGroupService {
     public GroupDetailInfoResponse getGroupDetailInfoById(Long groupId) {
         GroupEntity group = getGroupInfoById(groupId);
         GroupDetailInfoResponse resp = BeanUtil.copyProperties(group, GroupDetailInfoResponse.class);
+        if (resp.getAiBillingPolicy() == null) {
+            resp.setAiBillingPolicy(AiBillingPolicy.REVIEW_REQUIRED);
+        }
         resp.setOwnerInfo(displayService.getUserDisplayInfoByIds(Set.of(group.getOwnerId())).get(group.getOwnerId()));
         return resp;
     }

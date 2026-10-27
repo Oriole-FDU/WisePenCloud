@@ -117,6 +117,23 @@ public class InternalResourceItemController implements RemoteResourceService {
         return R.ok(hasPermission);
     }
 
+    @Override
+    @Operation(
+            summary = "内部查询资源 AI 计费审批小组",
+            description = """
+                    - 用途：供用户服务在 Token 结算时查询已经审批为目标资源承担 AI 费用的小组。
+                    - 请求：resourceId 指定目标 Agent 资源。
+                    - 约束：调用方必须通过内部服务调用边界。
+                    - 处理：读取资源的小组挂载关系，仅返回普通小组中 aiBillingApproved=true 的小组 ID；不判断用户角色、小组计费策略、钱包余额或用户偏好顺序。
+                    - 失败：底层资源查询发生未处理异常 -> CommonError.INTERNAL_ERROR；资源不存在、已删除或不是 Agent 时按空列表处理。
+                    - 响应：返回已审批小组 ID 列表。
+                    """
+    )
+    @PostMapping("/listAiBillingApprovedGroupIds")
+    public R<List<String>> listAiBillingApprovedGroupIds(@RequestParam("resourceId") String resourceId) {
+        return R.ok(resourceService.listAiBillingApprovedGroupIds(resourceId));
+    }
+
     @Operation(
             summary = "内部确保个人文件夹",
             description = """

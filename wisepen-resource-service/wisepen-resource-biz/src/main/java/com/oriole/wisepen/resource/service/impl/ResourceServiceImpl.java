@@ -12,6 +12,7 @@ import com.oriole.wisepen.resource.domain.ComputedGroupAcl;
 import com.oriole.wisepen.resource.domain.GroupTagBind;
 import com.oriole.wisepen.resource.domain.MarketSaleInfo;
 import com.oriole.wisepen.resource.domain.dto.*;
+import com.oriole.wisepen.resource.domain.dto.req.ResourceAiBillingApprovalUpdateRequest;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceRenameRequest;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceUpdateActionPermissionRequest;
 import com.oriole.wisepen.resource.domain.dto.res.ResourceBaseInfoResponse;
@@ -446,6 +447,40 @@ public class ResourceServiceImpl implements IResourceService {
 
         // 保存资源级权限覆盖后，触发重算
         eventPublisher.publishAclRecalculateEvent(entity.getResourceId(), "RESOURCE_ACTION_PERMISSION_CHANGED");
+    }
+
+    @Override
+    public void updateAiBillingApproval(ResourceAiBillingApprovalUpdateRequest req) {
+        ResourceItemEntity entity = getResourceEntity(req.getResourceId());
+        if (entity.getResourceType() != ResourceType.AGENT || entity.getGroupBinds() == null) {
+            throw new ServiceException(ResourceError.RESOURCE_AI_BILLING_APPROVAL_NOT_ALLOWED);
+        }
+
+        GroupTagBind groupBind = entity.getGroupBinds().stream()
+                .filter(bind -> req.getGroupId().equals(bind.getGroupId()) && bind.getMarketSaleInfo() == null).findFirst()
+                .orElseThrow(() -> new ServiceException(ResourceError.RESOURCE_AI_BILLING_APPROVAL_NOT_ALLOWED));
+        groupBind.setAiBillingApproved(req.getApproved());
+        resourceItemRepository.save(entity);
+        log.info("resource AI billing approval changed. resourceId={} groupId={} approved={}",
+                req.getResourceId(), req.getGroupId(), req.getApproved());
+    }
+
+    @Override
+    public List<String> listAiBillingApprovedGroupIds(String resourceId) {
+        if (!StringUtils.hasText(resourceId)) {
+            return Collections.emptyList();
+        }
+        ResourceItemEntity entity = getResourceEntity(resourceId);
+
+        if (entity.getResourceType() != ResourceType.AGENT || entity.getGroupBinds() == null) {
+            return Collections.emptyList();
+        }
+        return entity.getGroupBinds().stream()
+                .filter(bind -> bind.getMarketSaleInfo() == null)
+                .filter(bind -> Boolean.TRUE.equals(bind.getAiBillingApproved()))
+                .map(GroupTagBind::getGroupId)
+                .distinct()
+                .toList();
     }
 
     @Override

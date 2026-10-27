@@ -1,7 +1,6 @@
 package com.oriole.wisepen.user.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
-import com.oriole.wisepen.common.core.domain.enums.GroupType;
 import com.oriole.wisepen.user.api.domain.base.GroupInfoBase;
 import lombok.AllArgsConstructor;
 import lombok.Data;

@@ -3,12 +3,15 @@ package com.oriole.wisepen.user.controller;
 import com.oriole.wisepen.common.core.context.SecurityContextHolder;
 import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.R;
+import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.core.domain.enums.GroupType;
 import com.oriole.wisepen.common.core.domain.enums.IdentityType;
+import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.common.security.exception.PermissionError;
 import com.oriole.wisepen.common.security.exception.PermissionException;
+import com.oriole.wisepen.user.api.domain.dto.req.GroupAiBillingPolicyUpdateRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupCreateRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupDeleteRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupMemberJoinRequest;
@@ -115,6 +118,25 @@ public class GroupController {
 	}
 
 	@Operation(
+			summary = "设置小组 AI 计费策略",
+			description = """
+					- 用途：由小组管理员设置成员使用小组钱包支付 AI 调用费用的授权模式。
+					- 请求：groupId 指定目标小组；aiBillingPolicy 指定禁用、按资源审批或自由计费。
+					- 约束：当前用户必须是目标小组 OWNER 或 ADMIN。
+					- 处理：更新小组主记录的 AI 计费策略；不修改资源审批、成员计费顺序或钱包余额。
+					- 失败：当前用户不是小组 OWNER/ADMIN -> PermissionError.PERMISSION_DENIED；目标小组不存在 -> UserError.GROUP_NOT_EXIST。
+					- 响应：成功时返回空结果。
+					"""
+	)
+	@Log(title = "修改小组 AI 计费策略", businessType = BusinessType.UPDATE)
+	@PostMapping("/changeAiBillingPolicy")
+	public R<Void> updateAiBillingPolicy(@RequestBody @Valid GroupAiBillingPolicyUpdateRequest req) {
+		SecurityContextHolder.assertGroupRole(req.getGroupId(), GroupRoleType.OWNER, GroupRoleType.ADMIN);
+		groupService.updateAiBillingPolicy(req);
+		return R.ok();
+	}
+
+	@Operation(
 			summary = "解散小组",
 			description = """
 					- 用途：小组 OWNER 解散目标小组。
@@ -176,7 +198,7 @@ public class GroupController {
 					- 用途：查询小组管理视角下的详细信息。
 					- 请求：groupId 指定目标小组。
 					- 约束：当前用户必须已登录，且是目标小组 OWNER 或 ADMIN。
-					- 处理：读取小组主记录并补充 OWNER 展示信息；不返回成员分页列表。
+					- 处理：读取小组主记录并补充 OWNER 展示信息和 AI 计费策略；不返回成员分页列表。
 					- 失败：未登录 -> PermissionError.NOT_LOGIN；当前用户不是小组 OWNER/ADMIN -> PermissionError.PERMISSION_DENIED；目标小组不存在 -> UserError.GROUP_NOT_EXIST。
 					- 响应：返回小组详细信息。
 					"""

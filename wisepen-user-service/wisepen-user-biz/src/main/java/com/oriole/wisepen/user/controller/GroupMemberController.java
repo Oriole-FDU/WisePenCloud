@@ -3,8 +3,11 @@ package com.oriole.wisepen.user.controller;
 import com.oriole.wisepen.common.core.context.SecurityContextHolder;
 import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.R;
+import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
+import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.security.annotation.CheckRole;
+import com.oriole.wisepen.user.api.domain.dto.req.AiBillingGroupOrderUpdateRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupMemberKickRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupMemberRoleUpdateRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupMemberQuitRequest;
@@ -20,6 +23,8 @@ import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @Tag(name = "小组成员", description = "小组成员退出、移除、角色、配额与列表查询")
 @RestController
@@ -137,6 +142,40 @@ public class GroupMemberController {
 	@GetMapping("/getMyRole")
 	public R<GroupRoleType> getMyRole(@RequestParam("groupId") Long groupId) {
 		return R.ok(SecurityContextHolder.getGroupRole(groupId));
+	}
+
+	@Operation(
+			summary = "查询 AI 计费小组顺序",
+			description = """
+					- 用途：查询当前用户在 AI 调用中优先尝试使用的小组钱包顺序。
+					- 请求：无业务请求参数。
+					- 约束：当前用户必须已登录。
+					- 处理：读取当前用户仍有效的小组成员关系，已主动排序的小组优先，其余小组按加入时间排列。
+					- 失败：未登录 -> PermissionError.NOT_LOGIN。
+					- 响应：返回小组 ID 有序列表。
+					"""
+	)
+	@GetMapping("/getMyAiBillingGroupOrder")
+	public R<List<Long>> getMyAiBillingGroupOrder() {
+		return R.ok(groupMemberService.listAiBillingGroupOrder(SecurityContextHolder.getUserId()));
+	}
+
+	@Operation(
+			summary = "设置 AI 计费小组顺序",
+			description = """
+					- 用途：设置当前用户在 AI 调用中优先尝试使用的小组钱包顺序。
+					- 请求：orderedGroupIds 按优先级给出小组 ID，可为空列表以清除主动排序。
+					- 约束：当前用户必须已登录，列表内小组必须都是当前用户仍加入的小组。
+					- 处理：去重后保存列表顺序；未列出的小组保留为未主动排序并排在其后；不改变小组计费策略、资源审批或钱包余额。
+					- 失败：未登录 -> PermissionError.NOT_LOGIN；列表包含非成员小组 -> UserError.GROUP_MEMBER_NOT_FOUND。
+					- 响应：成功时返回空结果。
+					"""
+	)
+	@Log(title = "修改 AI 计费小组顺序", businessType = BusinessType.UPDATE)
+	@PostMapping("/changeMyAiBillingGroupOrder")
+	public R<Void> updateMyAiBillingGroupOrder(@RequestBody @Valid AiBillingGroupOrderUpdateRequest req) {
+		groupMemberService.updateAiBillingGroupOrder(req, SecurityContextHolder.getUserId());
+		return R.ok();
 	}
 
 	@Operation(
