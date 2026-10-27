@@ -106,7 +106,7 @@ public class AuthController {
     )
     @PostMapping("/register")
     public R<String> register(@Valid @RequestBody AuthRegisterRequest req) {
-        userService.register(req, null);
+        userService.register(req);
         return R.ok();
     }
 

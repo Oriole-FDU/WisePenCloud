@@ -129,10 +129,7 @@ public class UserServiceImpl implements IUserService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Long register(AuthRegisterRequest req, Long requestedUserId) {
-        if (requestedUserId != null && userMapper.selectById(requestedUserId) != null) {
-            throw new ServiceException(UserError.USER_ID_ALREADY_EXISTS);
-        }
+    public Long register(AuthRegisterRequest req) {
         // 校验用户名是否存在
         if (userMapper
                 .selectCount(Wrappers.<UserEntity>lambdaQuery().eq(UserEntity::getUsername, req.getUsername())) > 0) {
@@ -141,7 +138,6 @@ public class UserServiceImpl implements IUserService {
 
         // 新建未验证的学生用户
         UserEntity user = UserEntity.builder()
-                .userId(requestedUserId)
                 .username(req.getUsername())
                 .nickname(req.getUsername())
                 .identityType(IdentityType.STUDENT)
@@ -178,7 +174,7 @@ public class UserServiceImpl implements IUserService {
         AuthRegisterRequest registerRequest = new AuthRegisterRequest();
         registerRequest.setUsername(req.getUsername());
         registerRequest.setPassword(defaultPassword);
-        return register(registerRequest, req.getUserId());
+        return register(registerRequest);
     }
 
     @Override

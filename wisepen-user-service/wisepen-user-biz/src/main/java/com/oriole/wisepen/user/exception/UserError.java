@@ -23,7 +23,6 @@ public enum UserError implements IResult {
     // 用户相关异常
     USERNAME_ALREADY_EXISTS(3211, new ResultKey(BusinessDomain.USER, UserSubject.USER, ErrorReason.ALREADY_EXISTS), "用户名已存在"),
     CAMPUS_NO_ALREADY_EXISTS(3212, new ResultKey(BusinessDomain.USER, UserSubject.USER, ErrorReason.ALREADY_EXISTS), "学号已存在"),
-    USER_ID_ALREADY_EXISTS(3213, new ResultKey(BusinessDomain.USER, UserSubject.USER, ErrorReason.ALREADY_EXISTS), "用户ID已存在"),
     USER_PASSWORD_RESET_EXPIRED(3221,  new ResultKey(BusinessDomain.USER, UserSubject.USER, ErrorReason.EXPIRED),"重置密码链接已过期"),
     USER_PASSWORD_RESET_EMAIL_SEND_FAILED(3231, new ResultKey(BusinessDomain.USER, UserSubject.USER, ErrorReason.FAILED),"重置密码邮件发送失败"),
     USER_PASSWORD_UNCHANGED(3241, new ResultKey(BusinessDomain.USER, UserSubject.USER, ErrorReason.CONFLICT), "新密码不能与当前密码相同"),
