@@ -29,4 +29,16 @@ public interface UserValidationMsg {
      */
     String CAMPUS_NO_INVALID = "学工号格式不正确";
     String CAMPUS_NO_EMPTY = "学工号不能为空";
+
+    /**
+     * 用户注册资料相关消息
+     */
+    String EMAIL_INVALID = "邮箱格式不正确";
+    String MOBILE_INVALID = "手机号格式不正确";
+    String CAMPUS_NO_REQUIRES_VERIFICATION = "指定学工号时必须指定认证方式，且账号不能为未认证状态";
+    String VERIFIED_ACCOUNT_REQUIRES_MODE = "已认证账号必须指定认证方式";
+    String VERIFICATION_MODE_REQUIRES_VERIFIED_STATUS = "指定认证方式时账号不能为未认证状态";
+    String CAMPUS_VERIFICATION_REQUIRES_CAMPUS_NO_AND_EMAIL = "校园身份认证必须同时指定学工号和邮箱";
+    String EMAIL_VERIFICATION_REQUIRES_EMAIL = "邮箱认证必须指定邮箱";
+    String VERIFICATION_PROVIDER_REQUIRES_CAMPUS_MODE = "认证 Provider 编码仅适用于校园身份认证";
 }
