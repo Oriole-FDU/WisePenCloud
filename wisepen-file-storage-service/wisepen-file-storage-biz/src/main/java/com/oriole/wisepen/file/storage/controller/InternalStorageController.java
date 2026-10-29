@@ -2,6 +2,7 @@ package com.oriole.wisepen.file.storage.controller;
 
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.file.storage.api.domain.dto.CopyReqDTO;
+import com.oriole.wisepen.file.storage.api.domain.dto.DownloadUrlsReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.StorageRecordDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.StsTokenDTO;
@@ -18,6 +19,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @Tag(name = "内部 - 文件存储", description = "供业务微服务初始化上传、获取下载地址与管理物理文件")
 @RestController
@@ -108,6 +110,22 @@ public class InternalStorageController {
             @RequestParam(value = "duration", defaultValue = "900") Long duration,
             @RequestParam(value = "contentDisposition", required = false) String contentDisposition) {
         return R.ok(storageService.getDownloadUrl(objectKey, duration, contentDisposition));
+    }
+
+    @Operation(
+            summary = "内部批量获取文件下载地址",
+            description = """
+                    - 用途：供业务服务一次获取媒体分片等多个私有文件的限时下载地址。
+                    - 请求：objectKeys 指定 1 至 500 个文件；durationSeconds 为正数有效秒数，未传时使用 900 秒。
+                    - 约束：调用方必须通过内部服务调用边界；所有目标文件必须存在且未删除。
+                    - 处理：批量查询存储记录，对仍在上传的记录补偿检查云端状态，再按各自存储配置生成签名；重复 objectKey 仅返回一次，任一文件不可用则整批失败。
+                    - 失败：文件记录不存在或未上传完成 -> FileStorageError.FILE_RECORD_NOT_FOUND；存储配置不支持 -> FileStorageError.CANNOT_SUPPORT_STORAGE_PROVIDER；下载签名失败 -> FileStorageError.STORAGE_PROVIDER_GET_FILE_DOWNLOAD_URL_FAILED。
+                    - 响应：返回 objectKey 到限时下载 URL 的映射。
+                    """
+    )
+    @PostMapping("/getDownloadUrls")
+    public R<Map<String, String>> getDownloadUrls(@Validated @RequestBody DownloadUrlsReqDTO req) {
+        return R.ok(storageService.getDownloadUrls(req));
     }
 
     /**

@@ -17,14 +17,18 @@
         </processorPath>
         <module name="wisepen-system-api" />
         <module name="wisepen-note-api" />
+        <module name="wisepen-web-app-biz" />
         <module name="wisepen-common-log" />
         <module name="wisepen-user-api" />
         <module name="wisepen-note-biz" />
         <module name="wisepen-document-biz" />
+        <module name="wisepen-media-biz" />
+        <module name="wisepen-web-app-api" />
         <module name="wisepen-resource-biz" />
         <module name="wisepen-ai-asset-api" />
         <module name="wisepen-file-storage-biz" />
         <module name="wisepen-campus-extension-api" />
+        <module name="wisepen-media-api" />
         <module name="wisepen-file-storage-api" />
         <module name="wisepen-fudan-extension-biz" />
         <module name="wisepen-ai-asset-biz" />
@@ -56,6 +60,9 @@
       <module name="wisepen-file-storage-service" options="-parameters -parameters" />
       <module name="wisepen-fudan-extension-biz" options="-parameters -parameters" />
       <module name="wisepen-fudan-extension-service" options="-parameters -parameters" />
+      <module name="wisepen-media-api" options="-parameters -parameters" />
+      <module name="wisepen-media-biz" options="-parameters -parameters" />
+      <module name="wisepen-media-service" options="-parameters -parameters" />
       <module name="wisepen-note-api" options="-parameters -parameters" />
       <module name="wisepen-note-biz" options="-parameters -parameters" />
       <module name="wisepen-note-service" options="-parameters -parameters" />
@@ -68,6 +75,9 @@
       <module name="wisepen-user-api" options="-parameters -parameters" />
       <module name="wisepen-user-biz" options="-parameters -parameters" />
       <module name="wisepen-user-service" options="-parameters -parameters" />
+      <module name="wisepen-web-app-api" options="-parameters -parameters" />
+      <module name="wisepen-web-app-biz" options="-parameters -parameters" />
+      <module name="wisepen-web-app-service" options="-parameters -parameters" />
     </option>
   </component>
 </project>

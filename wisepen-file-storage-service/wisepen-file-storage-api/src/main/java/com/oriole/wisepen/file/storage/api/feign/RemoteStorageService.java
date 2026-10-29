@@ -2,6 +2,7 @@ package com.oriole.wisepen.file.storage.api.feign;
 
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.file.storage.api.domain.dto.CopyReqDTO;
+import com.oriole.wisepen.file.storage.api.domain.dto.DownloadUrlsReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.StorageRecordDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.StsTokenDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitReqDTO;
@@ -11,6 +12,7 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 内部存储服务 Feign 客户端
@@ -53,6 +55,10 @@ public interface RemoteStorageService {
     R<String> getDownloadUrl(@RequestParam("objectKey") String objectKey,
                              @RequestParam(value = "duration", required = false) Long duration,
                              @RequestParam(value = "contentDisposition", required = false) String contentDisposition);
+
+    /** 批量获取文件下载地址；任一文件不存在时整批失败。 */
+    @PostMapping("/getDownloadUrls")
+    R<Map<String, String>> getDownloadUrls(@RequestBody DownloadUrlsReqDTO req);
 
     /**
      * 颁发 STS 临时凭证（用于前端批量访问特定目录下的图片）

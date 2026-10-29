@@ -1,0 +1,144 @@
+{
+  "version": 1,
+  "service": "wisepen-media-service",
+  "dataId": "wisepen-media-service-{profile}.yaml",
+  "group": "DEFAULT_GROUP",
+  "configs": {
+    "media-upload-timeout-policy": {
+      "name": "媒体上传超时配置",
+      "description": "根据基础等待时间、最低上传速度和最大等待时间判定上传超时。",
+      "path": [
+        "wisepen",
+        "media",
+        "upload-timeout"
+      ],
+      "restartRequired": false,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "base-timeout-ms": {
+            "type": "integer",
+            "title": "上传基础超时时间（毫秒）",
+            "default": 600000,
+            "minimum": 1
+          },
+          "assumed-speed-bps": {
+            "type": "integer",
+            "title": "假设的最低上传速度（字节/秒）",
+            "default": 102400,
+            "minimum": 1
+          },
+          "max-timeout-ms": {
+            "type": "integer",
+            "title": "上传最大超时时间（毫秒）",
+            "default": 3600000,
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "media-processing-runtime": {
+      "name": "媒体处理运行配置",
+      "description": "处理超时应覆盖完整下载、探测、转码与上传流程；HTTP 与命令超时约束各个步骤。",
+      "path": [
+        "wisepen",
+        "media",
+        "processing-runtime"
+      ],
+      "restartRequired": false,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "processing-timeout-ms": {
+            "type": "integer",
+            "title": "处理任务失联超时时间（毫秒）",
+            "default": 3600000,
+            "minimum": 1
+          },
+          "http-request-timeout-ms": {
+            "type": "integer",
+            "title": "HTTP 请求超时时间（毫秒）",
+            "default": 120000,
+            "minimum": 1
+          },
+          "ffmpeg-timeout-ms": {
+            "type": "integer",
+            "title": "FFmpeg 与 FFprobe 命令超时时间（毫秒）",
+            "default": 300000,
+            "minimum": 1
+          },
+          "hls-segment-seconds": {
+            "type": "integer",
+            "title": "视频分片时长（秒）",
+            "default": 4,
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "media-playback-policy": {
+      "name": "媒体播放配置",
+      "description": "分片签名有效期为视频时长加额外有效时间；清单缓存扣除构建耗时及安全余量，保证新播放拥有完整播放窗口。",
+      "path": [
+        "wisepen",
+        "media",
+        "playback"
+      ],
+      "restartRequired": false,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "hls-segment-url-ttl-seconds": {
+            "type": "integer",
+            "title": "视频时长之外的签名有效时间（秒）",
+            "default": 900,
+            "minimum": 1
+          },
+          "manifest-cache-safety-seconds": {
+            "type": "integer",
+            "title": "清单缓存安全余量（秒）",
+            "default": 30,
+            "minimum": 0
+          },
+          "manifest-build-lock-ttl-seconds": {
+            "type": "integer",
+            "title": "清单构建锁有效期（秒）",
+            "default": 10,
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "media-stale-check-schedule": {
+      "name": "媒体超时检查调度",
+      "description": "定期补偿上传、处理与资源注册状态；调度间隔变更后需要重启媒体服务。",
+      "path": [
+        "wisepen",
+        "media",
+        "stale-check"
+      ],
+      "restartRequired": true,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "delay-ms": {
+            "type": "integer",
+            "title": "超时检测间隔（毫秒）",
+            "default": 300000,
+            "minimum": 1
+          },
+          "batch-size": {
+            "type": "integer",
+            "title": "每类状态单轮扫描上限",
+            "default": 500,
+            "minimum": 1
+          }
+        }
+      }
+    }
+  }
+}
