@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("sys_user_wallets")
+@TableName("user_wallet")
 public class UserWalletEntity implements Serializable {
 
 	@TableId(type = IdType.INPUT)

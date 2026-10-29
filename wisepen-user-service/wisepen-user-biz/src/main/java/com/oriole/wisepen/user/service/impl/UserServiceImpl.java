@@ -177,7 +177,7 @@ public class UserServiceImpl implements IUserService {
         // uid存入Redis
         String token = redisCacheManager.setPwdResetToken(userEntity.getUserId());
         // 构建重置链接
-        String resetLink = userProperties.getApiDomain() + "/password/reset?token=" + token;
+        String resetLink = userProperties.getEndpoint().getApiDomain() + "/password/reset?token=" + token;
 
         // 构建重置邮件
         Context context = new Context();
@@ -229,7 +229,9 @@ public class UserServiceImpl implements IUserService {
     public void resetPasswordAdmin(AuthPwdAdminResetRequest req) {
         Long userId = req.getUserId();
         updatePasswordByUserId(userId,
-                StrUtil.isBlank(req.getNewPassword()) ? userProperties.getDefaultPassword() : req.getNewPassword());
+                StrUtil.isBlank(req.getNewPassword())
+                        ? userProperties.getAdminPassword().getDefaultPassword()
+                        : req.getNewPassword());
         log.info("password reset. userId={} mode=admin", userId);
     }
 

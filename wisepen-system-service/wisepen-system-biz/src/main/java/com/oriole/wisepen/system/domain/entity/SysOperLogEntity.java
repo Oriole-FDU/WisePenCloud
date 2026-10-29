@@ -9,7 +9,7 @@ import lombok.EqualsAndHashCode;
 
 @EqualsAndHashCode(callSuper = true)
 @Data
-@TableName("sys_oper_log")
+@TableName("operation_log")
 public class SysOperLogEntity extends SysOperLogBase {
     @TableId(type = IdType.AUTO)
     private Long id;

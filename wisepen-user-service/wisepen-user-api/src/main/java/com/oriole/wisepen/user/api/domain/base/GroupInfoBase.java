@@ -1,5 +1,6 @@
 package com.oriole.wisepen.user.api.domain.base;
 
+import com.oriole.wisepen.user.api.enums.AiBillingPolicy;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
@@ -17,4 +18,6 @@ public class GroupInfoBase extends GroupDisplayBase{
 
     private Integer tokenUsed;
     private Integer tokenBalance;
+
+    private AiBillingPolicy aiBillingPolicy;
 }

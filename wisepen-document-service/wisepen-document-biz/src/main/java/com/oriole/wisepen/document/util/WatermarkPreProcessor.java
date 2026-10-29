@@ -206,13 +206,13 @@ public class WatermarkPreProcessor {
     /**
      * 从配置路径加载 CJK 字体，失败时静默返回 null。
      *
-     * @param bold 为 true 则读取 {@code cjkBoldFontPath}，否则读取 {@code cjkRegularFontPath}
+     * @param bold 为 true 则读取粗体字体路径，否则读取常规字体路径
      * @return 加载成功的 PDFont，或 null（路径未配置 / 文件不存在 / 加载失败）
      */
     private PDFont loadCjkFont(PDDocument doc, boolean bold) {
         String path = bold
-                ? documentProperties.getCjkBoldFontPath()
-                : documentProperties.getCjkRegularFontPath();
+                ? documentProperties.getWatermark().getFonts().getBoldPath()
+                : documentProperties.getWatermark().getFonts().getRegularPath();
         if (path == null || path.isBlank()) {
             return null;
         }

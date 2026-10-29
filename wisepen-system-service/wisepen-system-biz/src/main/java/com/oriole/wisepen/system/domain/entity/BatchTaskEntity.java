@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
 @SuperBuilder
 @AllArgsConstructor
 @NoArgsConstructor
-@TableName("sys_batch_task")
+@TableName("batch_task")
 public class BatchTaskEntity {
 
     @TableId(type = IdType.AUTO)

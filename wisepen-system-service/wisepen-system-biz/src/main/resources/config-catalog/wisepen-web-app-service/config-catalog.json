@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "service": "wisepen-web-app-service",
+  "dataId": "wisepen-web-app-service-{profile}.yaml",
+  "group": "DEFAULT_GROUP",
+  "configs": {
+    "single-html-page-policy": {
+      "name": "Single HTML Page 配置",
+      "description": "Single HTML Page 内容与版本的业务限制。",
+      "path": [
+        "wisepen",
+        "web-app",
+        "single-html-page"
+      ],
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "max-content-bytes": {
+            "type": "integer",
+            "title": "单个 HTML 版本最大字节数",
+            "default": 2097152,
+            "minimum": 1
+          }
+        }
+      },
+      "restartRequired": false
+    }
+  }
+}

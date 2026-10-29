@@ -10,10 +10,13 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.oriole.wisepen.common.core.domain.PageR;
+import com.oriole.wisepen.resource.feign.RemoteResourceService;
+import com.oriole.wisepen.user.api.config.UserProperties;
 import com.oriole.wisepen.user.api.domain.base.UserDisplayBase;
 import com.oriole.wisepen.user.api.domain.dto.req.WalletSettleCoinTradeRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.WalletTransferTokenRequest;
 import com.oriole.wisepen.user.api.enums.*;
+import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.core.domain.enums.GroupType;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupMemberTokenLimitUpdateRequest;
@@ -27,6 +30,7 @@ import com.oriole.wisepen.user.event.GroupTokenConsumeEvent;
 import com.oriole.wisepen.user.exception.UserError;
 import com.oriole.wisepen.user.mapper.*;
 import com.oriole.wisepen.user.service.IDisplayService;
+import com.oriole.wisepen.user.service.IGroupMemberService;
 import com.oriole.wisepen.user.service.IWalletService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,6 +51,8 @@ public class WalletServiceImpl implements IWalletService {
     private final ApplicationEventPublisher eventPublisher;
 
     private final IDisplayService displayService;
+    private final IGroupMemberService groupMemberService;
+    private final RemoteResourceService remoteResourceService;
     private final GroupMapper groupMapper;
     private final GroupMemberMapper groupMemberMapper;
     private final UserWalletsMapper userWalletsMapper;
@@ -54,23 +60,24 @@ public class WalletServiceImpl implements IWalletService {
     private final TokenVoucherMapper tokenVoucherMapper;
 
     private final RedisCacheManager redisCacheManager;
+    private final UserProperties userProperties;
 
     @Override
     // 消费Token
     public void consumptionToken(TokenConsumptionMessage message) {
         LambdaQueryWrapper<WalletTransactionRecordEntity> wrapper = new LambdaQueryWrapper<WalletTransactionRecordEntity>().eq(
                 WalletTransactionRecordEntity::getTraceId, message.getTraceId());
-        // 避免重复处理业务
-        if (walletTransactionRecordMapper.selectOne(wrapper) != null) return;
+        // 存在任一流水即表示该 traceId 已处理
+        if (walletTransactionRecordMapper.selectCount(wrapper) > 0) return;
 
         Long userId = message.getUserId();
-        Long groupId = message.getGroupId();
+        Long preferredGroupId = message.getPreferredGroupId();
 
         Integer tokenBill = message.getBillableTokens();
         Map<String, Object> billingDetail = message.getBillingDetail();
         if (tokenBill == null) {
-            log.error("token consumption event discarded because billableTokens is null. traceId={} userId={} groupId={} billingDetail={}",
-                    message.getTraceId(), userId, groupId, JSONUtil.toJsonStr(billingDetail));
+            log.error("token consumption event discarded because billableTokens is null. traceId={} userId={} preferredGroupId={} billingDetail={}",
+                    message.getTraceId(), userId, preferredGroupId, JSONUtil.toJsonStr(billingDetail));
             return;
         }
 
@@ -93,15 +100,96 @@ public class WalletServiceImpl implements IWalletService {
             return;
         }
 
-        if (groupId != null) {
-            // 组账单优先从组扣除
-            tokenBill = this.updateGroupMemberTokenUsed(groupId, userId, message.getTraceId(), tokenBill, billMeta, billingDetailJson);
+        // 获取可支付小组候选
+        List<Long> billingGroupIds = resolveBillingGroupIds(userId, message.getResourceId(), preferredGroupId);
+
+        // 尝试支付
+        for (Long billingGroupId : billingGroupIds) {
+            tokenBill = this.updateGroupMemberTokenUsed(
+                    billingGroupId, userId, message.getTraceId(), tokenBill, billMeta, billingDetailJson
+            );
+            if (tokenBill == 0) {
+                break; // 直到完全支付清所有账单为止
+            }
         }
+
         // 即个人账单，或组内未能支付全部账单
         if (tokenBill > 0) {
             // 从个人侧扣除
             this.updateUserTokenUsed(userId, message.getTraceId(), tokenBill, billMeta, billingDetailJson);
         }
+    }
+
+    private List<Long> resolveBillingGroupIds(Long userId, String resourceId, Long preferredGroupId) {
+        List<Long> orderedGroupIds = new ArrayList<>();
+        if (preferredGroupId != null) {
+            orderedGroupIds.add(preferredGroupId);
+        }
+
+        // 获取用户当前有效的 AI 计费小组顺序
+        orderedGroupIds.addAll(groupMemberService.listAiBillingGroupOrder(userId));
+        orderedGroupIds = new ArrayList<>(new LinkedHashSet<>(orderedGroupIds));
+        if (orderedGroupIds.isEmpty()) return Collections.emptyList();
+
+        // 列出这些小组的用户身份
+        List<GroupMemberEntity> memberships = groupMemberMapper.selectList(
+                new LambdaQueryWrapper<GroupMemberEntity>()
+                        .eq(GroupMemberEntity::getUserId, userId)
+                        .in(GroupMemberEntity::getGroupId, orderedGroupIds)
+        );
+
+        Map<Long, GroupMemberEntity> membershipByGroupId = memberships.stream()
+                .collect(Collectors.toMap(GroupMemberEntity::getGroupId, member -> member));
+
+        // 列出这些小组的配置信息
+        Map<Long, GroupEntity> groupById = groupMapper.selectBatchIds(membershipByGroupId.keySet()).stream()
+                .collect(Collectors.toMap(GroupEntity::getGroupId, group -> group));
+
+        Set<Long> approvedGroupIds = Collections.emptySet();
+        if (resourceId != null && !resourceId.isBlank()) {
+            // 列出当前资源（Agent）可支付账单的全部小组
+            List<String> approvedIds = remoteResourceService.listAiBillingApprovedGroupIds(resourceId).getData();
+            if (approvedIds != null && !approvedIds.isEmpty()) {
+                approvedGroupIds = approvedIds.stream().map(Long::valueOf).collect(Collectors.toSet());
+            }
+        }
+
+        List<Long> billableGroupIds = new ArrayList<>();
+        for (Long groupId : orderedGroupIds) {
+            GroupMemberEntity member = membershipByGroupId.get(groupId);
+            GroupEntity group = groupById.get(groupId);
+            if (member == null || group == null) continue;
+
+            AiBillingPolicy policy = Objects.requireNonNullElse(
+                    group.getAiBillingPolicy(), AiBillingPolicy.REVIEW_REQUIRED
+            );
+            // 小组禁用了支付，跳过
+            if (policy == AiBillingPolicy.DISABLED) continue;
+
+            GroupRoleType role = member.getRole();
+            // 是否可用此小组支付
+            boolean billingAuthorized = role == GroupRoleType.OWNER
+                    || role == GroupRoleType.ADMIN // 是所有者或管理员
+                    || policy == AiBillingPolicy.FREE // 自由支付
+                    || approvedGroupIds.contains(groupId); // 非自由支付但当前资源已被许可支付
+
+            // 不能使用当前小组支付，跳过
+            if (!billingAuthorized) {
+                continue;
+            }
+
+            // 检查成员余额是否可以支付
+            int memberBalance = Math.max(
+                    Objects.requireNonNullElse(member.getTokenLimit(), 0)
+                            - Objects.requireNonNullElse(member.getTokenUsed(), 0),
+                    0
+            );
+            int groupBalance = Math.max(Objects.requireNonNullElse(group.getTokenBalance(), 0), 0);
+            if (memberBalance > 0 && groupBalance > 0) {
+                billableGroupIds.add(groupId); // 只有成员余额和小组余额同时大于0时，才能纳入候选
+            }
+        }
+        return billableGroupIds;
     }
 
     private static String buildTokenBillMeta(Integer billableTokens, Map<String, Object> billingDetail) {
@@ -165,11 +253,6 @@ public class WalletServiceImpl implements IWalletService {
         walletTransactionRecordMapper.insert(record);
 
         groupMapper.update(null, wrapper);
-        if (group.getTokenBalance() + changedToken > 0) {
-            redisCacheManager.unblockGroupChat(groupId);
-        } else {
-            redisCacheManager.blockGroupChat(groupId);
-        }
     }
 
     @Override
@@ -192,9 +275,10 @@ public class WalletServiceImpl implements IWalletService {
         walletTransactionRecordMapper.insert(record);
 
         userWalletsMapper.update(null, wrapper);
-        if (walletEntity.getTokenBalance() + changedToken > 0) {
+        int updatedBalance = walletEntity.getTokenBalance() + changedToken;
+        if (updatedBalance >= 0) {
             redisCacheManager.unblockUserChat(userId);
-        } else {
+        } else if (updatedBalance <= -userProperties.getAiDebt().getHardLimitTokens()) {
             redisCacheManager.blockUserChat(userId);
         }
     }
@@ -223,18 +307,6 @@ public class WalletServiceImpl implements IWalletService {
         if (rows == 0) {
             throw new ServiceException(UserError.WALLET_TOKEN_LIMIT_BELOW_USED);
         }
-
-        LambdaQueryWrapper<GroupMemberEntity> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(GroupMemberEntity::getGroupId, req.getGroupId())
-                .in(GroupMemberEntity::getUserId, req.getTargetUserIds())
-                // 必须严格小于 (<)！如果等于，说明额度依然是满的，不能解封
-                .lt(GroupMemberEntity::getTokenUsed, req.getNewTokenLimit());
-
-        List<GroupMemberEntity> validMembersToUnblock = groupMemberMapper.selectList(queryWrapper);
-
-        validMembersToUnblock.forEach(member ->
-                redisCacheManager.unblockGroupMemberChat(req.getGroupId(), member.getUserId())
-        );
     }
 
     @Override
@@ -246,13 +318,6 @@ public class WalletServiceImpl implements IWalletService {
                 .setSql("token_balance = token_balance - " + usedToken);
 
         groupMapper.update(null, wrapper);
-
-        GroupEntity group = groupMapper.selectById(groupId);
-        if (group != null && group.getTokenBalance() <= 0) {
-            redisCacheManager.blockGroupChat(groupId);
-            log.warn("group chat blocked by token overdraft. groupId={} tokenBalance={}",
-                    groupId, group.getTokenBalance());
-        }
     }
 
     @EventListener
@@ -270,33 +335,41 @@ public class WalletServiceImpl implements IWalletService {
                 .eq(GroupMemberEntity::getUserId, userId);
         GroupMemberEntity member = groupMemberMapper.selectOne(queryWrapper);
 
-        Integer groupTokenBalance = member.getTokenLimit() - member.getTokenUsed();
-        Integer overageTokenBill = 0;
-        // 如果当前余额不足以支付订单
-        if (groupTokenBalance < tokenBill) {
-            overageTokenBill = tokenBill - groupTokenBalance; // 超支部分，转个人支付
-            tokenBill = groupTokenBalance; // 扣除所有余量
-            // 触发组成员熔断
-            redisCacheManager.blockGroupMemberChat(groupId, userId);
-            log.warn("group member chat blocked by quota. groupId={} userId={}",
-                    groupId, userId);
+        GroupEntity group = groupMapper.selectById(groupId);
+        if (member == null || group == null) return tokenBill;
+
+        // 组员余额
+        int memberBalance = Math.max(
+                Objects.requireNonNullElse(member.getTokenLimit(), 0)
+                        - Objects.requireNonNullElse(member.getTokenUsed(), 0),
+                0
+        );
+        // 小组余额
+        int groupBalance = Math.max(Objects.requireNonNullElse(group.getTokenBalance(), 0), 0);
+
+        // 小组支付的账单（应付账单、小组余额、个人余额取最小值）
+        int groupPayment = Math.min(tokenBill, Math.min(memberBalance, groupBalance));
+        if (groupPayment <= 0) { // 小组支付为 0 ，直接返回全部账单
+            return tokenBill;
         }
+        // 剩余未支付部分
+        int overageTokenBill = tokenBill - groupPayment;
 
         // 联动扣除群组大盘资金池
-        eventPublisher.publishEvent(new GroupTokenConsumeEvent(this, groupId, tokenBill));
+        eventPublisher.publishEvent(new GroupTokenConsumeEvent(this, groupId, groupPayment));
 
         // 累计组成员的组内用量
         UpdateWrapper<GroupMemberEntity> wrapper = new UpdateWrapper<>();
         wrapper.eq("group_id", groupId)
                 .eq("user_id", userId)
-                .setSql("token_used = token_used + " + tokenBill);
+                .setSql("token_used = token_used + " + groupPayment);
         groupMemberMapper.update(null, wrapper);
 
         // 记录交易
         WalletTransactionRecordEntity record = WalletTransactionRecordEntity.builder()
                 .traceId(traceId)
                 .payerId(groupId).payerType(WalletPayerType.GROUP)
-                .count(tokenBill)
+                .count(groupPayment)
                 .walletTransactionType(WalletTransactionType.SPEND)
                 .walletBusinessType(WalletBusinessType.TOKEN)
                 .operatorId(userId)
@@ -318,10 +391,11 @@ public class WalletServiceImpl implements IWalletService {
         userWalletsMapper.update(null, wrapper);
 
         UserWalletEntity walletEntity = userWalletsMapper.selectById(userId);
-        if (walletEntity != null && walletEntity.getTokenBalance() <= 0) {
+        int aiDebtHardLimitTokens = userProperties.getAiDebt().getHardLimitTokens();
+        if (walletEntity != null && walletEntity.getTokenBalance() <= -aiDebtHardLimitTokens) {
             redisCacheManager.blockUserChat(userId);
-            log.warn("user chat blocked by token overdraft. userId={} tokenBalance={}",
-                    userId, walletEntity.getTokenBalance());
+            log.warn("user AI blocked by token debt. userId={} tokenBalance={} debtHardLimit={}",
+                    userId, walletEntity.getTokenBalance(), aiDebtHardLimitTokens);
         }
 
         // 记录交易

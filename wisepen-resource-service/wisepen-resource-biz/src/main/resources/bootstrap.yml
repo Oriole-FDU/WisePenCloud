@@ -36,10 +36,6 @@ wisepen:
     title: 资源服务 API
     version: 1.0.0
     description: WisePen 资源、标签、搜索与交互接口
-  resource:
-    # 阅读量去重窗口时长（分钟）。
-    # 同一用户在此时间内重复打开同一资源，仅计一次阅读。
-    read-dedup-ttl-minutes: 10
 
 springwolf:
   plugin:

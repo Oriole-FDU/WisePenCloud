@@ -1,5 +1,6 @@
 package com.oriole.wisepen.user.api.domain.mq;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -15,7 +16,9 @@ import java.util.Map;
 @AllArgsConstructor
 public class TokenConsumptionMessage implements Serializable{
 	private Long userId;
-	private Long groupId;
+	private String resourceId;
+	@JsonAlias("groupId")
+	private Long preferredGroupId;
 	private Integer usageTokens;
 	private Integer billableTokens;
 	private Map<String, Object> billingDetail;

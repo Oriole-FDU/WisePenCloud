@@ -21,7 +21,7 @@ import com.oriole.wisepen.file.storage.api.domain.base.StorageRecordBase;
 import com.oriole.wisepen.file.storage.api.domain.base.UploadUrlBase;
 import com.oriole.wisepen.file.storage.api.domain.dto.StsTokenDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitRespDTO;
-import com.oriole.wisepen.file.storage.domain.entity.StorageConfigEntity;
+import com.oriole.wisepen.file.storage.config.StorageProperties;
 import com.oriole.wisepen.file.storage.exception.FileStorageError;
 import com.oriole.wisepen.file.storage.strategy.StorageProvider;
 import lombok.extern.slf4j.Slf4j;
@@ -44,25 +44,27 @@ import java.util.Scanner;
 @Slf4j
 public class AliyunOssProvider implements StorageProvider {
 
-    private final StorageConfigEntity config;
+    private final String providerCode;
+    private final StorageProperties.Provider config;
     private final OSS ossClient;
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     // 构造器注入配置并初始化连接
-    public AliyunOssProvider(StorageConfigEntity config) {
+    public AliyunOssProvider(String providerCode, StorageProperties.Provider config) {
+        this.providerCode = providerCode;
         this.config = config;
         this.ossClient = new OSSClientBuilder().build(
                 config.getEndpoint(),
                 config.getAccessKeyId(),
                 config.getAccessKeySecret()
         );
-        log.info("aliyun oss client initialized. configId={} provider={} name={}",
-                config.getId(), config.getProvider(), config.getName());
+        log.info("aliyun oss client initialized. providerCode={} provider={} name={}",
+                providerCode, config.getProvider(), config.getName());
     }
 
     @Override
-    public Long getConfigId() {
-        return config.getId();
+    public String getProviderCode() {
+        return providerCode;
     }
 
     @Override
@@ -204,7 +206,7 @@ public class AliyunOssProvider implements StorageProvider {
 
             // 构建请求
             AssumeRoleRequest request = new AssumeRoleRequest()
-                    .setRoleArn(config.getRoleArn()) // 从数据库动态获取
+                    .setRoleArn(config.getRoleArn()) // 从 Nacos 业务配置读取
                     .setRoleSessionName("wisepen-" + IdUtil.fastSimpleUUID())
                     .setDurationSeconds(durationSeconds)
                     .setPolicy(policy);
@@ -221,8 +223,8 @@ public class AliyunOssProvider implements StorageProvider {
                     .build();
 
         } catch (Exception e) {
-            log.error("aliyun sts token generate failed. pathPrefix={} configId={}",
-                    pathPrefix, config.getId(), e);
+            log.error("aliyun sts token generate failed. pathPrefix={} providerCode={}",
+                    pathPrefix, providerCode, e);
             throw new ServiceException(FileStorageError.STORAGE_PROVIDER_GENERATE_STS_TOKEN_FAILED);
         }
     }

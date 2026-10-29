@@ -87,7 +87,7 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
         String token = redisCacheManager.setEmailVerificationCode(email, userId);
 
         // 构建验证链接
-        String verifyLink = userProperties.getApiDomain() + "/email/verify?token=" + token;
+        String verifyLink = userProperties.getEndpoint().getApiDomain() + "/email/verify?token=" + token;
 
         // 构建验证邮件
         Context context = new Context();

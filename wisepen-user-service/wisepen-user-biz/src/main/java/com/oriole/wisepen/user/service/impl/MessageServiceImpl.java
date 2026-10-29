@@ -9,6 +9,7 @@ import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.exception.ServiceException;
+import com.oriole.wisepen.user.api.config.UserProperties;
 import com.oriole.wisepen.user.api.domain.dto.req.MessagePublishRequest;
 import com.oriole.wisepen.user.api.domain.dto.res.MessageInfoResponse;
 import com.oriole.wisepen.user.api.enums.MessageDeliveryScope;
@@ -24,7 +25,6 @@ import com.oriole.wisepen.user.mapper.MessageRecipientMapper;
 import com.oriole.wisepen.user.mapper.UserMapper;
 import com.oriole.wisepen.user.service.IMessageService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -47,12 +47,10 @@ public class MessageServiceImpl implements IMessageService {
     private final MessageRecipientMapper messageRecipientMapper;
     private final UserMapper userMapper;
     private final GroupMapper groupMapper;
+    private final UserProperties userProperties;
 
     private static final Pattern USER_PLACEHOLDER_PATTERN = Pattern.compile("\\{\\{USER:(\\d+)}}");
     private static final Pattern GROUP_PLACEHOLDER_PATTERN = Pattern.compile("\\{\\{GROUP:(\\d+)}}");
-
-    @Value("${wisepen.user.message-dedup-window-minutes:60}")
-    private long messageDedupWindowMinutes;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -81,7 +79,8 @@ public class MessageServiceImpl implements IMessageService {
         String messageHash = req.getMessageHash();
         if (MessageDeliveryScope.DIRECT.equals(req.getDeliveryScope())) {
             // 找最近窗口内同 hash 的消息
-            LocalDateTime dedupStartTime = LocalDateTime.now().minusMinutes(messageDedupWindowMinutes);
+            LocalDateTime dedupStartTime = LocalDateTime.now()
+                    .minusMinutes(userProperties.getMessageDedup().getWindowMinutes());
             LambdaQueryWrapper<MessageEntity> duplicateMessageWrapper = new LambdaQueryWrapper<>();
             duplicateMessageWrapper.eq(MessageEntity::getMessageHash, messageHash)
                     .ge(MessageEntity::getCreateTime, dedupStartTime);

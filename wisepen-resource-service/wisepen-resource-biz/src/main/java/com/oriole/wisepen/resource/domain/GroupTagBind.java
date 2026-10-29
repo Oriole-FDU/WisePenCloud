@@ -23,6 +23,9 @@ public class GroupTagBind {
     // 仅集市组使用
     private MarketSaleInfo marketSaleInfo;
 
+    // 当前小组是否已审批使用组钱包支付该资源的调用费用
+    private Boolean aiBillingApproved = false;
+
     @Builder
     public GroupTagBind(List<String> tagIds, String groupId) {
         this.tagIds = tagIds;

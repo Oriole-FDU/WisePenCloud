@@ -111,7 +111,7 @@ public class DocumentConversionAndParseConsumer {
         File hookedPdf = createCacheFile(msg.getDocumentId(), "_hook.pdf");
         File mdFile = createCacheFile(msg.getDocumentId(), ".md");
 
-        boolean isOnlyOfficeAvailable = "onlyoffice".equalsIgnoreCase(documentProperties.getConversionProvider());
+        boolean isOnlyOfficeAvailable = "onlyoffice".equalsIgnoreCase(documentProperties.getIntegration().getProvider());
         try {
             // Office → PDF 格式转换
             if (isOffice) {
@@ -170,7 +170,7 @@ public class DocumentConversionAndParseConsumer {
 
     /** 流式下载源文件到本地缓存目录 */
     private File downloadSourceFile(String url, String documentId, String ext) throws IOException, InterruptedException {
-        Path dir = Paths.get(documentProperties.getCachePath());
+        Path dir = Paths.get(documentProperties.getLocalResources().getCachePath());
         Files.createDirectories(dir);
         Path target = dir.resolve(documentId + "_source." + ext);
 
@@ -212,7 +212,7 @@ public class DocumentConversionAndParseConsumer {
 
     /** 在缓存目录下创建临时文件（用于存放 Office→PDF 转换产物） */
     private File createCacheFile(String documentId, String suffix) throws IOException {
-        Path dir = Paths.get(documentProperties.getCachePath());
+        Path dir = Paths.get(documentProperties.getLocalResources().getCachePath());
         Files.createDirectories(dir);
         return Files.createTempFile(dir, documentId + "_", suffix).toFile();
     }

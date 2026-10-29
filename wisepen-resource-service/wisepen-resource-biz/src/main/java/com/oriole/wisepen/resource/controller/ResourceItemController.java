@@ -14,6 +14,7 @@ import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.resource.constant.ResourceConstants;
 import com.oriole.wisepen.resource.constant.ResourceValidationMsg;
 import com.oriole.wisepen.resource.domain.dto.req.BatchResourceUpdateTagsRequest;
+import com.oriole.wisepen.resource.domain.dto.req.ResourceAiBillingApprovalUpdateRequest;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceDeleteRequest;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceUpdateActionPermissionRequest;
 import com.oriole.wisepen.resource.domain.dto.res.ResourceBaseInfoResponse;
@@ -150,6 +151,25 @@ public class ResourceItemController {
                     req.getMode()
             );
         }
+        return R.ok();
+    }
+
+    @Operation(
+            summary = "设置 AI 资源计费审批",
+            description = """
+                    - 用途：由小组管理员决定目标小组是否允许为指定 Agent 的调用承担费用。
+                    - 请求：resourceId 指定 Agent 资源；groupId 指定付款小组；approved 控制审批状态。
+                    - 约束：当前用户必须是目标小组 OWNER 或 ADMIN；Agent 必须已挂载到目标普通小组。
+                    - 处理：更新该资源对应小组挂载关系上的 AI 计费审批；解除整个小组挂载时审批随关系一并移除；不修改资源动作权限。
+                    - 失败：当前用户不是目标小组 OWNER/ADMIN -> PermissionError.PERMISSION_DENIED；资源不存在 -> ResourceError.RESOURCE_NOT_FOUND；资源不是 Agent、未挂载到目标组或目标为 Market 组 -> ResourceError.RESOURCE_AI_BILLING_APPROVAL_NOT_ALLOWED。
+                    - 响应：成功时返回空结果。
+                    """
+    )
+    @Log(title = "修改 AI 资源计费审批", businessType = BusinessType.UPDATE)
+    @PostMapping("/changeAiBillingApproval")
+    public R<Void> updateAiBillingApproval(@Validated @RequestBody ResourceAiBillingApprovalUpdateRequest req) {
+        SecurityContextHolder.assertGroupRole(Long.parseLong(req.getGroupId()), GroupRoleType.OWNER, GroupRoleType.ADMIN);
+        resourceService.updateAiBillingApproval(req);
         return R.ok();
     }
 

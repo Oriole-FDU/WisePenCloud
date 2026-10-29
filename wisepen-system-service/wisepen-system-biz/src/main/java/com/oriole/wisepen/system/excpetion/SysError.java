@@ -23,7 +23,12 @@ public enum SysError implements IResult {
     BATCH_TASK_STATE_INVALID(2231, new ResultKey(BusinessDomain.SYSTEM, SystemSubject.BATCH_TASK, ErrorReason.STATE_INVALID), "批量任务当前状态不允许该操作"),
     BATCH_TASK_META_INVALID(2232, new ResultKey(BusinessDomain.SYSTEM, SystemSubject.BATCH_TASK, ErrorReason.INVALID), "批量任务参数无效"),
     BATCH_TASK_ITEM_EXECUTION_FAILED(2261, new ResultKey(BusinessDomain.SYSTEM, SystemSubject.BATCH_TASK, ErrorReason.FAILED), "批量任务项执行失败"),
-    BATCH_TASK_ITEM_INTERRUPTED(2262, new ResultKey(BusinessDomain.SYSTEM, SystemSubject.BATCH_TASK, ErrorReason.FAILED), "批量任务项执行中断");
+    BATCH_TASK_ITEM_INTERRUPTED(2262, new ResultKey(BusinessDomain.SYSTEM, SystemSubject.BATCH_TASK, ErrorReason.FAILED), "批量任务项执行中断"),
+
+    BUSINESS_CONFIG_NOT_FOUND(2311, new ResultKey(BusinessDomain.SYSTEM, SystemSubject.BUSINESS_CONFIG, ErrorReason.NOT_FOUND), "业务配置不存在"),
+    BUSINESS_CONFIG_CONTENT_INVALID(2321, new ResultKey(BusinessDomain.SYSTEM, SystemSubject.BUSINESS_CONFIG, ErrorReason.INVALID), "业务配置内容无效"),
+    BUSINESS_CONFIG_REVISION_CONFLICT(2331, new ResultKey(BusinessDomain.SYSTEM, SystemSubject.BUSINESS_CONFIG, ErrorReason.CONFLICT), "业务配置已被修改"),
+    BUSINESS_CONFIG_NACOS_FAILED(2361, new ResultKey(BusinessDomain.SYSTEM, SystemSubject.BUSINESS_CONFIG, ErrorReason.EXTERNAL_FAILED), "Nacos 配置操作失败");
 
     private final Integer code;
     private final ResultKey key;

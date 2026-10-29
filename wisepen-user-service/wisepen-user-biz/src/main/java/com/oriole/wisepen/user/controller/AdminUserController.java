@@ -31,7 +31,7 @@ public class AdminUserController {
             description = """
                     - 用途：管理员按关键字、账号状态和身份类型筛选用户列表。
                     - 请求：keyword 支持真实姓名模糊匹配，或学工号、用户名、用户 ID 精确匹配；userStatus 和 identityType 为可选过滤条件；page 和 size 控制分页。
-                    - 约束：当前操作者必须具备管理员身份；page 最小为 1，size 限制为 1 至 100。
+                    - 约束：当前操作者必须具备管理员身份；keyword 作为用户 ID 匹配时需可转换为数字；page 最小为 1，size 限制为 1 至 100。
                     - 处理：查询未逻辑删除用户并按创建时间倒序分页，仅在 keyword 可转换为 Long 时增加用户 ID 匹配，返回专用列表 DTO。
                     - 失败：当前操作者不是管理员 -> PermissionError.UNAUTHORIZED。
                     - 响应：返回分页用户账号列表和总数。
@@ -50,14 +50,14 @@ public class AdminUserController {
     }
 
     @Operation(
-            summary = "获取用户详情",
+            summary = "获取用户资料详情",
             description = """
                     - 用途：管理员查看指定用户的账号、资料与当前认证摘要。
                     - 请求：userId 指定目标用户。
-                    - 约束：当前操作者必须具备管理员身份。
-                    - 处理：聚合 sys_user 与 sys_user_profile 的账号及资料信息，认证方式和 Provider 编码平铺返回；钱包和流水通过独立接口加载。
+                    - 约束：当前操作者必须具备管理员身份；目标用户资料记录必须存在。
+                    - 处理：读取 user_account 与 user_profile 的账号及资料信息，认证方式和 Provider 编码平铺返回。
                     - 失败：当前操作者不是管理员 -> PermissionError.UNAUTHORIZED。
-                    - 响应：返回目标用户账号、资料、认证摘要及账号创建和更新时间；账号或资料记录不存在时 data 为空。
+                    - 响应：账号、资料、认证摘要及账号创建和更新时间；账号或资料记录不存在时 data 为空。
                     """
     )
     @GetMapping("/getUserInfo")
@@ -70,7 +70,7 @@ public class AdminUserController {
             summary = "更新用户学籍资料",
             description = """
                     - 用途：管理员修正指定用户的性别、学校、院系、专业、班级、入学年份、学历层次和职称资料。
-                    - 请求：userId 指定被维护用户；其余字段属于用户资料域，对应 sys_user_profile；未传字段不表达业务变更意图。
+                    - 请求：userId 指定被维护用户；其余字段属于用户资料域，对应 user_profile；未传字段不表达业务变更意图。
                     - 约束：当前操作者必须具备管理员身份；目标用户资料记录必须存在。
                     - 处理：更新用户资料域，不修改账号、昵称、真实姓名、头像、身份类型、认证方式、账号状态或密码；学生资料与教师资料的互斥清理不由本接口自动完成。
                     - 失败：当前操作者不是管理员 -> PermissionError.UNAUTHORIZED。
@@ -88,7 +88,7 @@ public class AdminUserController {
             summary = "更新用户账号信息",
             description = """
                     - 用途：管理员维护指定用户的账号展示信息、认证信息、身份类型和账号状态。
-                    - 请求：userId 指定被维护用户；username、campusNo、email、mobile、verificationMode、userStatus、identityType 等字段属于用户账号域，对应 sys_user。
+                    - 请求：userId 指定被维护用户；username、campusNo、email、mobile、verificationMode、userStatus、identityType 等字段属于用户账号域，对应 user_account。
                     - 约束：当前操作者必须具备管理员身份；目标用户必须存在；username 在全量用户中必须唯一；正常状态用户的 campusNo 必须唯一。
                     - 处理：更新用户账号域；当 identityType 发生变化时，同步清理不适用于新身份的资料字段：切换为学生时清空职称，切换为教师时清空专业、班级、入学年份和学历层次。
                     - 失败：当前操作者不是管理员 -> PermissionError.UNAUTHORIZED；用户名重复 -> UserError.USERNAME_ALREADY_EXISTS；学工号冲突 -> UserError.CAMPUS_NO_ALREADY_EXISTS。

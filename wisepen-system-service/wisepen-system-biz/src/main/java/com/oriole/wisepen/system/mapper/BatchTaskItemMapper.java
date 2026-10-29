@@ -16,7 +16,7 @@ import java.util.List;
 public interface BatchTaskItemMapper extends BaseMapper<BatchTaskItemEntity> {
     @Insert("""
             <script>
-            INSERT INTO sys_batch_task_item
+            INSERT INTO batch_task_item
                 (task_id, status, meta, result, error_code, error_message,
                  start_time, finish_time, create_time, update_time)
             VALUES
@@ -31,8 +31,8 @@ public interface BatchTaskItemMapper extends BaseMapper<BatchTaskItemEntity> {
 
     @Select("""
             SELECT i.*
-            FROM sys_batch_task_item i
-            INNER JOIN sys_batch_task t ON t.id = i.task_id
+            FROM batch_task_item i
+            INNER JOIN batch_task t ON t.id = i.task_id
             WHERE i.status = 'PENDING'
               AND t.status IN ('PENDING', 'RUNNING')
               AND t.deleted_at IS NULL
@@ -43,8 +43,8 @@ public interface BatchTaskItemMapper extends BaseMapper<BatchTaskItemEntity> {
 
     @Select("""
             SELECT i.*
-            FROM sys_batch_task_item i
-            INNER JOIN sys_batch_task t ON t.id = i.task_id
+            FROM batch_task_item i
+            INNER JOIN batch_task t ON t.id = i.task_id
             WHERE i.status = 'RUNNING'
               AND i.start_time < #{cutoff}
               AND t.status IN ('PENDING', 'RUNNING', 'PAUSING')
@@ -56,13 +56,13 @@ public interface BatchTaskItemMapper extends BaseMapper<BatchTaskItemEntity> {
                                                       @Param("limit") int limit);
 
     @Update("""
-            UPDATE sys_batch_task_item
+            UPDATE batch_task_item
             SET status = 'RUNNING', start_time = #{startTime}, update_time = #{startTime}
             WHERE id = #{itemId} AND status = 'PENDING'
               AND EXISTS (
                   SELECT 1
-                  FROM sys_batch_task t
-                  WHERE t.id = sys_batch_task_item.task_id
+                  FROM batch_task t
+                  WHERE t.id = batch_task_item.task_id
                     AND t.status IN ('PENDING', 'RUNNING')
                     AND t.deleted_at IS NULL
               )
@@ -70,7 +70,7 @@ public interface BatchTaskItemMapper extends BaseMapper<BatchTaskItemEntity> {
     int claimPendingItem(@Param("itemId") Long itemId, @Param("startTime") LocalDateTime startTime);
 
     @Update("""
-            UPDATE sys_batch_task_item
+            UPDATE batch_task_item
             SET status = #{status}, result = #{result},
                 error_code = #{errorCode}, error_message = #{errorMessage},
                 finish_time = #{finishTime}, update_time = #{finishTime}
@@ -84,7 +84,7 @@ public interface BatchTaskItemMapper extends BaseMapper<BatchTaskItemEntity> {
                             @Param("finishTime") LocalDateTime finishTime);
 
     @Update("""
-            UPDATE sys_batch_task_item
+            UPDATE batch_task_item
             SET status = 'PENDING', start_time = NULL, finish_time = NULL, update_time = #{updateTime}
             WHERE id = #{itemId} AND status = 'RUNNING'
             """)

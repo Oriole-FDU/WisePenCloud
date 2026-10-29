@@ -84,8 +84,8 @@ public class AuthController {
     private Cookie buildAuthCookie (String value, Integer maxAge) {
         Cookie cookie = new Cookie(AUTHORIZATION_TOKEN, value);
         cookie.setPath("/");
-        if (StrUtil.isNotBlank(userProperties.getAuthCookieDomain())) {
-            cookie.setDomain(userProperties.getAuthCookieDomain());
+        if (StrUtil.isNotBlank(userProperties.getEndpoint().getAuthCookieDomain())) {
+            cookie.setDomain(userProperties.getEndpoint().getAuthCookieDomain());
         }
         cookie.setHttpOnly(true); // 严禁前端 JS 读取，防 XSS
         // cookie.setSecure(true); // HTTPS 务必开启此项

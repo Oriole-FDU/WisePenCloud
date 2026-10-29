@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("sys_vouchers")
+@TableName("token_voucher")
 public class TokenVoucherEntity implements Serializable {
 
 	@TableId(value="voucher_id", type = IdType.INPUT)

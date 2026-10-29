@@ -19,7 +19,7 @@ import java.time.LocalDateTime;
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("sys_storage_record")
+@TableName("storage_record")
 public class StorageRecordEntity extends StorageRecordBase implements Serializable {
 
     @Serial
@@ -29,9 +29,9 @@ public class StorageRecordEntity extends StorageRecordBase implements Serializab
     private Long fileId;
 
     /**
-     * 该文件所在的供应商配置源
+     * 该文件所在的存储提供商编码
      */
-    private Long configId;
+    private String providerCode;
 
     private StorageStatusEnum status;
 

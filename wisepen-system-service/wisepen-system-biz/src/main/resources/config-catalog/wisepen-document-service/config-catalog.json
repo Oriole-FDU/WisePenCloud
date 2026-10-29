@@ -1,0 +1,158 @@
+{
+  "version": 1,
+  "service": "wisepen-document-service",
+  "dataId": "wisepen-document-service-{profile}.yaml",
+  "group": "DEFAULT_GROUP",
+  "configs": {
+    "document-conversion-runtime": {
+      "name": "文档转换运行配置",
+      "description": "文档转换超时、轮询频率和源文件临时 URL 有效期。",
+      "path": [
+        "wisepen",
+        "document",
+        "conversion-runtime"
+      ],
+      "restartRequired": false,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "timeout-ms": {
+            "type": "integer",
+            "title": "ONLYOFFICE 转换超时时间（毫秒）",
+            "default": 120000,
+            "minimum": 1
+          },
+          "poll-interval-ms": {
+            "type": "integer",
+            "title": "ONLYOFFICE 转换轮询间隔（毫秒）",
+            "default": 1000,
+            "minimum": 1
+          },
+          "source-url-duration-seconds": {
+            "type": "integer",
+            "title": "ONLYOFFICE 源文件 URL 有效期（秒）",
+            "default": 3600,
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "document-download-policy": {
+      "name": "文档下载配置",
+      "description": "文档下载临时 URL 的有效时间。",
+      "path": [
+        "wisepen",
+        "document",
+        "download"
+      ],
+      "restartRequired": false,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "url-duration-seconds": {
+            "type": "integer",
+            "title": "文档下载 URL 有效期（秒）",
+            "default": 900,
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "document-edit-session-policy": {
+      "name": "文档编辑会话配置",
+      "description": "ONLYOFFICE 编辑会话的有效时间。",
+      "path": [
+        "wisepen",
+        "document",
+        "edit-session"
+      ],
+      "restartRequired": false,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ttl-seconds": {
+            "type": "integer",
+            "title": "ONLYOFFICE 编辑会话有效期（秒）",
+            "default": 86400,
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "document-watermark-policy": {
+      "name": "文档水印配置",
+      "description": "文档暗水印生成使用的密钥。",
+      "path": [
+        "wisepen",
+        "document",
+        "watermark",
+        "secret-key"
+      ],
+      "restartRequired": false,
+      "schema": {
+        "type": "string",
+        "title": "暗水印密钥",
+        "minLength": 1
+      }
+    },
+    "document-upload-timeout-policy": {
+      "name": "文档上传超时配置",
+      "description": "根据基础等待时间、最低上传速度和最大等待时间判定上传超时。",
+      "path": [
+        "wisepen",
+        "document",
+        "upload-timeout"
+      ],
+      "restartRequired": false,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "base-timeout-ms": {
+            "type": "integer",
+            "title": "上传基础超时时间（毫秒）",
+            "default": 600000,
+            "minimum": 1
+          },
+          "assumed-speed-bps": {
+            "type": "integer",
+            "title": "假设的最低上传速度（字节/秒）",
+            "default": 102400,
+            "minimum": 1
+          },
+          "max-timeout-ms": {
+            "type": "integer",
+            "title": "上传最大超时时间（毫秒）",
+            "default": 3600000,
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "document-stale-check-schedule": {
+      "name": "文档上传超时检查调度",
+      "description": "检测上传超时文档的任务执行间隔，发布后需要重启文档服务。",
+      "path": [
+        "wisepen",
+        "document",
+        "stale-check"
+      ],
+      "restartRequired": true,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "delay-ms": {
+            "type": "integer",
+            "title": "上传超时检测间隔（毫秒）",
+            "default": 300000,
+            "minimum": 1
+          }
+        }
+      }
+    }
+  }
+}

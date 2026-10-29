@@ -1,10 +1,8 @@
 package com.oriole.wisepen.file.storage.strategy;
 
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.oriole.wisepen.common.core.exception.ServiceException;
-import com.oriole.wisepen.file.storage.domain.entity.StorageConfigEntity;
+import com.oriole.wisepen.file.storage.config.StorageProperties;
 import com.oriole.wisepen.file.storage.exception.FileStorageError;
-import com.oriole.wisepen.file.storage.mapper.StorageConfigMapper;
 import com.oriole.wisepen.file.storage.strategy.aliyun.AliyunOssProvider;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -25,13 +23,13 @@ import java.util.concurrent.ConcurrentHashMap;
 @RequiredArgsConstructor
 public class StorageManager {
 
-    private final StorageConfigMapper storageConfigMapper;
+    private final StorageProperties storageProperties;
 
     // 存储实例缓存池
-    private final Map<Long, StorageProvider> providerCache = new ConcurrentHashMap<>();
+    private final Map<String, StorageProvider> providerCache = new ConcurrentHashMap<>();
 
-    // 首要存储源 ID
-    private Long primaryConfigId;
+    // 首要存储提供商编码
+    private String primaryProviderCode;
 
     /**
      * 系统启动时自动加载并初始化所有启用的存储实例
@@ -42,39 +40,40 @@ public class StorageManager {
         // 销毁旧实例
         destroyAll();
 
-        List<StorageConfigEntity> configs = storageConfigMapper.selectList(
-                Wrappers.<StorageConfigEntity>lambdaQuery().eq(StorageConfigEntity::getEnabled, true)
-        );
+        StorageProperties.Providers providers = storageProperties.getProviders();
+        if (providers.getPrimaryCode() == null || providers.getPrimaryCode().isBlank()) {
+            throw new IllegalStateException("wisepen.storage.providers.primary-code must not be blank");
+        }
 
-        for (StorageConfigEntity config : configs) {
-            try {
-                StorageProvider provider = buildProvider(config);
-                providerCache.put(config.getId(), provider);
-
-                if (Boolean.TRUE.equals(config.getIsPrimary())) {
-                    this.primaryConfigId = config.getId();
-                }
-            } catch (Exception e) {
-                log.error("storage provider init failed. configId={} provider={}",
-                        config.getId(), config.getProvider(), e);
+        for (Map.Entry<String, StorageProperties.Provider> entry : providers.getItems().entrySet()) {
+            String providerCode = entry.getKey();
+            StorageProperties.Provider config = entry.getValue();
+            if (providerCode == null || providerCode.isBlank()) {
+                throw new IllegalStateException("storage provider code must not be blank");
             }
+            if (config == null) {
+                throw new IllegalStateException("storage provider config must not be null: " + providerCode);
+            }
+            if (!Boolean.TRUE.equals(config.getEnabled())) {
+                continue;
+            }
+            providerCache.put(providerCode, buildProvider(providerCode, config));
         }
 
-        if (this.primaryConfigId == null && !providerCache.isEmpty()) {
-            this.primaryConfigId = providerCache.keySet().iterator().next();
-            log.warn("primary storage provider degraded. primaryConfigId={}",
-                    this.primaryConfigId);
+        this.primaryProviderCode = providers.getPrimaryCode();
+        if (!providerCache.containsKey(primaryProviderCode)) {
+            throw new IllegalStateException("primary storage provider must exist and be enabled: " + primaryProviderCode);
         }
-        log.info("storage provider load finished. task=storageManagerInit providerCount={} primaryConfigId={}",
-                providerCache.size(), primaryConfigId);
+        log.info("storage provider load finished. task=storageManagerInit providerCount={} primaryProviderCode={}",
+                providerCache.size(), primaryProviderCode);
     }
 
     /**
      * 根据具体提供商类型，通过工厂方法构建实例
      */
-    private StorageProvider buildProvider(StorageConfigEntity config) {
+    private StorageProvider buildProvider(String providerCode, StorageProperties.Provider config) {
         return switch (config.getProvider()) {
-            case ALIYUN_OSS -> new AliyunOssProvider(config);
+            case ALIYUN_OSS -> new AliyunOssProvider(providerCode, config);
             // 预留其他云厂商的扩展口
             // case MINIO -> new MinioProvider(config);
             default -> throw new ServiceException(FileStorageError.CANNOT_SUPPORT_STORAGE_PROVIDER);
@@ -85,7 +84,7 @@ public class StorageManager {
      * 获取首要存储实例
      */
     public StorageProvider getPrimaryProvider() {
-        StorageProvider provider = providerCache.get(primaryConfigId);
+        StorageProvider provider = providerCache.get(primaryProviderCode);
         if (provider == null) {
             throw new ServiceException(FileStorageError.CANNOT_SUPPORT_STORAGE_PROVIDER);
         }
@@ -93,13 +92,13 @@ public class StorageManager {
     }
 
     /**
-     * 根据 ConfigId 获取指定存储实例
+     * 根据提供商编码获取指定存储实例
      */
-    public StorageProvider getProvider(Long configId) {
-        if (configId == null) {
+    public StorageProvider getProvider(String providerCode) {
+        if (providerCode == null || providerCode.isBlank()) {
             return getPrimaryProvider();
         }
-        StorageProvider provider = providerCache.get(configId);
+        StorageProvider provider = providerCache.get(providerCode);
         if (provider == null) {
             throw new ServiceException(FileStorageError.CANNOT_SUPPORT_STORAGE_PROVIDER);
         }
@@ -131,6 +130,7 @@ public class StorageManager {
         int providerCount = providerCache.size();
         providerCache.values().forEach(StorageProvider::destroy);
         providerCache.clear();
+        primaryProviderCode = null;
         log.info("storage provider destroyed. providerCount={}", providerCount);
     }
 }

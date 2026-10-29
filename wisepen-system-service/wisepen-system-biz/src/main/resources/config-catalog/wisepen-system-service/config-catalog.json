@@ -1,0 +1,216 @@
+{
+  "version": 1,
+  "service": "wisepen-system-service",
+  "dataId": "wisepen-system-service-{profile}.yaml",
+  "group": "DEFAULT_GROUP",
+  "configs": {
+    "batch-task-execution": {
+      "name": "批量任务执行配置",
+      "description": "单批执行数量和执行中任务超时认定参数。",
+      "path": [
+        "wisepen",
+        "batch-task",
+        "execution"
+      ],
+      "restartRequired": false,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "batch-size": {
+            "type": "integer",
+            "title": "单批执行任务项数量",
+            "default": 20,
+            "minimum": 1
+          },
+          "stale-minutes": {
+            "type": "integer",
+            "title": "执行中任务项超时分钟数",
+            "default": 30,
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "batch-task-schedule": {
+      "name": "批量任务轮询调度",
+      "description": "批量任务轮询间隔，发布后需要重启系统服务。",
+      "path": [
+        "wisepen",
+        "batch-task",
+        "schedule"
+      ],
+      "restartRequired": true,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "poll-delay-ms": {
+            "type": "integer",
+            "title": "任务轮询间隔（毫秒）",
+            "default": 10000,
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "mail-delivery": {
+      "name": "邮件发送配置",
+      "description": "系统邮件的 SMTP + SSL 连接、认证和超时设置，发布后需要重启系统服务。",
+      "path": [
+        "spring",
+        "mail"
+      ],
+      "restartRequired": true,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "host",
+          "port",
+          "protocol",
+          "username",
+          "password",
+          "default-encoding",
+          "properties"
+        ],
+        "properties": {
+          "host": {
+            "type": "string",
+            "title": "SMTP 主机",
+            "minLength": 1
+          },
+          "port": {
+            "type": "integer",
+            "title": "SMTP 端口",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "protocol": {
+            "type": "string",
+            "title": "邮件协议",
+            "enum": [
+              "smtp"
+            ],
+            "default": "smtp"
+          },
+          "username": {
+            "type": "string",
+            "title": "SMTP 用户名",
+            "minLength": 1
+          },
+          "password": {
+            "type": "string",
+            "title": "SMTP 密码",
+            "minLength": 1
+          },
+          "default-encoding": {
+            "type": "string",
+            "title": "默认编码",
+            "enum": [
+              "UTF-8"
+            ],
+            "default": "UTF-8"
+          },
+          "properties": {
+            "type": "object",
+            "title": "JavaMail 参数",
+            "additionalProperties": false,
+            "required": [
+              "mail"
+            ],
+            "properties": {
+              "mail": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "debug",
+                  "smtp"
+                ],
+                "properties": {
+                  "smtp": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "auth",
+                      "ssl",
+                      "connectiontimeout",
+                      "timeout",
+                      "writetimeout"
+                    ],
+                    "properties": {
+                      "auth": {
+                        "type": "boolean",
+                        "title": "是否启用 SMTP 认证",
+                        "const": true,
+                        "default": true
+                      },
+                      "ssl": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "enable"
+                        ],
+                        "properties": {
+                          "enable": {
+                            "type": "boolean",
+                            "title": "是否启用 SSL",
+                            "const": true,
+                            "default": true
+                          }
+                        }
+                      },
+                      "connectiontimeout": {
+                        "type": "integer",
+                        "title": "连接超时时间（毫秒）",
+                        "default": 5000,
+                        "minimum": 1
+                      },
+                      "timeout": {
+                        "type": "integer",
+                        "title": "读取超时时间（毫秒）",
+                        "default": 5000,
+                        "minimum": 1
+                      },
+                      "writetimeout": {
+                        "type": "integer",
+                        "title": "写入超时时间（毫秒）",
+                        "default": 5000,
+                        "minimum": 1
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "system-mail-identity": {
+      "name": "系统邮件身份配置",
+      "description": "系统邮件对外展示的发件人名称。",
+      "path": [
+        "wisepen",
+        "system",
+        "mail"
+      ],
+      "restartRequired": false,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "from-name"
+        ],
+        "properties": {
+          "from-name": {
+            "type": "string",
+            "title": "发件人显示名称",
+            "default": "WisePen系统",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

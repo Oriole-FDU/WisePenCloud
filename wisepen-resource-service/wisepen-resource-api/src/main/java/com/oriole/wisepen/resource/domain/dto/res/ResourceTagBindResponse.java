@@ -9,5 +9,6 @@ import java.util.Map;
 public class ResourceTagBindResponse {
     private String groupId;
     private String primaryTagId;
+    private Boolean aiBillingApproved;
     private Map<String, TagInfoBase> tags;
 }

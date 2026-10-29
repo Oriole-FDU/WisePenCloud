@@ -15,7 +15,7 @@ import java.io.Serial;
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("sys_group_member")
+@TableName("group_member")
 public class GroupMemberEntity extends GroupMemberBase {
 
     @Serial
@@ -23,4 +23,7 @@ public class GroupMemberEntity extends GroupMemberBase {
 
     private Long groupId; // 组ID
     private Long userId; // 用户ID
+
+    // 当前用户使用多个小组支付 AI 费用时的偏好顺序，null 表示未主动排序
+    private Integer aiBillingPriority;
 }

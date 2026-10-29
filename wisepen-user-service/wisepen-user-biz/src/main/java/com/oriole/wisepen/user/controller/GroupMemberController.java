@@ -3,8 +3,11 @@ package com.oriole.wisepen.user.controller;
 import com.oriole.wisepen.common.core.context.SecurityContextHolder;
 import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.R;
+import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
+import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.security.annotation.CheckRole;
+import com.oriole.wisepen.user.api.domain.dto.req.AiBillingGroupOrderUpdateRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupMemberKickRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupMemberRoleUpdateRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupMemberQuitRequest;
@@ -20,6 +23,8 @@ import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @Tag(name = "小组成员", description = "小组成员退出、移除、角色、配额与列表查询")
 @RestController
@@ -140,12 +145,46 @@ public class GroupMemberController {
 	}
 
 	@Operation(
+			summary = "查询 AI 计费小组顺序",
+			description = """
+					- 用途：查询当前用户在 AI 调用中优先尝试使用的小组钱包顺序。
+					- 请求：无业务请求参数。
+					- 约束：当前用户必须已登录。
+					- 处理：读取当前用户仍有效的小组成员关系，已主动排序的小组优先，其余小组按加入时间排列。
+					- 失败：未登录 -> PermissionError.NOT_LOGIN。
+					- 响应：返回小组 ID 有序列表。
+					"""
+	)
+	@GetMapping("/getMyAiBillingGroupOrder")
+	public R<List<Long>> getMyAiBillingGroupOrder() {
+		return R.ok(groupMemberService.listAiBillingGroupOrder(SecurityContextHolder.getUserId()));
+	}
+
+	@Operation(
+			summary = "设置 AI 计费小组顺序",
+			description = """
+					- 用途：设置当前用户在 AI 调用中优先尝试使用的小组钱包顺序。
+					- 请求：orderedGroupIds 按优先级给出小组 ID，可为空列表以清除主动排序。
+					- 约束：当前用户必须已登录，列表内小组必须都是当前用户仍加入的小组。
+					- 处理：去重后保存列表顺序；未列出的小组保留为未主动排序并排在其后；不改变小组计费策略、资源审批或钱包余额。
+					- 失败：未登录 -> PermissionError.NOT_LOGIN；列表包含非成员小组 -> UserError.GROUP_MEMBER_NOT_FOUND。
+					- 响应：成功时返回空结果。
+					"""
+	)
+	@Log(title = "修改 AI 计费小组顺序", businessType = BusinessType.UPDATE)
+	@PostMapping("/changeMyAiBillingGroupOrder")
+	public R<Void> updateMyAiBillingGroupOrder(@RequestBody @Valid AiBillingGroupOrderUpdateRequest req) {
+		groupMemberService.updateAiBillingGroupOrder(req, SecurityContextHolder.getUserId());
+		return R.ok();
+	}
+
+	@Operation(
 			summary = "更新成员信息点额度",
 			description = """
 					- 用途：小组 OWNER 调整一个或多个成员在高级小组内的信息点使用额度。
 					- 请求：groupId 指定目标小组；targetUserIds 指定成员列表；newTokenLimit 指定新的额度上限。
 					- 约束：当前用户必须是目标小组 OWNER；目标小组必须支持配置成员额度；新额度不能低于成员已使用额度。
-					- 处理：批量更新成员额度，并对额度高于已使用量的成员解除聊天熔断；不修改小组总余额。
+					- 处理：批量更新成员额度；不修改成员已使用量或小组总余额。
 					- 失败：未登录 -> PermissionError.NOT_LOGIN；当前用户不是 OWNER -> PermissionError.PERMISSION_DENIED；小组不存在 -> UserError.GROUP_NOT_EXIST；普通小组不允许配置额度 -> UserError.CANNOT_CONFIGURE_GROUP_WALLET_QUOTA；额度低于已使用量 -> UserError.WALLET_TOKEN_LIMIT_BELOW_USED。
 					- 响应：成功时返回空结果。
 					"""

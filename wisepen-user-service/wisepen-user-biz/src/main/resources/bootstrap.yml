@@ -32,39 +32,13 @@ spring:
 
 wisepen:
   user:
-    api-domain: ${WISEPEN_USER_API_DOMAIN:}
-    auth-cookie-domain: ${WISEPEN_USER_AUTH_COOKIE_DOMAIN:}
+    endpoint:
+      api-domain: ${WISEPEN_USER_API_DOMAIN:}
+      auth-cookie-domain: ${WISEPEN_USER_AUTH_COOKIE_DOMAIN:}
   campus-identity:
-    providers:
+    routing:
       FUDAN_UIS:
-        enabled: ${WISEPEN_CAMPUS_IDENTITY_FUDAN_UIS_ENABLED:true}
         service-name: ${WISEPEN_CAMPUS_IDENTITY_FUDAN_UIS_SERVICE_NAME:wisepen-fudan-extension-service}
-  user-task:
-    rules:
-      ONBOARDING_TUTORIAL:
-        enabled: ${WISEPEN_USER_TASK_ONBOARDING_TUTORIAL_ENABLED:true}
-      STUDENT_VERIFICATION:
-        enabled: ${WISEPEN_USER_TASK_STUDENT_VERIFICATION_ENABLED:true}
-        reward-type: ${WISEPEN_USER_TASK_STUDENT_VERIFICATION_REWARD_TYPE:TOKEN}
-        reward-amount: ${WISEPEN_USER_TASK_STUDENT_VERIFICATION_REWARD_AMOUNT:5000000}
-      TEACHER_VERIFICATION:
-        enabled: ${WISEPEN_USER_TASK_TEACHER_VERIFICATION_ENABLED:true}
-        reward-type: ${WISEPEN_USER_TASK_TEACHER_VERIFICATION_REWARD_TYPE:TOKEN}
-        reward-amount: ${WISEPEN_USER_TASK_TEACHER_VERIFICATION_REWARD_AMOUNT:100000000}
-    daily-check-in:
-      enabled: ${WISEPEN_USER_TASK_DAILY_CHECK_IN_ENABLED:true}
-      reward-type: ${WISEPEN_USER_TASK_DAILY_CHECK_IN_REWARD_TYPE:TOKEN}
-      min-reward-amount: ${WISEPEN_USER_TASK_DAILY_CHECK_IN_MIN_REWARD_AMOUNT:100000}
-      max-reward-amount: ${WISEPEN_USER_TASK_DAILY_CHECK_IN_MAX_REWARD_AMOUNT:1000000}
-      reward-step-amount: ${WISEPEN_USER_TASK_DAILY_CHECK_IN_REWARD_STEP_AMOUNT:100000}
-      refresh-cycle-days: ${WISEPEN_USER_TASK_DAILY_CHECK_IN_REFRESH_CYCLE_DAYS:1}
-      guarantee-cycle-count: ${WISEPEN_USER_TASK_DAILY_CHECK_IN_GUARANTEE_CYCLE_COUNT:10}
-    invite-verified-user:
-      enabled: ${WISEPEN_USER_TASK_INVITE_VERIFIED_USER_ENABLED:true}
-      reward-type: ${WISEPEN_USER_TASK_INVITE_VERIFIED_USER_REWARD_TYPE:TOKEN}
-      min-reward-amount: ${WISEPEN_USER_TASK_INVITE_VERIFIED_USER_MIN_REWARD_AMOUNT:1000000}
-      max-reward-amount: ${WISEPEN_USER_TASK_INVITE_VERIFIED_USER_MAX_REWARD_AMOUNT:10000000}
-      reward-step-amount: ${WISEPEN_USER_TASK_INVITE_VERIFIED_USER_REWARD_STEP_AMOUNT:1000000}
   openapi:
     title: 用户服务 API
     version: 1.0.0

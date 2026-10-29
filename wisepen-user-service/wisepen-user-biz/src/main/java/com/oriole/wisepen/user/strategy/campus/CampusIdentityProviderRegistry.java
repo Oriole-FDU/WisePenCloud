@@ -35,12 +35,14 @@ public class CampusIdentityProviderRegistry {
     }
 
     public RemoteIdentityService require(String providerCode) {
-        CampusIdentityProviderProperties.ProviderConfig config = properties.getProviders().get(providerCode);
-        if (config == null || !config.isEnabled() || StrUtil.isBlank(config.getServiceName())) {
+        CampusIdentityProviderProperties.ProviderConfig providerConfig = properties.getProviders().get(providerCode);
+        CampusIdentityProviderProperties.RoutingConfig routingConfig = properties.getRouting().get(providerCode);
+        if (providerConfig == null || !providerConfig.isEnabled()
+                || routingConfig == null || StrUtil.isBlank(routingConfig.getServiceName())) {
             throw new ServiceException(UserError.VERIFICATION_CAMPUS_IDENTITY_PROVIDER_NOT_FOUND);
         }
 
-        String serviceName = config.getServiceName().trim();
+        String serviceName = routingConfig.getServiceName().trim();
         return clients.computeIfAbsent(serviceName, this::createClient);
     }
 

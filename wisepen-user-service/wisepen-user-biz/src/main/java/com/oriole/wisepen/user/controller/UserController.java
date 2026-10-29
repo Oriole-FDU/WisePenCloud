@@ -58,7 +58,7 @@ public class UserController {
                     - 用途：查询当前登录用户的账号信息、资料信息和可编辑字段边界。
                     - 请求：无需显式传入 userId，目标用户来自当前认证上下文。
                     - 约束：当前用户必须已登录。
-                    - 处理：读取 sys_user 与 sys_user_profile，并在用户已完成身份认证时根据认证方式计算只读字段；不刷新认证状态。
+                    - 处理：读取 user_account 与 user_profile，并在用户已完成身份认证时根据认证方式计算只读字段；不刷新认证状态。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN。
                     - 响应：返回用户账号信息、资料信息和只读字段列表。
                     """
@@ -78,7 +78,7 @@ public class UserController {
                     - 用途：在站内消息等需要选择接收人的场景中，根据完整用户名或邮箱查找可见用户。
                     - 请求：keyword 为完整用户名或完整邮箱；不接受学工号搜索，也不做模糊匹配。
                     - 约束：当前用户必须已登录；可见用户必须账号正常且完成身份认证。
-                    - 处理：精确查询 sys_user 的 username 或 email，并过滤未认证或非正常状态用户；不返回邮箱、手机号或学工号。
+                    - 处理：精确查询 user_account 的 username 或 email，并过滤未认证或非正常状态用户；不返回邮箱、手机号或学工号。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN。
                     - 响应：返回符合条件的用户展示列表；无可见用户时返回空列表。
                     """
@@ -115,7 +115,7 @@ public class UserController {
             summary = "更新用户资料",
             description = """
                     - 用途：当前用户维护自己的学籍、院系、专业、班级、入学年份、学历层次、职称与性别资料。
-                    - 请求：请求体字段属于用户资料域，对应 sys_user_profile；空字段不覆盖已有值。
+                    - 请求：请求体字段属于用户资料域，对应 user_profile；空字段不覆盖已有值。
                     - 约束：当前用户必须已登录且已完成身份认证；认证策略标记的只读字段不能被用户修改。
                     - 处理：更新当前用户资料域；学生身份会清空职称字段，非学生身份会清空专业和班级字段；不修改账号、密码、状态或认证方式。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN；用户未完成身份认证 -> UserError.CANNOT_OPERATE_BEFORE_AUTH_VERIFICATION。
@@ -136,7 +136,7 @@ public class UserController {
                     - 用途：当前用户维护自己的展示类账号信息。
                     - 请求：nickname、avatar、realName 为可更新的账号展示字段。
                     - 约束：当前用户必须已登录。
-                    - 处理：更新当前用户 sys_user 中的展示信息，不修改用户名、学工号、身份类型、认证方式、账号状态或密码。
+                    - 处理：更新当前用户 user_account 中的展示信息，不修改用户名、学工号、身份类型、认证方式、账号状态或密码。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN。
                     - 响应：成功时返回空结果。
                     """

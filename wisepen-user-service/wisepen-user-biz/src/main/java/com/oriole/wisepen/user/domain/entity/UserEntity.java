@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("sys_user")
+@TableName("user_account")
 public class UserEntity extends UserInfoBase {
 
     @TableId(type = IdType.ASSIGN_ID)
