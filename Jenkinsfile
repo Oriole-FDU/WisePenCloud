@@ -1,21 +1,25 @@
 pipeline {
     agent any
 
-    // 环境变量配置中心
+    options {
+        skipDefaultCheckout(true)
+        disableConcurrentBuilds()
+        timestamps()
+    }
+
     environment {
-        // 项目基础名称
         PROJECT_NAME = 'wisepencloud'
-        // Docker 镜像仓库地址 (如果在单机内网部署，可以直接留空或使用 local)
         DOCKER_REGISTRY = 'local'
-        // 动态获取 Git 提交的简短哈希作为镜像版本 Tag
-        IMAGE_TAG = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-        // 部署脚本的绝对或相对路径
         COMPOSE_FILE_PATH = 'docker-compose-app.yml'
     }
 
     // 可选参数化构建，方便手动触发时选择分支
     parameters {
         string(name: 'BRANCH_NAME', defaultValue: 'main', description: '选择需要构建的 Git 分支')
+        booleanParam(name: 'DEPLOY_AFTER_BUILD', defaultValue: true, description: '构建成功后是否执行部署')
+        booleanParam(name: 'PUSH_TO_REGISTRY', defaultValue: false, description: '是否额外上传镜像到用户指定的制品仓')
+        string(name: 'REGISTRY_HOST', defaultValue: '', description: '制品仓主机名和可选端口，不包含协议或路径')
+        string(name: 'REGISTRY_NAMESPACE', defaultValue: '', description: '制品仓命名空间，例如 wisepen')
         booleanParam(name: 'DEPLOY_USER_SERVICE', defaultValue: true, description: '构建并部署 user-service')
         booleanParam(name: 'DEPLOY_SYSTEM_SERVICE', defaultValue: true, description: '构建并部署 system-service')
         booleanParam(name: 'DEPLOY_DOCS_SERVICE', defaultValue: true, description: '构建并部署 docs-service')
@@ -31,9 +35,16 @@ pipeline {
     stages {
         stage('1. 拉取代码 (Checkout)') {
             steps {
-                echo "开始拉取 ${params.BRANCH_NAME} 分支代码..."
-                checkout scm
-                echo "✅ 代码拉取成功，当前构建版本 TAG: ${IMAGE_TAG}"
+                script {
+                    def remoteUrl = scm.userRemoteConfigs[0].url
+                    echo "开始从 ${remoteUrl} 拉取 ${params.BRANCH_NAME} 分支代码..."
+                    deleteDir()
+                    git branch: params.BRANCH_NAME, url: remoteUrl
+                    env.GIT_COMMIT_FULL = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+                    env.IMAGE_TAG = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                    sh 'git status --short --branch'
+                    echo "代码拉取成功，Commit: ${env.GIT_COMMIT_FULL}，镜像 TAG: ${env.IMAGE_TAG}"
+                }
             }
         }
 
@@ -72,10 +83,10 @@ pipeline {
                         selectedServices << 'fudan-extension-service'
                     }
                     if (selectedServices.isEmpty()) {
-                        error '至少需要选择一个要构建并部署的服务。'
+                        error '至少需要选择一个要构建的服务。'
                     }
                     env.SELECTED_COMPOSE_SERVICES = selectedServices.join(' ')
-                    echo "本次选择构建并部署的服务: ${env.SELECTED_COMPOSE_SERVICES}"
+                    echo "本次选择构建的服务: ${env.SELECTED_COMPOSE_SERVICES}"
                 }
             }
         }
@@ -85,9 +96,7 @@ pipeline {
                 stage('Java Backend Build') {
                     steps {
                         echo "开始进行 Java 微服务 Maven 构建..."
-                        // 赋予 maven wrapper 执行权限
                         sh 'chmod +x ./mvnw'
-                        // 多模块统一编译打包，跳过测试，开启单核多线程编译加快速度
                         sh './mvnw clean package -Dmaven.test.skip=true -T 1C'
                         sh '''
                         echo "开始整理构建产物..."
@@ -125,8 +134,7 @@ pipeline {
             }
         }
 
-        stage('3. 并行构建并推送镜像 (Docker Build & Push)') {
-            // failFast true：任何一个微服务构建失败，立即停止整个流水线，避免资源浪费
+        stage('3. 构建 Docker 镜像 (Docker Build)') {
             failFast true
 
             parallel {
@@ -233,7 +241,67 @@ pipeline {
             }
         }
 
-        stage('4. 自动化部署 (Deploy)') {
+        stage('3.5 上传镜像到制品仓 (Push Registry)') {
+            when {
+                expression { return params.PUSH_TO_REGISTRY }
+            }
+            steps {
+                script {
+                    if (!params.REGISTRY_HOST?.trim() || params.REGISTRY_HOST.contains('://') || params.REGISTRY_HOST.contains('/')) {
+                        error 'REGISTRY_HOST 必须填写主机名和可选端口，不能包含协议或路径。'
+                    }
+                    if (!params.REGISTRY_NAMESPACE?.trim()) {
+                        error '启用制品仓上传时必须填写 REGISTRY_NAMESPACE。'
+                    }
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: 'docker-registry-credentials',
+                            usernameVariable: 'REGISTRY_USERNAME',
+                            passwordVariable: 'REGISTRY_PASSWORD'
+                        )
+                    ]) {
+                        withEnv([
+                            "REGISTRY_HOST=${params.REGISTRY_HOST.trim()}",
+                            "REGISTRY_NAMESPACE=${params.REGISTRY_NAMESPACE.trim()}"
+                        ]) {
+                            sh '''
+                            set -eu
+                            DOCKER_CONFIG="$(mktemp -d)"
+                            export DOCKER_CONFIG
+                            trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+                            printf '%s' "$REGISTRY_PASSWORD" | docker login "$REGISTRY_HOST" \
+                                --username "$REGISTRY_USERNAME" --password-stdin
+
+                            for service in $SELECTED_COMPOSE_SERVICES; do
+                                case "$service" in
+                                    user-service) image_name=user ;;
+                                    system-service) image_name=system ;;
+                                    docs-service) image_name=docs ;;
+                                    resource-service) image_name=resource ;;
+                                    document-service) image_name=document ;;
+                                    note-service) image_name=note ;;
+                                    ai-asset-service) image_name=ai-asset ;;
+                                    web-app-service) image_name=web-app ;;
+                                    file-storage-service) image_name=file-storage ;;
+                                    fudan-extension-service) image_name=fudan-extension ;;
+                                    *) echo "未知服务: $service"; exit 1 ;;
+                                esac
+                                source_image="${DOCKER_REGISTRY}/${PROJECT_NAME}-${image_name}:${IMAGE_TAG}"
+                                target_image="${REGISTRY_HOST}/${REGISTRY_NAMESPACE}/${PROJECT_NAME}-${image_name}:${IMAGE_TAG}"
+                                docker tag "$source_image" "$target_image"
+                                docker push "$target_image"
+                            done
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('4. 部署 (Deploy)') {
+            when {
+                expression { return params.DEPLOY_AFTER_BUILD }
+            }
             environment {
                 NACOS_USER = credentials('nacos-username')
                 NACOS_PWD  = credentials('nacos-password')
@@ -241,57 +309,63 @@ pipeline {
             steps {
                 script {
                     echo "开始部署最新版本: ${IMAGE_TAG}，服务: ${env.SELECTED_COMPOSE_SERVICES} ..."
-                    // Jenkins 和 运行服务器 在同一台宿主机
                     sh """
-                    # 如果没有 docker-compose，则静默下载最新独立版
-                    if ! command -v docker-compose &> /dev/null; then
-                        echo "容器内缺失 docker-compose，正在自动下载..."
-                        curl -L -# -o /usr/local/bin/docker-compose "https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)"
-                        chmod +x /usr/local/bin/docker-compose
-                    fi
+                    set -eu
+                    docker compose version
 
-                    # 导出所需环境变量
                     export APP_VERSION=${IMAGE_TAG}
                     export DOCKER_REGISTRY=${DOCKER_REGISTRY}
                     export NACOS_USERNAME=\${NACOS_USER}
                     export NACOS_PASSWORD=\${NACOS_PWD}
 
-                    # 网络兼容
-                    # 检测到遗留 cloud-infra_cloud-net 时叠加 legacy-net overlay
-                    # 老中间件全部下线后，本脚本可以与docker-compose-app.legacy-net.yml文件、部署脚本中的探测分支一并删除
                     docker network create wisepen-net 2>/dev/null || true
-                    COMPOSE_FILES="-f docker-compose-app.yml"
-                    if docker network inspect cloud-infra_cloud-net >/dev/null 2>&1; then
-                        echo "检测到遗留网络 cloud-infra_cloud-net，叠加 docker-compose-app.legacy-net.yml"
-                        COMPOSE_FILES="\$COMPOSE_FILES -f docker-compose-app.legacy-net.yml"
-                    fi
 
-                    # 启动部署
-                    docker-compose \$COMPOSE_FILES up -d --remove-orphans ${env.SELECTED_COMPOSE_SERVICES}
+                    # 清理本轮选中服务的规范容器
+                    for service in ${env.SELECTED_COMPOSE_SERVICES}; do
+                        case "\$service" in
+                            user-service) container_name=wisepen-user-service ;;
+                            system-service) container_name=wisepen-system-service ;;
+                            docs-service) container_name=wisepen-docs-service ;;
+                            resource-service) container_name=wisepen-resource-service ;;
+                            document-service) container_name=wisepen-document-service ;;
+                            note-service) container_name=wisepen-note-service ;;
+                            ai-asset-service) container_name=wisepen-ai-asset-service ;;
+                            web-app-service) container_name=wisepen-web-app-service ;;
+                            file-storage-service) container_name=wisepen-file-storage-service ;;
+                            fudan-extension-service) container_name=wisepen-fudan-extension-service ;;
+                            *)
+                                echo "未知 Compose 服务: \$service"
+                                exit 1
+                                ;;
+                        esac
+                        docker rm -f "\$container_name" >/dev/null 2>&1 || true
+                    done
+
+                    docker compose \
+                        -p wisepen-cloud \
+                        -f ${COMPOSE_FILE_PATH} \
+                        up -d --no-build --force-recreate --remove-orphans \
+                        ${env.SELECTED_COMPOSE_SERVICES}
                     """
                 }
             }
         }
     }
 
-    // 后置处理钩子
     post {
         always {
-            // 清理悬挂的无用镜像 (<none>:<none>)，防止长年累月撑爆 Jenkins 宿主机磁盘
             echo "执行 Docker 垃圾回收..."
             sh 'docker image prune -f'
         }
         success {
-            echo "🎉 构建与部署大功告成！版本: ${IMAGE_TAG}"
-            // 可以在这里增加 curl 命令发送钉钉/飞书 webhook 机器人通知
-            // sh """
-            // curl -X POST 'https://oapi.dingtalk.com/robot/send?access_token=xxx' \
-            // -H 'Content-Type: application/json' \
-            // -d '{"msgtype": "text", "text": {"content": "【WisePenCloud CI/CD】\n版本 ${IMAGE_TAG} 已成功部署！"}}'
-            // """
+            script {
+                echo(params.DEPLOY_AFTER_BUILD
+                    ? "构建与部署完成！版本: ${IMAGE_TAG}"
+                    : "构建完成，已按 build-only 模式跳过部署！版本: ${IMAGE_TAG}")
+            }
         }
         failure {
-            echo "❌ 流水线执行失败，请检查 Jenkins 控制台报错日志！"
+            echo "流水线执行失败，请检查 Jenkins 控制台报错日志！"
         }
     }
 }
