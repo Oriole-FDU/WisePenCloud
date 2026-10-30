@@ -311,7 +311,7 @@ pipeline {
                     echo "开始部署最新版本: ${IMAGE_TAG}，服务: ${env.SELECTED_COMPOSE_SERVICES} ..."
                     sh """
                     set -eu
-                    docker compose version
+                    docker-compose version
 
                     export APP_VERSION=${IMAGE_TAG}
                     export DOCKER_REGISTRY=${DOCKER_REGISTRY}
@@ -333,15 +333,12 @@ pipeline {
                             web-app-service) container_name=wisepen-web-app-service ;;
                             file-storage-service) container_name=wisepen-file-storage-service ;;
                             fudan-extension-service) container_name=wisepen-fudan-extension-service ;;
-                            *)
-                                echo "未知 Compose 服务: \$service"
-                                exit 1
-                                ;;
+                            *) echo "未知 Compose 服务: \$service"; exit 1 ;;
                         esac
                         docker rm -f "\$container_name" >/dev/null 2>&1 || true
                     done
 
-                    docker compose \
+                    docker-compose \
                         -p wisepen-cloud \
                         -f ${COMPOSE_FILE_PATH} \
                         up -d --no-build --force-recreate --remove-orphans \
