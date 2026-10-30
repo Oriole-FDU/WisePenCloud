@@ -15,12 +15,14 @@ import com.oriole.wisepen.resource.domain.dto.res.TagTreeResponse;
 import com.oriole.wisepen.resource.service.ITagService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
+import static com.oriole.wisepen.resource.constant.ResourceValidationMsg.GROUP_ID_NOT_BLANK;
 import static com.oriole.wisepen.resource.constant.ResourceConstants.MARKET_GROUP_PREFIX;
 import static com.oriole.wisepen.resource.constant.ResourceConstants.PERSONAL_GROUP_PREFIX;
 
@@ -32,6 +34,46 @@ import static com.oriole.wisepen.resource.constant.ResourceConstants.PERSONAL_GR
 public class ResourceTagController {
 
     private final ITagService tagService;
+
+    // 获取当前用户的个人 Tag 树
+    @Operation(
+            operationId = "getPersonalTagTree",
+            summary = "获取个人标签树",
+            description = """
+                    - 用途：获取当前用户个人资源空间的完整标签树，供个人文件浏览、挂载和标签维护使用。
+                    - 请求：无需业务参数，当前用户由登录上下文确定。
+                    - 约束：当前用户必须处于允许访问的登录身份和账号状态。
+                    - 处理：使用当前用户 ID 生成个人标签空间标识，读取全部标签并在内存中组装树；缺少系统根节点或回收站节点时自动初始化，不修改普通业务标签。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；登录身份或账号状态无效 -> PermissionError.UNAUTHORIZED；账号未完成身份认证 -> PermissionError.ACCOUNT_UNIDENTIFIED。
+                    - 响应：返回当前用户个人标签空间的根节点列表及其子节点。
+                    """
+    )
+    @GetMapping("/getPersonalTagTree")
+    public R<List<TagTreeResponse>> getPersonalTagTree() {
+        String personalGroupId = PERSONAL_GROUP_PREFIX + SecurityContextHolder.getUserId();
+        return R.ok(tagService.getTagTree(personalGroupId));
+    }
+
+    // 获取指定小组的 Tag 树
+    @Operation(
+            operationId = "getGroupTagTree",
+            summary = "获取小组标签树",
+            description = """
+                    - 用途：获取指定小组资源空间的完整标签树，供小组文件浏览、挂载和标签维护使用。
+                    - 请求：groupId 必传，指定目标小组；M_ 前缀会按现有规则归一化为真实小组 ID。
+                    - 约束：当前用户必须属于目标小组。
+                    - 处理：校验小组访问权限后读取全部标签并在内存中组装树；不修改普通业务标签。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；登录身份或账号状态无效 -> PermissionError.UNAUTHORIZED；账号未完成身份认证 -> PermissionError.ACCOUNT_UNIDENTIFIED；当前用户不属于目标小组 -> PermissionError.PERMISSION_DENIED。
+                    - 响应：返回目标小组标签空间的根节点列表及其子节点。
+                    """
+    )
+    @GetMapping("/getGroupTagTree")
+    public R<List<TagTreeResponse>> getGroupTagTree(
+            @RequestParam(value = "groupId") @NotBlank(message = GROUP_ID_NOT_BLANK) String groupId) {
+        TagSpaceBase tagSpaceBase = new TagSpaceBase(groupId);
+        checkPermission(tagSpaceBase, false);
+        return R.ok(tagService.getTagTree(tagSpaceBase.getGroupId()));
+    }
 
     // 获取指定用户组的完整 Tag 树
     @Operation(
