@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "service": "wisepen-generic-resource-service",
+  "dataId": "wisepen-generic-resource-service-{profile}.yaml",
+  "group": "DEFAULT_GROUP",
+  "configs": {
+    "generic-resource-upload-timeout-policy": {
+      "name": "通用资源上传超时配置",
+      "description": "根据基础等待时间、最低上传速度和最大等待时间判定通用资源上传超时。",
+      "path": ["wisepen", "generic-resource", "upload-timeout"],
+      "restartRequired": false,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "base-timeout-ms": {
+            "type": "integer",
+            "title": "上传基础超时时间（毫秒）",
+            "default": 600000,
+            "minimum": 1
+          },
+          "assumed-speed-bps": {
+            "type": "integer",
+            "title": "假设的最低上传速度（字节/秒）",
+            "default": 102400,
+            "minimum": 1
+          },
+          "max-timeout-ms": {
+            "type": "integer",
+            "title": "上传最大超时时间（毫秒）",
+            "default": 3600000,
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "generic-resource-stale-check-schedule": {
+      "name": "通用资源上传检查与注册补偿",
+      "description": "控制上传超时检查和注册补偿的执行间隔、批量上限与注册超时时间，发布后需要重启通用资源服务。",
+      "path": ["wisepen", "generic-resource", "stale-check"],
+      "restartRequired": true,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "delay-ms": {
+            "type": "integer",
+            "title": "上传超时检测间隔（毫秒）",
+            "default": 300000,
+            "minimum": 1
+          },
+          "batch-size": {
+            "type": "integer",
+            "title": "上传检查和注册补偿每轮各自的处理上限",
+            "default": 100,
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "registration-timeout-ms": {
+            "type": "integer",
+            "title": "注册任务超时及失败重试间隔（毫秒）",
+            "default": 300000,
+            "minimum": 1
+          }
+        }
+      }
+    }
+  }
+}
