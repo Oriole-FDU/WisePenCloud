@@ -27,13 +27,13 @@ import java.util.Map;
         name = "idx_resource_id",
         def = "{'resourceId': 1}",
         unique = true,
-        partialFilter = "{'resourceId': {'$exists': true, '$ne': null}}"
+        partialFilter = "{'resourceId': {'$type': 'string'}}"
 )
 @CompoundIndex(
         name = "idx_object_key",
         def = "{'objectKey': 1}",
         unique = true,
-        partialFilter = "{'objectKey': {'$exists': true, '$ne': null}}"
+        partialFilter = "{'objectKey': {'$type': 'string'}}"
 )
 @CompoundIndex(name = "idx_status_create_time", def = "{'status': 1, 'createTime': 1, '_id': 1}")
 @CompoundIndex(name = "idx_status_update_time", def = "{'status': 1, 'updateTime': 1, '_id': 1}")
