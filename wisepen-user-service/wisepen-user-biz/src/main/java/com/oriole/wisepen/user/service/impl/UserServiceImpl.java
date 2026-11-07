@@ -20,6 +20,8 @@ import com.oriole.wisepen.user.api.config.UserProperties;
 import com.oriole.wisepen.user.api.domain.base.UserInfoBase;
 import com.oriole.wisepen.user.api.domain.base.UserProfileBase;
 import com.oriole.wisepen.user.api.domain.dto.req.*;
+import com.oriole.wisepen.user.api.domain.dto.res.UserAdminDetailResponse;
+import com.oriole.wisepen.user.api.domain.dto.res.UserAdminListItemResponse;
 import com.oriole.wisepen.user.api.domain.dto.res.UserDetailInfoResponse;
 import com.oriole.wisepen.user.api.domain.dto.res.UserSearchUserResponse;
 import com.oriole.wisepen.user.cache.RedisCacheManager;
@@ -359,10 +361,11 @@ public class UserServiceImpl implements IUserService {
     }
 
     @Override
-    public PageR<UserEntity> getUserListAdmin(int page, int size, String keyword, UserStatus userStatus,
-            IdentityType identityType) {
+    public PageR<UserAdminListItemResponse> getUserListAdmin(int page, int size, String keyword, UserStatus userStatus,
+                                                            IdentityType identityType) {
         page = Math.max(1, page);
-        size = Math.max(1, size);
+        // 增加分页上限为100
+        size = Math.clamp(size, 1, 100);
 
         // 构建查询条件
         LambdaQueryWrapper<UserEntity> queryWrapper = Wrappers.<UserEntity>lambdaQuery().eq(UserEntity::getDelFlag, 0);
@@ -377,25 +380,49 @@ public class UserServiceImpl implements IUserService {
             // 关键词模糊匹配 realName，或精确匹配 campusNo、username，或尝试作为 id 精确匹配
             String kw = keyword.trim();
             queryWrapper.and(wrapper -> {
-                wrapper.like(UserEntity::getRealName, kw).or().eq(UserEntity::getCampusNo, kw).or()
-                        .eq(UserEntity::getUsername, kw);
-                wrapper.or().eq(UserEntity::getUserId, Long.valueOf(kw));
+                wrapper.like(UserEntity::getRealName, kw)
+                        .or().eq(UserEntity::getCampusNo, kw)
+                        .or().eq(UserEntity::getUsername, kw);
+
+                Long keywordUserId = null;
+                try {
+                    keywordUserId = Long.valueOf(kw);
+                } catch (NumberFormatException ignored) {
+                    // keyword不可转化为Long时不进行ID匹配
+                }
+                if (keywordUserId != null) {
+                    wrapper.or().eq(UserEntity::getUserId, keywordUserId);
+                }
             });
         }
         queryWrapper.orderByDesc(UserEntity::getCreateTime);
 
         Page<UserEntity> result = userMapper.selectPage(new Page<>(page, size), queryWrapper);
 
-        List<UserEntity> records = result.getRecords();
-        for (UserEntity userEntity : records) {
-            userEntity.setPassword(null);
-        }
-        PageR<UserEntity> pageR = new PageR<>(result.getTotal(), page, size);
+        List<UserAdminListItemResponse> records = result.getRecords()
+                .stream()
+                .map(userEntity -> BeanUtil.copyProperties(
+                        userEntity,
+                        UserAdminListItemResponse.class))
+                .toList();
+        PageR<UserAdminListItemResponse> pageR = new PageR<>(result.getTotal(), page, size);
         pageR.addAll(records);
         return pageR;
     }
 
-    public UserProfileEntity getUserDetailInfoAdmin(Long userId) {
-        return userProfileMapper.selectById(userId);
+    @Override
+    public UserAdminDetailResponse getUserDetailInfoAdmin(Long userId) {
+        UserEntity userEntity = userMapper.selectById(userId);
+        if (userEntity == null) {
+            return null;
+        }
+        UserProfileEntity userProfileEntity = userProfileMapper.selectById(userId);
+        if (userProfileEntity == null) {
+            return null;
+        }
+        UserAdminDetailResponse response = new UserAdminDetailResponse();
+        BeanUtil.copyProperties(userProfileEntity, response);
+        BeanUtil.copyProperties(userEntity, response);
+        return response;
     }
 }
