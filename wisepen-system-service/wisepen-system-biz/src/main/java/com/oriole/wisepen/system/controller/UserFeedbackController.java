@@ -27,9 +27,9 @@ public class UserFeedbackController {
             summary = "提交用户反馈",
             description = """
                     - 用途：让登录用户提交问题报错、功能建议或使用咨询反馈。
-                    - 请求：content 为反馈正文；type 为反馈类型；contact 和 browser 为可选补充信息；imageUrl 为已上传图片的访问地址，可不传，最长 1024 字符。
-                    - 约束：当前用户必须已登录；content 和 type 必须表达有效的反馈内容与反馈类型。
-                    - 处理：创建反馈记录，保存登录用户 ID 和图片地址，并将状态初始化为 PENDING；不在本接口分派处理人或发送通知。
+                    - 请求：content 为反馈正文；contact 为联系方式；type 为类型数组，可取 BUG_REPORT、SUGGESTION、CONSULTATION、COMPLAINT、OTHER，例如 ["BUG_REPORT","SUGGESTION"]；browser 为可选环境信息；imageUrl 为已上传图片的访问地址，可不传，最长 1024 字符。
+                    - 约束：当前用户必须已登录；type 必填且至少选择一种类型，元素不能为空，允许多选，重复类型自动去重。
+                    - 处理：创建反馈记录，保存登录用户 ID、所选类型和图片地址，并将状态初始化为 PENDING。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN；反馈记录写入发生未处理异常 -> CommonError.INTERNAL_ERROR。
                     - 响应：成功时返回空结果。
                     """

@@ -3,15 +3,14 @@ package com.oriole.wisepen.system.domain.entity;
 import com.baomidou.mybatisplus.annotation.*;
 import com.oriole.wisepen.system.api.enums.FeedbackStatus;
 import com.oriole.wisepen.system.api.enums.FeedbackType;
+import com.oriole.wisepen.system.mapper.handler.FeedbackTypeSetTypeHandler;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.Set;
 
-/**
- * @author Xiong Heng
- */
 @Data
-@TableName("feedback")
+@TableName(value = "feedback", autoResultMap = true)
 public class FeedbackEntity {
     @TableId(type = IdType.AUTO)
     private Long id;
@@ -21,7 +20,8 @@ public class FeedbackEntity {
     @TableField("image_url")
     private String imageUrl;
     private String browser;
-    private FeedbackType type;
+    @TableField(value = "type", typeHandler = FeedbackTypeSetTypeHandler.class)
+    private Set<FeedbackType> type;
     private FeedbackStatus status;
 
     @TableField(value = "create_time", fill = FieldFill.INSERT)

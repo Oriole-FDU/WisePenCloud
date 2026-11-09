@@ -17,6 +17,8 @@ public enum SysError implements IResult {
 
     MAIL_SEND_FAILED(2111, new ResultKey(BusinessDomain.SYSTEM, SystemSubject.MAIL, ErrorReason.FAILED),"邮件发送失败"),
 
+    FEEDBACK_NOT_FOUND(2311, new ResultKey(BusinessDomain.SYSTEM, SystemSubject.FEEDBACK, ErrorReason.NOT_FOUND), "反馈不存在"),
+
     BATCH_TASK_NOT_FOUND(2211, new ResultKey(BusinessDomain.SYSTEM, SystemSubject.BATCH_TASK, ErrorReason.NOT_FOUND), "批量任务不存在"),
     BATCH_TASK_TARGET_USER_NOT_FOUND(2212, new ResultKey(BusinessDomain.SYSTEM, SystemSubject.BATCH_TASK, ErrorReason.NOT_FOUND), "批量任务目标用户不存在"),
     BATCH_TASK_TYPE_UNSUPPORTED(2221, new ResultKey(BusinessDomain.SYSTEM, SystemSubject.BATCH_TASK, ErrorReason.UNSUPPORTED), "批量任务类型不支持"),
