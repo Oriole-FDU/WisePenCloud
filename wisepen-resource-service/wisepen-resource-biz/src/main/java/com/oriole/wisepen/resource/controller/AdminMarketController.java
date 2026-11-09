@@ -8,6 +8,7 @@ import com.oriole.wisepen.common.core.domain.enums.IdentityType;
 import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.resource.domain.dto.req.MarketSaleAuditRequest;
+import com.oriole.wisepen.resource.domain.dto.res.MarketOrderResponse;
 import com.oriole.wisepen.resource.domain.dto.res.MarketSearchHitItemResponse;
 import com.oriole.wisepen.resource.enums.MarketSaleStatus;
 import com.oriole.wisepen.resource.enums.SearchScope;
@@ -16,7 +17,10 @@ import com.oriole.wisepen.resource.service.ISearchQueryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -29,6 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/admin/market")
 @RequiredArgsConstructor
 @CheckRole(IdentityType.ADMIN)
+@Validated
 public class AdminMarketController {
 
     private final IMarketService marketService;
@@ -62,6 +67,26 @@ public class AdminMarketController {
                 page,
                 size
         ));
+    }
+
+    @Operation(
+            summary = "分页查询集市订单",
+            description = """
+                    - 用途：供平台管理员查询集市交易订单。
+                    - 请求：userId 可选，指定后按买家筛选订单；page 和 size 控制分页，均从 1 开始。
+                    - 约束：当前用户必须是平台管理员；page 和 size 必须大于等于 1。
+                    - 处理：传入 userId 时按买家分页查询；未传 userId 时按创建时间倒序分页读取全部订单；不修改订单、买家或卖家数据。
+                    - 失败：当前身份不是平台管理员 -> PermissionError.UNAUTHORIZED。
+                    - 响应：返回订单分页，包含订单 ID、买家、卖家、资源、集市组、购买版本、支付价格和创建时间。
+                    """
+    )
+    @Log(title = "管理员查询集市订单", businessType = BusinessType.SELECT, isSaveRequestData = false, isSaveResponseData = false)
+    @GetMapping("/listOrders")
+    public R<PageR<MarketOrderResponse>> listOrders(
+            @RequestParam(value = "userId", required = false) String userId,
+            @RequestParam(value = "page", defaultValue = "1") @Min(1) int page,
+            @RequestParam(value = "size", defaultValue = "20") @Min(1) @Max(100) int size) {
+        return R.ok(marketService.listOrders(userId, page, size));
     }
 
     @Operation(

@@ -15,6 +15,8 @@ public interface INoteVersionService {
 
     NoteSnapshotResponse getLatestVersion(String resourceId);
 
+    NoteSnapshotResponse getVersion(String resourceId, Integer targetVersion);
+
     NoteSearchTextResponse getSearchText(String resourceId, Integer targetVersion);
 
     PageR<NoteVersionInfoResponse> listVersions(String resourceId, int page, int size);

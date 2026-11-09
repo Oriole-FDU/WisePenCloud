@@ -2,6 +2,7 @@ package com.oriole.wisepen.resource.feign;
 
 import com.oriole.wisepen.resource.domain.dto.*;
 import com.oriole.wisepen.resource.domain.dto.req.PersonalFolderEnsureReqDTO;
+import com.oriole.wisepen.resource.domain.dto.req.MarketSaleVersionCheckRequest;
 import com.oriole.wisepen.resource.domain.dto.res.ResourceItemResponse;
 import com.oriole.wisepen.common.core.domain.R;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -31,6 +32,9 @@ public interface RemoteResourceService {
 
     @PostMapping("/internal/resource/checkResPermission")
     R<ResourceCheckPermissionResDTO> checkResPermission(@RequestBody ResourceCheckPermissionReqDTO dto);
+
+    @PostMapping("/internal/resource/assertMarketSaleVersion")
+    R<Void> assertMarketSaleVersion(@RequestBody MarketSaleVersionCheckRequest request);
 
     @PostMapping("/internal/resource/listAiBillingApprovedGroupIds")
     R<List<String>> listAiBillingApprovedGroupIds(@RequestParam("resourceId") String resourceId);
