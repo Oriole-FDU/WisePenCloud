@@ -8,12 +8,10 @@ import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.oriole.wisepen.common.web.decoder.RemoteResponseErrorDecoder;
 import com.oriole.wisepen.common.web.interceptor.FeignRequestInterceptor;
 import feign.RequestInterceptor;
 import feign.codec.Decoder;
 import feign.codec.Encoder;
-import feign.codec.ErrorDecoder;
 import org.springframework.beans.factory.ObjectFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.http.HttpMessageConverters;
@@ -88,8 +86,4 @@ public class FeignConfiguration {
         return new ResponseEntityDecoder(new SpringDecoder(factory));
     }
 
-    @Bean
-    public ErrorDecoder feignErrorDecoder() {
-        return new RemoteResponseErrorDecoder(feignObjectMapper());
-    }
 }
