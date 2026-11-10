@@ -152,6 +152,33 @@ public class NoteVersionServiceImpl implements INoteVersionService {
     }
 
     @Override
+    public NoteSnapshotResponse getVersion(String resourceId, Integer targetVersion) {
+        noteVersionRepository.findByResourceIdAndVersion(resourceId, targetVersion)
+                .orElseThrow(() -> new ServiceException(NoteError.NOTE_NOT_FOUND));
+
+        Optional<NoteVersionEntity> targetFullVersionEntity = noteVersionRepository
+                .findFirstByResourceIdAndTypeAndVersionLessThanEqualOrderByVersionDesc(
+                        resourceId, VersionType.FULL, targetVersion);
+        Integer fullVersion = targetFullVersionEntity.map(NoteVersionEntity::getVersion).orElse(0);
+        List<NoteVersionEntity> deltaVersionEntities = noteVersionRepository
+                .findByResourceIdAndVersionRangeAndTypeOrderByVersionAsc(
+                        resourceId, fullVersion, targetVersion, VersionType.DELTA);
+
+        String fullSnapshot = targetFullVersionEntity
+                .map(entity -> Base64.getEncoder().encodeToString(entity.getData().getData()))
+                .orElse(null);
+        List<String> deltas = deltaVersionEntities.stream()
+                .map(entity -> Base64.getEncoder().encodeToString(entity.getData().getData()))
+                .toList();
+        return NoteSnapshotResponse.builder()
+                .resourceId(resourceId)
+                .version(targetVersion)
+                .fullSnapshot(fullSnapshot)
+                .deltas(deltas.isEmpty() ? null : deltas)
+                .build();
+    }
+
+    @Override
     public NoteSearchTextResponse getSearchText(String resourceId, Integer targetVersion) {
         NoteVersionEntity versionEntity = targetVersion == null
                 ? noteVersionRepository.findFirstByResourceIdAndTypeOrderByVersionDesc(resourceId, VersionType.FULL)

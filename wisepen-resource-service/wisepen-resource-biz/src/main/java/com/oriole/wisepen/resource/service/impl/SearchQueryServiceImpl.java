@@ -159,8 +159,10 @@ public class SearchQueryServiceImpl implements ISearchQueryService {
     private Query buildMarketQuery(String keyword, String marketGroupId, SearchScope scope, MarketSaleStatus marketSaleStatus) {
         BoolQuery.Builder bool = new BoolQuery.Builder();
 
-        // [must] 关键词召回
-        bool.must(buildKeywordQuery(keyword, SearchConstants.MARKET_BOOSTED_SEARCH_FIELDS));
+        // [must] 关键词召回；关键词为空时允许管理员按状态浏览完整队列
+        if (StringUtils.hasText(keyword)) {
+            bool.must(buildKeywordQuery(keyword, SearchConstants.MARKET_BOOSTED_SEARCH_FIELDS));
+        }
 
         // [filter] SearchScope 类型过滤
         if (scope != null) {
