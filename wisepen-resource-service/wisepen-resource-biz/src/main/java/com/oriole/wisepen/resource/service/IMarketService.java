@@ -20,6 +20,8 @@ public interface IMarketService {
 
     MarketOrderResponse purchaseResource(MarketPurchaseRequest request, String buyerId);
 
+    void recoverPendingOrder(String orderId);
+
     /** buyerId 为空时查询全部订单；仅管理员入口可以不传 buyerId。 */
     PageR<MarketOrderResponse> listOrders(String buyerId, int page, int size);
 }
