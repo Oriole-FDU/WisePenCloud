@@ -26,7 +26,7 @@ public class DocumentGcTask {
     private final IDocumentService documentService;
     private final DocumentProperties documentProperties;
 
-    @Scheduled(fixedDelayString = "${wisepen.document.stale-check-delay-ms:300000}")
+    @Scheduled(fixedDelayString = "${wisepen.document.stale-check.delay-ms:300000}")
     public void detectStaleUploads() {
         long start = System.currentTimeMillis();
         log.info("document gc started. task=staleUpload");
@@ -75,10 +75,10 @@ public class DocumentGcTask {
      */
     private long calculateTimeoutMs(Long size) {
         if (size == null || size <= 0) {
-            return documentProperties.getBaseTimeoutMs();
+            return documentProperties.getUploadTimeout().getBaseTimeoutMs();
         }
-        long sizeBasedMs = size * 1000L / documentProperties.getAssumedSpeedBps();
-        return Math.max(documentProperties.getBaseTimeoutMs(),
-                Math.min(documentProperties.getMaxTimeoutMs(), sizeBasedMs));
+        long sizeBasedMs = size * 1000L / documentProperties.getUploadTimeout().getAssumedSpeedBps();
+        return Math.max(documentProperties.getUploadTimeout().getBaseTimeoutMs(),
+                Math.min(documentProperties.getUploadTimeout().getMaxTimeoutMs(), sizeBasedMs));
     }
 }

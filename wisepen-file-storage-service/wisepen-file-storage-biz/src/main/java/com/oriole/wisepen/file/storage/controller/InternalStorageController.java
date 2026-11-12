@@ -35,7 +35,7 @@ public class InternalStorageController {
             summary = "内部初始化文件上传",
             description = """
                     - 用途：供业务服务为大文件或私有文件申请对象存储直传凭证。
-                    - 请求：md5 用于同配置下秒传判定；extension 为文件后缀；scene 决定存储前缀；bizTag 决定业务目录；configId 可指定存储配置；expectedSize 为预期大小。
+                    - 请求：md5 用于同配置下秒传判定；extension 为文件后缀；scene 决定存储前缀；bizTag 决定业务目录；providerCode 可指定存储配置；expectedSize 为预期大小。
                     - 约束：调用方必须通过内部服务调用边界；scene 和 extension 必须由上游业务确认合法。
                     - 处理：优先按 md5 和配置查询可复用文件；命中时在对象存储内复制文件、创建新记录并发布上传完成事件；未命中时创建 UPLOADING 记录并返回 PUT 上传凭证。
                     - 失败：存储配置不支持 -> FileStorageError.CANNOT_SUPPORT_STORAGE_PROVIDER；对象存储生成回调策略失败 -> FileStorageError.STORAGE_PROVIDER_GENERATE_CALLBACK_POLICY_FAILED；秒传复制文件失败 -> FileStorageError.STORAGE_PROVIDER_COPY_FILE_FAILED。
@@ -117,7 +117,7 @@ public class InternalStorageController {
             summary = "内部获取临时访问凭证",
             description = """
                     - 用途：供业务服务为前端批量访问指定目录下的文件申请临时凭证。
-                    - 请求：scene 决定授权目录前缀；bizTag 可继续限定业务目录；configId 可指定存储配置；durationSeconds 指定凭证有效时长。
+                    - 请求：scene 决定授权目录前缀；bizTag 可继续限定业务目录；providerCode 可指定存储配置；durationSeconds 指定凭证有效时长。
                     - 约束：调用方必须通过内部服务调用边界；scene 必须是合法存储场景。
                     - 处理：拼接 scene 与 bizTag 得到目录通配前缀，并从目标存储配置申请只覆盖该前缀的 STS 凭证；不创建或删除文件记录。
                     - 失败：存储配置不支持 -> FileStorageError.CANNOT_SUPPORT_STORAGE_PROVIDER；云厂商临时凭证申请失败 -> FileStorageError.STORAGE_PROVIDER_GENERATE_STS_TOKEN_FAILED。
@@ -128,9 +128,9 @@ public class InternalStorageController {
     public R<StsTokenDTO> getStsToken(
             @RequestParam("scene") StorageSceneEnum scene,
             @RequestParam(value = "bizTag", required = false) String bizTag,
-            @RequestParam(value = "configId", required = false) Long configId,
+            @RequestParam(value = "providerCode", required = false) String providerCode,
             @RequestParam(value = "durationSeconds", defaultValue = "3600") Long durationSeconds) {
-        return R.ok(storageService.getStsToken(scene, bizTag, configId, durationSeconds));
+        return R.ok(storageService.getStsToken(scene, bizTag, providerCode, durationSeconds));
     }
 
     /**

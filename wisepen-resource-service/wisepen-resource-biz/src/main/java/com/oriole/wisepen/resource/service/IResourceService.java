@@ -6,6 +6,7 @@ import com.oriole.wisepen.common.core.domain.enums.list.QueryLogicEnum;
 import com.oriole.wisepen.common.core.domain.enums.list.SortDirectionEnum;
 import com.oriole.wisepen.resource.domain.GroupTagBind;
 import com.oriole.wisepen.resource.domain.dto.*;
+import com.oriole.wisepen.resource.domain.dto.req.ResourceAiBillingApprovalUpdateRequest;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceRenameRequest;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceUpdateActionPermissionRequest;
 import com.oriole.wisepen.resource.domain.dto.res.ResourceBaseInfoResponse;
@@ -46,6 +47,10 @@ public interface IResourceService {
     void checkGroupMemberTagMountPermission(String userId, List<TagEntity> tags);
 
     void updateResourceActionPermission(ResourceUpdateActionPermissionRequest req);
+
+    void updateAiBillingApproval(ResourceAiBillingApprovalUpdateRequest req);
+
+    List<String> listAiBillingApprovedGroupIds(String resourceId);
 
     ResourceBaseInfoResponse getResourceBaseInfo(String resourceId, String currentUserId, Map<Long, GroupRoleType> groupRoles);
 

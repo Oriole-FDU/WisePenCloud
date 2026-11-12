@@ -31,11 +31,11 @@ public class OnlyOfficeConversionClient {
         this.documentProperties = documentProperties;
         this.documentServerClient = new ApacheHttpclientDocumentServerClient(
                 DocumentServerClientSettings.builder()
-                        .baseUrl(documentProperties.getOnlyofficeInternalUrl())
+                        .baseUrl(documentProperties.getIntegration().getOnlyoffice().getInternalUrl())
                         .security(Security.builder()
-                                .key(documentProperties.getOnlyofficeJwtSecret())
-                                .header(documentProperties.getOnlyofficeJwtHeader())
-                                .prefix(documentProperties.getOnlyofficeJwtPrefix())
+                                .key(documentProperties.getIntegration().getOnlyoffice().getJwtSecret())
+                                .header(documentProperties.getIntegration().getOnlyoffice().getJwtHeader())
+                                .prefix(documentProperties.getIntegration().getOnlyoffice().getJwtPrefix())
                                 .build())
                         .ignoreSSLCertificate(false)
                         .build()
@@ -64,7 +64,7 @@ public class OnlyOfficeConversionClient {
                 .build();
 
         // 计算转换超时截止时间
-        long deadline = System.currentTimeMillis() + documentProperties.getOnlyofficeConversionTimeoutMs();
+        long deadline = System.currentTimeMillis() + documentProperties.getConversionRuntime().getTimeoutMs();
         ConvertResponse convertRes = postConvert(convertReq); // 调用
 
         while (!Boolean.TRUE.equals(convertRes.getEndConvert())) { // 只要 endConvert 不是 true，就继续
@@ -77,7 +77,7 @@ public class OnlyOfficeConversionClient {
             }
             // 等待
             try {
-                Thread.sleep(documentProperties.getOnlyofficeConversionPollIntervalMs());
+                Thread.sleep(documentProperties.getConversionRuntime().getPollIntervalMs());
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new ServiceException(DocumentError.DOCUMENT_PROCESS_CONVERT_FAILED, e.getMessage());

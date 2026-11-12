@@ -13,7 +13,7 @@ public class BatchTaskScheduler {
 
     private final BatchTaskExecutionService batchTaskExecutionService;
 
-    @Scheduled(fixedDelayString = "${wisepen.batch-task.poll-delay-ms:10000}")
+    @Scheduled(fixedDelayString = "${wisepen.batch-task.schedule.poll-delay-ms:10000}")
     public void executePendingBatchTasks() {
         long start = System.currentTimeMillis();
         log.info("batch task execution started. task=batchTaskExecution");

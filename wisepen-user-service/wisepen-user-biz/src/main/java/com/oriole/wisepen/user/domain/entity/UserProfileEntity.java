@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("sys_user_profile")
+@TableName("user_profile")
 public class UserProfileEntity extends UserProfileBase {
 
     @TableId(type = IdType.INPUT)

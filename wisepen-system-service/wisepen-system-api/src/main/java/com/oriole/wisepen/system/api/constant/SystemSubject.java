@@ -9,6 +9,7 @@ public enum SystemSubject implements IBusinessSubject {
     BATCH_TASK,
     BATCH_TASK_RESOURCE_FORK,
     BATCH_TASK_USER_REGISTER,
+    BUSINESS_CONFIG,
     ;
 
     @Override

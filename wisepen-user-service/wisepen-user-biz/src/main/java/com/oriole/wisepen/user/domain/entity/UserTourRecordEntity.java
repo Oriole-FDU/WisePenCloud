@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("sys_user_tour_record")
+@TableName("user_tour_record")
 public class UserTourRecordEntity {
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;

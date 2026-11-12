@@ -31,6 +31,12 @@ public interface IGroupMemberService {
 	// 获取群组成员 ID 列表
 	List<Long> listGroupMemberIds(Long groupId);
 
+	// 获取用户当前有效的 AI 计费小组顺序
+	List<Long> listAiBillingGroupOrder(Long userId);
+
+	// 更新用户的 AI 计费小组顺序
+	void updateAiBillingGroupOrder(AiBillingGroupOrderUpdateRequest req, Long userId);
+
 	// 内部业务方法
 
 	// 加入群组(以特定身份)

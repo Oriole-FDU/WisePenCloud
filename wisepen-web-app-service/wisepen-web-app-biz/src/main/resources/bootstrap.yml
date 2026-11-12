@@ -31,9 +31,6 @@ spring:
     active: dev
 
 wisepen:
-  web-app:
-    single-html-page:
-      max-content-bytes: 2097152
   openapi:
     title: Web App 服务 API
     version: 1.0.0

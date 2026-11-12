@@ -40,9 +40,7 @@ public class RedisCacheManager {
 	private static final String REDIS_PWD_RESET_TOKEN_PREFIX = "wisepen:user:auth:reset:";
 	private static final String REDIS_SESSION_PREFIX = "wisepen:user:auth:session:";
 	private static final String REDIS_SESSION_TO_USER_PREFIX = "wisepen:user:auth:user2session:";
-	private static final String REDIS_GROUP_CHAT_BLOCK_PREFIX = "wisepen:chat:block:group:";
-	private static final String REDIS_GROUP_MEMBER_CHAT_BLOCK_PREFIX = "wisepen:chat:block:member:";
-	private static final String REDIS_GROUP_USER_BLOCK_PREFIX = "wisepen:chat:block:user:";
+	private static final String REDIS_USER_CHAT_BLOCK_PREFIX = "wisepen:chat:block:user:";
 	private static final String REDIS_EMAIL_VERIFY_TOKEN_PREFIX = "wisepen:user:auth:verify:";
     private static final long SESSION_TIMEOUT_DAYS = 7;
 
@@ -181,27 +179,11 @@ public class RedisCacheManager {
 				SESSION_TIMEOUT_DAYS, TimeUnit.DAYS);
 	}
 
-	// 封印/解封 群组Chat (DB1)
-	public void blockGroupChat(Long groupId) {
-		stringRedisTemplateDB1.opsForValue().set(REDIS_GROUP_CHAT_BLOCK_PREFIX + groupId, "1");
+	// 用户个人欠费达到硬阈值后封禁全部平台付费 AI；个人欠费清零后解封（DB1）
+	public void blockUserChat(Long userId) {
+		stringRedisTemplateDB1.opsForValue().set(REDIS_USER_CHAT_BLOCK_PREFIX + userId, "1");
 	}
-	public void unblockGroupChat(Long groupId) {
-		stringRedisTemplateDB1.delete(REDIS_GROUP_CHAT_BLOCK_PREFIX + groupId);
-	}
-
-	// 封印/解封 组成员Chat (DB1)
-	public void blockGroupMemberChat(Long groupId, Long userId) {
-		stringRedisTemplateDB1.opsForValue().set(REDIS_GROUP_MEMBER_CHAT_BLOCK_PREFIX + groupId + ":" + userId, "1");
-	}
-	public void unblockGroupMemberChat(Long groupId, Long userId) {
-		stringRedisTemplateDB1.delete(REDIS_GROUP_MEMBER_CHAT_BLOCK_PREFIX + groupId + ":" + userId);
-	}
-
-	// 封印/解封 个人Chat (DB1)
-	public void blockUserChat(Long groupId) {
-		stringRedisTemplateDB1.opsForValue().set(REDIS_GROUP_USER_BLOCK_PREFIX + groupId, "1");
-	}
-	public void unblockUserChat(Long groupId) {
-		stringRedisTemplateDB1.delete(REDIS_GROUP_USER_BLOCK_PREFIX + groupId);
+	public void unblockUserChat(Long userId) {
+		stringRedisTemplateDB1.delete(REDIS_USER_CHAT_BLOCK_PREFIX + userId);
 	}
 }

@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "service": "wisepen-resource-service",
+  "dataId": "wisepen-resource-service-{profile}.yaml",
+  "group": "DEFAULT_GROUP",
+  "configs": {
+    "resource-retention-policy": {
+      "name": "资源保留配置",
+      "description": "已删除资源在物理清理前的保留天数。",
+      "path": [
+        "wisepen",
+        "resource",
+        "retention"
+      ],
+      "restartRequired": false,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "deleted-retention-days": {
+            "type": "integer",
+            "title": "已删除资源保留天数",
+            "default": 30,
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "resource-cleanup-schedule": {
+      "name": "资源清理任务调度",
+      "description": "资源物理清理 Cron，发布后需要重启资源服务。",
+      "path": [
+        "wisepen",
+        "resource",
+        "cleanup"
+      ],
+      "restartRequired": true,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "physical-gc-cron": {
+            "type": "string",
+            "title": "资源物理清理 Cron",
+            "default": "0 0 3 * * ?",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "resource-read-count-policy": {
+      "name": "资源阅读量统计配置",
+      "description": "同一用户重复阅读同一资源时使用的去重窗口。",
+      "path": [
+        "wisepen",
+        "resource",
+        "read-count"
+      ],
+      "restartRequired": false,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "dedup-ttl-minutes": {
+            "type": "integer",
+            "title": "阅读量去重窗口（分钟）",
+            "default": 10,
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "group-dashboard-cache-policy": {
+      "name": "小组看板指标缓存配置",
+      "description": "资源服务保存小组看板指标缓存的有效天数。",
+      "path": [
+        "wisepen",
+        "resource",
+        "dashboard-cache"
+      ],
+      "restartRequired": false,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "metric-ttl-days": {
+            "type": "integer",
+            "title": "小组看板指标缓存有效天数",
+            "default": 3,
+            "minimum": 1
+          }
+        }
+      }
+    }
+  }
+}

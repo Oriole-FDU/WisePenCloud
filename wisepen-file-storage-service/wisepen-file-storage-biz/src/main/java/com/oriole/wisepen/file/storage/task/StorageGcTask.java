@@ -34,11 +34,11 @@ public class StorageGcTask {
      * 任务：死信占位符清理 (默认每2小时执行一次)
      * 用户申请了上传凭证，但一直没有回调，主动去云端查证一次，有文件则自愈补偿，无文件直接删除记录。
      */
-    @Scheduled(cron = "${wisepen.storage.zombie-cleanup-cron:0 0 */2 * * ?}")
+    @Scheduled(cron = "${wisepen.storage.cleanup.zombie-cron:0 0 */2 * * ?}")
     public void cleanupUploadingZombies() {
         long start = System.currentTimeMillis();
         log.info("storage gc started. task=uploadingZombie");
-        LocalDateTime threshold = LocalDateTime.now().minusHours(storageProperties.getUploadingTimeoutHours());
+        LocalDateTime threshold = LocalDateTime.now().minusHours(storageProperties.getUpload().getUploadingTimeoutHours());
 
         // 每次最多处理 500 条，防止内存溢出和数据库长事务
         List<StorageRecordEntity> zombies = storageRecordMapper.selectList(
@@ -82,11 +82,11 @@ public class StorageGcTask {
      * 任务：回收站物理垃圾回收 (默认每天凌晨 3 点执行)
      * 业务场景：将那些被业务端软删除 (DELETED) 且已经度过 30 天（默认）后悔期的文件，从物理云盘彻底抹除。
      */
-    @Scheduled(cron = "${wisepen.storage.physical-gc-cron:0 0 3 * * ?}")
+    @Scheduled(cron = "${wisepen.storage.cleanup.physical-gc-cron:0 0 3 * * ?}")
     public void physicalGarbageCollection() {
         long start = System.currentTimeMillis();
         log.info("storage gc started. task=physicalDelete");
-        LocalDateTime threshold = LocalDateTime.now().minusDays(storageProperties.getDeletedRetentionDays());
+        LocalDateTime threshold = LocalDateTime.now().minusDays(storageProperties.getRetention().getDeletedRetentionDays());
 
         List<StorageRecordEntity> trashes = storageRecordMapper.selectList(
                 Wrappers.<StorageRecordEntity>lambdaQuery()
@@ -107,7 +107,7 @@ public class StorageGcTask {
         for (StorageRecordEntity trash : trashes) {
             try {
                 // 先删云端物理文件
-                StorageProvider provider = storageManager.getProvider(trash.getConfigId());
+                StorageProvider provider = storageManager.getProvider(trash.getProviderCode());
                 provider.deleteObject(trash.getObjectKey());
 
                 // 物理删除不抛异常，再硬删除数据库记录

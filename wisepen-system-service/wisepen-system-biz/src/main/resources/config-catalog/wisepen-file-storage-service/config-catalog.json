@@ -1,0 +1,192 @@
+{
+  "version": 1,
+  "service": "wisepen-file-storage-service",
+  "dataId": "wisepen-file-storage-service-{profile}.yaml",
+  "group": "DEFAULT_GROUP",
+  "configs": {
+    "file-upload-policy": {
+      "name": "文件上传配置",
+      "description": "上传凭证、小文件限制和上传中记录超时认定参数。",
+      "path": [
+        "wisepen",
+        "storage",
+        "upload"
+      ],
+      "restartRequired": false,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "default-ticket-duration": {
+            "type": "integer",
+            "title": "上传凭证有效期（秒）",
+            "default": 900,
+            "minimum": 1
+          },
+          "max-small-file-size": {
+            "type": "integer",
+            "title": "小文件最大字节数",
+            "default": 5242880,
+            "minimum": 1
+          },
+          "uploading-timeout-hours": {
+            "type": "integer",
+            "title": "上传中记录超时小时数",
+            "default": 2,
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "file-retention-policy": {
+      "name": "文件保留配置",
+      "description": "已删除文件在物理清理前的保留天数。",
+      "path": [
+        "wisepen",
+        "storage",
+        "retention"
+      ],
+      "restartRequired": false,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "deleted-retention-days": {
+            "type": "integer",
+            "title": "已删除文件保留天数",
+            "default": 30,
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "file-cleanup-schedule": {
+      "name": "文件清理任务调度",
+      "description": "上传中记录与物理文件的清理 Cron，发布后需要重启文件存储服务。",
+      "path": [
+        "wisepen",
+        "storage",
+        "cleanup"
+      ],
+      "restartRequired": true,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "zombie-cron": {
+            "type": "string",
+            "title": "上传中记录清理 Cron",
+            "default": "0 0 */2 * * ?",
+            "minLength": 1
+          },
+          "physical-gc-cron": {
+            "type": "string",
+            "title": "物理文件清理 Cron",
+            "default": "0 0 3 * * ?",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "storage-provider-config": {
+      "name": "存储提供商配置",
+      "description": "文件存储服务使用的提供商、首要提供商及访问凭据，发布后需要重启文件存储服务。",
+      "path": [
+        "wisepen",
+        "storage",
+        "providers"
+      ],
+      "restartRequired": true,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "primary-code",
+          "items"
+        ],
+        "properties": {
+          "primary-code": {
+            "type": "string",
+            "title": "首要存储提供商编码",
+            "minLength": 1
+          },
+          "items": {
+            "type": "object",
+            "title": "存储提供商配置映射",
+            "minProperties": 1,
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "provider",
+                "region",
+                "endpoint",
+                "access-key-id",
+                "access-key-secret",
+                "bucket-name",
+                "domain",
+                "role-arn",
+                "enabled"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "title": "配置名称",
+                  "minLength": 1
+                },
+                "provider": {
+                  "type": "string",
+                  "title": "存储提供商",
+                  "enum": [
+                    "ALIYUN_OSS"
+                  ]
+                },
+                "region": {
+                  "type": "string",
+                  "title": "地域 (Region)",
+                  "minLength": 1
+                },
+                "endpoint": {
+                  "type": "string",
+                  "title": "Endpoint",
+                  "minLength": 1
+                },
+                "access-key-id": {
+                  "type": "string",
+                  "title": "AccessKey ID",
+                  "minLength": 1
+                },
+                "access-key-secret": {
+                  "type": "string",
+                  "title": "AccessKey Secret",
+                  "minLength": 1
+                },
+                "bucket-name": {
+                  "type": "string",
+                  "title": "Bucket 名称",
+                  "minLength": 1
+                },
+                "domain": {
+                  "type": "string",
+                  "title": "访问域名",
+                  "minLength": 1
+                },
+                "role-arn": {
+                  "type": "string",
+                  "title": "STS Role ARN",
+                  "minLength": 1
+                },
+                "enabled": {
+                  "type": "boolean",
+                  "title": "是否启用",
+                  "default": true
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

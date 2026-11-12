@@ -40,16 +40,14 @@ jodconverter:
 
 wisepen:
   document:
-    conversion-provider: ${WISEPEN_DOCUMENT_CONVERSION_PROVIDER:onlyoffice}
-    onlyoffice-internal-url: ${WISEPEN_ONLYOFFICE_INTERNAL_URL:http://onlyoffice:8101/}
-    onlyoffice-callback-base-url: ${WISEPEN_ONLYOFFICE_CALLBACK_BASE_URL:http://apisix/}
-    onlyoffice-jwt-secret: ${WISEPEN_ONLYOFFICE_JWT_SECRET:wisepen-onlyoffice-dev-secret}
-    onlyoffice-jwt-header: ${WISEPEN_ONLYOFFICE_JWT_HEADER:Authorization}
-    onlyoffice-jwt-prefix: "${WISEPEN_ONLYOFFICE_JWT_PREFIX:Bearer }"
-    onlyoffice-conversion-timeout-ms: ${WISEPEN_ONLYOFFICE_CONVERSION_TIMEOUT_MS:120000}
-    onlyoffice-conversion-poll-interval-ms: ${WISEPEN_ONLYOFFICE_CONVERSION_POLL_INTERVAL_MS:1000}
-    onlyoffice-source-url-duration-seconds: ${WISEPEN_ONLYOFFICE_SOURCE_URL_DURATION_SECONDS:3600}
-    onlyoffice-edit-session-ttl-seconds: ${WISEPEN_ONLYOFFICE_EDIT_SESSION_TTL_SECONDS:86400}
+    integration:
+      provider: ${WISEPEN_DOCUMENT_CONVERSION_PROVIDER:onlyoffice}
+      onlyoffice:
+        internal-url: ${WISEPEN_ONLYOFFICE_INTERNAL_URL:http://onlyoffice:8101/}
+        callback-base-url: ${WISEPEN_ONLYOFFICE_CALLBACK_BASE_URL:http://apisix/}
+        jwt-secret: ${WISEPEN_ONLYOFFICE_JWT_SECRET:wisepen-onlyoffice-dev-secret}
+        jwt-header: ${WISEPEN_ONLYOFFICE_JWT_HEADER:Authorization}
+        jwt-prefix: "${WISEPEN_ONLYOFFICE_JWT_PREFIX:Bearer }"
   openapi:
     title: 文档服务 API
     version: 1.0.0

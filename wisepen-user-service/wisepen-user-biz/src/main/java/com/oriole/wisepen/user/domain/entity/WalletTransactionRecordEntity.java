@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("sys_token_record")
+@TableName("wallet_transaction_record")
 public class WalletTransactionRecordEntity extends WalletTransactionRecordBase implements Serializable {
 	@TableId(type = IdType.ASSIGN_ID)
 	Long id;

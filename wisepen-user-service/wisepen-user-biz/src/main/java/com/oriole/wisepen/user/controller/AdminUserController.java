@@ -74,7 +74,7 @@ public class AdminUserController {
                     - 用途：管理员查看指定用户的资料域详情。
                     - 请求：userId 指定目标用户。
                     - 约束：当前操作者必须具备管理员身份；目标用户资料记录必须存在。
-                    - 处理：读取 sys_user_profile 对应资料记录；不返回用户密码、钱包余额或小组成员信息。
+                    - 处理：读取 user_profile 对应资料记录；不返回用户密码、钱包余额或小组成员信息。
                     - 失败：当前操作者不是管理员 -> PermissionError.UNAUTHORIZED。
                     - 响应：返回目标用户资料实体。
                     """
@@ -89,7 +89,7 @@ public class AdminUserController {
             summary = "更新用户学籍资料",
             description = """
                     - 用途：管理员修正指定用户的性别、学校、院系、专业、班级、入学年份、学历层次和职称资料。
-                    - 请求：userId 指定被维护用户；其余字段属于用户资料域，对应 sys_user_profile；未传字段不表达业务变更意图。
+                    - 请求：userId 指定被维护用户；其余字段属于用户资料域，对应 user_profile；未传字段不表达业务变更意图。
                     - 约束：当前操作者必须具备管理员身份；目标用户资料记录必须存在。
                     - 处理：更新用户资料域，不修改账号、昵称、真实姓名、头像、身份类型、认证方式、账号状态或密码；学生资料与教师资料的互斥清理不由本接口自动完成。
                     - 失败：当前操作者不是管理员 -> PermissionError.UNAUTHORIZED。
@@ -107,7 +107,7 @@ public class AdminUserController {
             summary = "更新用户账号信息",
             description = """
                     - 用途：管理员维护指定用户的账号展示信息、认证信息、身份类型和账号状态。
-                    - 请求：userId 指定被维护用户；username、campusNo、email、mobile、verificationMode、userStatus、identityType 等字段属于用户账号域，对应 sys_user。
+                    - 请求：userId 指定被维护用户；username、campusNo、email、mobile、verificationMode、userStatus、identityType 等字段属于用户账号域，对应 user_account。
                     - 约束：当前操作者必须具备管理员身份；目标用户必须存在；username 在全量用户中必须唯一；正常状态用户的 campusNo 必须唯一。
                     - 处理：更新用户账号域；当 identityType 发生变化时，同步清理不适用于新身份的资料字段：切换为学生时清空职称，切换为教师时清空专业、班级、入学年份和学历层次。
                     - 失败：当前操作者不是管理员 -> PermissionError.UNAUTHORIZED；用户名重复 -> UserError.USERNAME_ALREADY_EXISTS；学工号冲突 -> UserError.CAMPUS_NO_ALREADY_EXISTS。

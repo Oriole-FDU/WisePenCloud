@@ -7,9 +7,9 @@ import jakarta.servlet.http.HttpServletRequest;
 public interface StorageProvider {
 
     /**
-     * 获取当前实例对应的配置 ID
+     * 获取当前实例对应的存储提供商编码
      */
-    Long getConfigId();
+    String getProviderCode();
 
     /**
      * 获取当前实例绑定的对外访问域名

@@ -157,7 +157,7 @@ public class DocumentPreviewServiceImpl implements IDocumentPreviewService {
                 .build().toString() : null;
         try {
             ossUrl = remoteStorageService.getDownloadUrl(
-                    versionEntity.getPreviewObjectKey(), documentProperties.getDownloadUrlDurationSeconds(), contentDisposition
+                    versionEntity.getPreviewObjectKey(), documentProperties.getDownload().getUrlDurationSeconds(), contentDisposition
             ).getData();
         } catch (Exception e) {
             log.warn("document {} url apply failed. resourceId={} objectKey={}",
@@ -197,7 +197,7 @@ public class DocumentPreviewServiceImpl implements IDocumentPreviewService {
                 ServletOutputStream out = response.getOutputStream();
                 pipeOssRange(ossUrl, 0, originalSize - 1, out);
                 if (watermarkRequired) {
-                    out.write(WatermarkAppendixBuilder.build(meta, userId, previewTime, documentProperties.getWatermarkSecretKey()));
+                    out.write(WatermarkAppendixBuilder.build(meta, userId, previewTime, documentProperties.getWatermark().getSecretKey()));
                 }
             } else {
                 handleRangeRequest(rangeHeader, totalSize, originalSize,
@@ -237,7 +237,7 @@ public class DocumentPreviewServiceImpl implements IDocumentPreviewService {
         try {
             ossUrl = remoteStorageService.getDownloadUrl(
                     versionEntity.getSourceObjectKey(),
-                    documentProperties.getDownloadUrlDurationSeconds(),
+                    documentProperties.getDownload().getUrlDurationSeconds(),
                     contentDisposition
             ).getData();
         } catch (Exception e) {
@@ -288,7 +288,7 @@ public class DocumentPreviewServiceImpl implements IDocumentPreviewService {
 
         } else if (start >= originalSize) {
             // 情形 2：完全落在附录段 → 内存生成后切片
-            byte[] appendix = WatermarkAppendixBuilder.build(meta, userId, previewTime, documentProperties.getWatermarkSecretKey());
+            byte[] appendix = WatermarkAppendixBuilder.build(meta, userId, previewTime, documentProperties.getWatermark().getSecretKey());
             int offset = (int) (start - originalSize);
             int length = (int) (end - start + 1);
             out.write(appendix, offset, length);
@@ -296,7 +296,7 @@ public class DocumentPreviewServiceImpl implements IDocumentPreviewService {
         } else {
             // 情形 3：跨越两段边界 → OSS 尾部 + 附录头部
             pipeOssRange(ossUrl, start, originalSize - 1, out);
-            byte[] appendix = WatermarkAppendixBuilder.build(meta, userId, previewTime, documentProperties.getWatermarkSecretKey());
+            byte[] appendix = WatermarkAppendixBuilder.build(meta, userId, previewTime, documentProperties.getWatermark().getSecretKey());
             int lengthInAppendix = (int) (end - originalSize + 1);
             out.write(appendix, 0, lengthInAppendix);
         }

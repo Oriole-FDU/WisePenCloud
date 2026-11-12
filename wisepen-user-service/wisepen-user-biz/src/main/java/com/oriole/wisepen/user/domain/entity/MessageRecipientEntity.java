@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("sys_message_recipient")
+@TableName("message_recipient")
 public class MessageRecipientEntity {
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;

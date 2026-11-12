@@ -54,10 +54,10 @@ public interface IStorageService {
      * 颁发 STS 临时凭证（支持前端批量加载受保护目录）
      * @param scene           场景隔离标识
      * @param bizTag         业务路径隔离标识
-     * @param configId        目标存储源ID（如业务方不指定，则降级使用 Primary 源）
+     * @param providerCode    目标存储提供商编码（未指定时使用首要存储提供商）
      * @param durationSeconds 凭证有效时长
      */
-    StsTokenDTO getStsToken(StorageSceneEnum scene, String bizTag, Long configId, Long durationSeconds);
+    StsTokenDTO getStsToken(StorageSceneEnum scene, String bizTag, String providerCode, Long durationSeconds);
 
     /**
      * 软删除文件

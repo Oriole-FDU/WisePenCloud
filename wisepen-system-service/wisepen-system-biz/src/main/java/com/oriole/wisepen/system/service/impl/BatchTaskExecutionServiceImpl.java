@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.system.api.enums.BatchTaskItemStatus;
 import com.oriole.wisepen.system.api.enums.BatchTaskStatus;
+import com.oriole.wisepen.system.config.BatchTaskProperties;
 import com.oriole.wisepen.system.domain.entity.BatchTaskEntity;
 import com.oriole.wisepen.system.domain.entity.BatchTaskItemEntity;
 import com.oriole.wisepen.system.excpetion.SysError;
@@ -13,7 +14,6 @@ import com.oriole.wisepen.system.service.BatchTaskExecutionService;
 import com.oriole.wisepen.system.service.batch.BatchTaskExecutorRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -33,12 +33,7 @@ public class BatchTaskExecutionServiceImpl implements BatchTaskExecutionService 
     private final BatchTaskMapper batchTaskMapper;
     private final BatchTaskItemMapper batchTaskItemMapper;
     private final BatchTaskExecutorRegistry executorRegistry;
-
-    @Value("${wisepen.batch-task.execution-batch-size:20}")
-    private int executionBatchSize;
-
-    @Value("${wisepen.batch-task.stale-minutes:30}")
-    private long staleMinutes;
+    private final BatchTaskProperties batchTaskProperties;
 
     @Override
     public ExecutionSummary executePendingItems() {
@@ -50,8 +45,9 @@ public class BatchTaskExecutionServiceImpl implements BatchTaskExecutionService 
 
         LocalDateTime now = LocalDateTime.now();
         // 检查并回收超时的执行中任务项
+        BatchTaskProperties.Execution executionProperties = batchTaskProperties.getExecution();
         List<BatchTaskItemEntity> staleItems = batchTaskItemMapper.selectStaleRunningItems(
-                now.minusMinutes(staleMinutes), executionBatchSize);
+                now.minusMinutes(executionProperties.getStaleMinutes()), executionProperties.getBatchSize());
         for (BatchTaskItemEntity item : staleItems) {
             int updated = batchTaskItemMapper.completeRunningItem(
                     item.getId(), BatchTaskItemStatus.FAILED, null,
@@ -63,7 +59,7 @@ public class BatchTaskExecutionServiceImpl implements BatchTaskExecutionService 
             }
         }
 
-        List<BatchTaskItemEntity> candidates = batchTaskItemMapper.selectRunnableItems(executionBatchSize);
+        List<BatchTaskItemEntity> candidates = batchTaskItemMapper.selectRunnableItems(executionProperties.getBatchSize());
 
         Map<Long, BatchTaskEntity> taskCache = new HashMap<>();
         for (BatchTaskItemEntity item : candidates) {

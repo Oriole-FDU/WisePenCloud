@@ -23,6 +23,7 @@ import com.oriole.wisepen.user.service.IGroupMemberService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -201,6 +202,46 @@ public class GroupMemberServiceImpl implements IGroupMemberService {
 		return groupMemberMapper.selectList(wrapper).stream()
 				.map(GroupMemberEntity::getUserId)
 				.collect(Collectors.toList());
+	}
+
+	@Override
+	public List<Long> listAiBillingGroupOrder(Long userId) {
+		List<GroupMemberEntity> memberships = groupMemberMapper.selectList(
+				new LambdaQueryWrapper<GroupMemberEntity>()
+						.eq(GroupMemberEntity::getUserId, userId)
+						.select(GroupMemberEntity::getGroupId, GroupMemberEntity::getJoinTime,
+								GroupMemberEntity::getAiBillingPriority)
+		);
+		return memberships.stream()
+				.sorted(Comparator
+						.comparing(GroupMemberEntity::getAiBillingPriority,
+								Comparator.nullsLast(Integer::compareTo))
+						.thenComparing(GroupMemberEntity::getJoinTime,
+								Comparator.nullsLast(LocalDateTime::compareTo))
+						.thenComparing(GroupMemberEntity::getGroupId))
+				.map(GroupMemberEntity::getGroupId)
+				.toList();
+	}
+
+	@Override
+	@Transactional(rollbackFor = Exception.class)
+	public void updateAiBillingGroupOrder(AiBillingGroupOrderUpdateRequest req, Long userId) {
+		List<Long> orderedGroupIds = new ArrayList<>(new LinkedHashSet<>(req.getOrderedGroupIds()));
+		List<GroupMemberEntity> memberships = groupMemberMapper.selectList(
+				new LambdaQueryWrapper<GroupMemberEntity>()
+						.eq(GroupMemberEntity::getUserId, userId)
+						.select(GroupMemberEntity::getGroupId)
+		);
+		Set<Long> joinedGroupIds = memberships.stream()
+				.map(GroupMemberEntity::getGroupId)
+				.collect(Collectors.toSet());
+		if (!joinedGroupIds.containsAll(orderedGroupIds)) {
+			throw new ServiceException(UserError.GROUP_MEMBER_NOT_FOUND);
+		}
+
+		groupMemberMapper.updateAiBillingPriorities(userId, orderedGroupIds);
+		log.info("AI billing group order updated. userId={} orderedGroups={} orderedGroupIds={}",
+				userId, orderedGroupIds.size(), orderedGroupIds);
 	}
 
 	@Override

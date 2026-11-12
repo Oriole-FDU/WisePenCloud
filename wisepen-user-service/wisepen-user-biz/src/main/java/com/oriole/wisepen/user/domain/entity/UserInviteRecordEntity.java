@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("sys_user_invite_record")
+@TableName("user_invite_record")
 public class UserInviteRecordEntity implements Serializable {
 
     @TableId(type = IdType.ASSIGN_ID)

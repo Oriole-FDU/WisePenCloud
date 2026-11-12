@@ -1,0 +1,305 @@
+{
+  "version": 1,
+  "service": "wisepen-user-service",
+  "dataId": "wisepen-user-service-{profile}.yaml",
+  "group": "DEFAULT_GROUP",
+  "configs": {
+    "user-admin-password-policy": {
+      "name": "管理员重置密码配置",
+      "description": "管理员未指定新密码时使用的默认密码。",
+      "path": [
+        "wisepen",
+        "user",
+        "admin-password"
+      ],
+      "restartRequired": false,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "default-password": {
+            "type": "string",
+            "title": "默认密码"
+          }
+        }
+      }
+    },
+    "user-ai-debt-policy": {
+      "name": "用户 AI 欠费策略",
+      "description": "个人钱包允许透支的 Token 上限；达到负向上限后禁止继续使用 AI。",
+      "path": [
+        "wisepen",
+        "user",
+        "ai-debt"
+      ],
+      "restartRequired": false,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "hard-limit-tokens"
+        ],
+        "properties": {
+          "hard-limit-tokens": {
+            "type": "integer",
+            "title": "AI 欠费硬上限（Token）",
+            "default": 10000,
+            "minimum": 1,
+            "maximum": 2147483647
+          }
+        }
+      }
+    },
+    "message-dedup-policy": {
+      "name": "消息去重配置",
+      "description": "相同消息的重复判定窗口。",
+      "path": [
+        "wisepen",
+        "user",
+        "message-dedup"
+      ],
+      "restartRequired": false,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "window-minutes": {
+            "type": "integer",
+            "title": "消息去重窗口（分钟）",
+            "default": 60,
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "group-dashboard-aggregate-schedule": {
+      "name": "小组看板聚合任务调度",
+      "description": "小组看板指标聚合 Cron，发布后需要重启用户服务。",
+      "path": [
+        "wisepen",
+        "user",
+        "dashboard-aggregate"
+      ],
+      "restartRequired": true,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cron": {
+            "type": "string",
+            "title": "小组看板指标聚合 Cron",
+            "default": "0 */10 * * * ?",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "campus-identity-provider-switches": {
+      "name": "校园身份 Provider 开关",
+      "description": "用户服务可调用的校园身份 Provider 启停状态。",
+      "path": [
+        "wisepen",
+        "campus-identity",
+        "providers"
+      ],
+      "restartRequired": false,
+      "schema": {
+        "type": "object",
+        "title": "Provider 注册表",
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "title": "是否启用",
+              "default": true
+            }
+          }
+        }
+      }
+    },
+    "user-task-policy": {
+      "name": "用户任务配置",
+      "description": "用户任务开关、奖励类型、奖励额度和周期参数。",
+      "path": [
+        "wisepen",
+        "user-task"
+      ],
+      "restartRequired": false,
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "rules": {
+            "type": "object",
+            "title": "普通任务规则",
+            "additionalProperties": false,
+            "properties": {
+              "ONBOARDING_TUTORIAL": {
+                "type": "object",
+                "title": "新手教程",
+                "additionalProperties": false,
+                "properties": {
+                  "enabled": {
+                    "type": "boolean",
+                    "title": "是否启用",
+                    "default": true
+                  }
+                }
+              },
+              "STUDENT_VERIFICATION": {
+                "type": "object",
+                "title": "学生认证",
+                "additionalProperties": false,
+                "properties": {
+                  "enabled": {
+                    "type": "boolean",
+                    "title": "是否启用",
+                    "default": true
+                  },
+                  "reward-type": {
+                    "type": "string",
+                    "title": "奖励类型",
+                    "enum": [
+                      "TOKEN",
+                      "COIN",
+                      "NONE"
+                    ],
+                    "default": "TOKEN"
+                  },
+                  "reward-amount": {
+                    "type": "integer",
+                    "title": "奖励数量",
+                    "default": 5000000,
+                    "minimum": 0
+                  }
+                }
+              },
+              "TEACHER_VERIFICATION": {
+                "type": "object",
+                "title": "教师认证",
+                "additionalProperties": false,
+                "properties": {
+                  "enabled": {
+                    "type": "boolean",
+                    "title": "是否启用",
+                    "default": true
+                  },
+                  "reward-type": {
+                    "type": "string",
+                    "title": "奖励类型",
+                    "enum": [
+                      "TOKEN",
+                      "COIN",
+                      "NONE"
+                    ],
+                    "default": "TOKEN"
+                  },
+                  "reward-amount": {
+                    "type": "integer",
+                    "title": "奖励数量",
+                    "default": 100000000,
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          },
+          "daily-check-in": {
+            "type": "object",
+            "title": "每日签到",
+            "additionalProperties": false,
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "title": "是否启用",
+                "default": true
+              },
+              "reward-type": {
+                "type": "string",
+                "title": "奖励类型",
+                "enum": [
+                  "TOKEN",
+                  "COIN",
+                  "NONE"
+                ],
+                "default": "TOKEN"
+              },
+              "min-reward-amount": {
+                "type": "integer",
+                "title": "最小奖励数量",
+                "default": 100000,
+                "minimum": 0
+              },
+              "max-reward-amount": {
+                "type": "integer",
+                "title": "最大奖励数量",
+                "default": 1000000,
+                "minimum": 0
+              },
+              "reward-step-amount": {
+                "type": "integer",
+                "title": "奖励步长",
+                "default": 100000,
+                "minimum": 1
+              },
+              "refresh-cycle-days": {
+                "type": "integer",
+                "title": "刷新周期天数",
+                "default": 1,
+                "minimum": 1
+              },
+              "guarantee-cycle-count": {
+                "type": "integer",
+                "title": "保底周期次数",
+                "default": 10,
+                "minimum": 1
+              }
+            }
+          },
+          "invite-verified-user": {
+            "type": "object",
+            "title": "邀请认证用户",
+            "additionalProperties": false,
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "title": "是否启用",
+                "default": true
+              },
+              "reward-type": {
+                "type": "string",
+                "title": "奖励类型",
+                "enum": [
+                  "TOKEN",
+                  "COIN",
+                  "NONE"
+                ],
+                "default": "TOKEN"
+              },
+              "min-reward-amount": {
+                "type": "integer",
+                "title": "最小奖励数量",
+                "default": 1000000,
+                "minimum": 0
+              },
+              "max-reward-amount": {
+                "type": "integer",
+                "title": "最大奖励数量",
+                "default": 10000000,
+                "minimum": 0
+              },
+              "reward-step-amount": {
+                "type": "integer",
+                "title": "奖励步长",
+                "default": 1000000,
+                "minimum": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

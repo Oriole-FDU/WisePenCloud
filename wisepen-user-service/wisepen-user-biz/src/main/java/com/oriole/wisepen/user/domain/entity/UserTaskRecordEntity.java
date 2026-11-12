@@ -19,7 +19,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("sys_user_task_record")
+@TableName("user_task_record")
 public class UserTaskRecordEntity implements Serializable {
 
     @TableId(type = IdType.ASSIGN_ID)

@@ -15,7 +15,7 @@ public interface MessageRecipientMapper extends BaseMapper<MessageRecipientEntit
 
     @Insert("""
             <script>
-            INSERT INTO sys_message_recipient (
+            INSERT INTO message_recipient (
                 id,
                 message_id,
                 delivery_scope,

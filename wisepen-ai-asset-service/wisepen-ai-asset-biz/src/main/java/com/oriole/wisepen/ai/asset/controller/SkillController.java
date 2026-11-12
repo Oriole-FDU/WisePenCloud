@@ -173,7 +173,7 @@ public class SkillController {
                     - 用途：为技能编辑器读取当前技能目录下的资产文件申请临时只读访问凭证。
                     - 请求：resourceId 指定技能资产资源；targetVersion 指定当前准备读取的版本，未传时按当前已发布版本做权限裁决。
                     - 约束：当前用户必须拥有目标资源 VIEW 动作；非所有者只能为已发布版本申请凭证；目标技能资产必须存在。
-                    - 处理：固定以 PRIVATE_SKILL_ASSET 场景和 resourceId 作为业务目录申请 1 小时 STS 凭证；不生成单文件下载地址，不读取文件内容，不允许前端指定 scene、configId 或授权时长。
+                    - 处理：固定以 PRIVATE_SKILL_ASSET 场景和 resourceId 作为业务目录申请 1 小时 STS 凭证；不生成单文件下载地址，不读取文件内容，不允许前端指定 scene、providerCode 或授权时长。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN；资源无查看权限或非所有者请求未发布版本 -> AIResourceError.AI_RESOURCE_PERMISSION_DENIED；技能不存在 -> AIResourceError.AI_RESOURCE_NOT_FOUND；存储服务申请 STS 失败 -> FileStorageError.STORAGE_PROVIDER_GENERATE_STS_TOKEN_FAILED。
                     - 响应：返回访问当前技能资产目录所需的临时凭证、bucket、region 和过期时间。
                     """

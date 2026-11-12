@@ -5,15 +5,32 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 /**
- * 存储服务全局配置属性
+ * 资源服务配置属性
  */
 @Data
 @Component
 @ConfigurationProperties(prefix = "wisepen.resource")
 public class ResourceProperties {
-    /** 软删除回收站保留天数，默认 30 天 */
-    private Integer deletedRetentionDays = 30;
 
-    /** 物理垃圾回收任务 Cron 表达式 */
-    private String physicalGcCron = "0 0 3 * * ?";
+    private Retention retention = new Retention();
+    private ReadCount readCount = new ReadCount();
+    private DashboardCache dashboardCache = new DashboardCache();
+
+    @Data
+    public static class Retention {
+        /** 软删除回收站保留天数 */
+        private Integer deletedRetentionDays = 30;
+    }
+
+    @Data
+    public static class ReadCount {
+        /** 阅读量去重窗口时长（分钟） */
+        private long dedupTtlMinutes = 10;
+    }
+
+    @Data
+    public static class DashboardCache {
+        /** 小组看板指标缓存有效天数 */
+        private long metricTtlDays = 3;
+    }
 }

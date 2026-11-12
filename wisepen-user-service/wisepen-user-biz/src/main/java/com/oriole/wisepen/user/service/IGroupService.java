@@ -2,6 +2,7 @@ package com.oriole.wisepen.user.service;
 
 import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.enums.GroupType;
+import com.oriole.wisepen.user.api.domain.dto.req.GroupAiBillingPolicyUpdateRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupCreateRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupDeleteRequest;
 import com.oriole.wisepen.user.api.domain.dto.req.GroupMemberJoinRequest;
@@ -26,6 +27,9 @@ public interface IGroupService {
 
     // 更新群组基础信息
     void updateGroup(GroupUpdateRequest req);
+
+    // 更新小组 AI 计费策略
+    void updateAiBillingPolicy(GroupAiBillingPolicyUpdateRequest req);
 
     // 删除群组
     void deleteGroup(Long userId, GroupDeleteRequest req);

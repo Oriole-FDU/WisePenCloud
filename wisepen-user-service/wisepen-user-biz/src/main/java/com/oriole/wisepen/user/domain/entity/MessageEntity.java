@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("sys_message")
+@TableName("message")
 public class MessageEntity extends MessageBase {
     @TableId(type = IdType.ASSIGN_ID)
     private Long messageId;

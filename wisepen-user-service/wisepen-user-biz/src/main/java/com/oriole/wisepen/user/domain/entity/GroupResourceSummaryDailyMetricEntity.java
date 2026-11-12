@@ -20,7 +20,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper = true)
-@TableName("sys_group_resource_summary_daily_metric")
+@TableName("group_resource_summary_daily_metric")
 public class GroupResourceSummaryDailyMetricEntity extends GroupResourceMetricBase {
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;

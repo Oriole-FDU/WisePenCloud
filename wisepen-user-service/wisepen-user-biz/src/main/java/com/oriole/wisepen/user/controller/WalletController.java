@@ -74,7 +74,7 @@ public class WalletController {
                     - 用途：小组 OWNER 在个人钱包和高级小组钱包之间转移信息点。
                     - 请求：groupId 指定目标小组；tokenCount 为转移数量；tokenTransferType 决定转入小组或转回个人。
                     - 约束：当前用户必须是目标小组 OWNER；目标小组必须是高级小组；转出方余额必须足够。
-                    - 处理：按转移方向分别扣减转出方、增加转入方余额，写入对应钱包流水，并按余额状态更新聊天熔断缓存。
+                    - 处理：按转移方向分别扣减转出方、增加转入方余额并写入对应钱包流水；个人欠费清零或达到硬阈值时同步更新用户级 AI 熔断。
                     - 失败：未登录 -> PermissionError.NOT_LOGIN；当前用户不是 OWNER -> PermissionError.PERMISSION_DENIED；小组不存在 -> UserError.GROUP_NOT_EXIST；普通小组不允许配置钱包 -> UserError.CANNOT_CONFIGURE_GROUP_WALLET_QUOTA；转出方余额不足 -> UserError.WALLET_TOKEN_LIMIT_BELOW_USED。
                     - 响应：成功时返回空结果。
                     """

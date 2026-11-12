@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.oriole.wisepen.user.mapper.GroupMemberMapper">
+
+    <update id="updateAiBillingPriorities">
+        UPDATE group_member
+        SET ai_billing_priority =
+        <choose>
+            <when test="orderedGroupIds != null and orderedGroupIds.size() > 0">
+                CASE group_id
+                <foreach collection="orderedGroupIds" item="groupId" index="priority">
+                    WHEN #{groupId} THEN #{priority}
+                </foreach>
+                ELSE NULL END
+            </when>
+            <otherwise>NULL</otherwise>
+        </choose>
+        WHERE user_id = #{userId}
+    </update>
+
+</mapper>

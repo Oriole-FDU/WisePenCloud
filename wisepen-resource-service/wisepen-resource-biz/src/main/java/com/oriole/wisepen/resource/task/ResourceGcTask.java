@@ -36,10 +36,10 @@ public class ResourceGcTask {
     private final IResourceService resourceService;
     private final ITagService tagService;
 
-    @Scheduled(cron = "${wisepen.resource.physical-gc-cron:0 0 3 * * ?}")
+    @Scheduled(cron = "${wisepen.resource.cleanup.physical-gc-cron:0 0 3 * * ?}")
     public void garbageCollection() {
         long startMs = System.currentTimeMillis();
-        int retentionDays = resourceProperties.getDeletedRetentionDays();
+        int retentionDays = resourceProperties.getRetention().getDeletedRetentionDays();
         LocalDateTime threshold = LocalDateTime.now().minusDays(retentionDays);
 
         log.info("resource gc started. task=physicalDelete retentionDays={}", retentionDays);

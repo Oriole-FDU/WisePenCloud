@@ -13,7 +13,7 @@ public class GroupResourceDashboardMetricAggregateTask {
 
     private final IGroupDashboardService groupDashboardService;
 
-    @Scheduled(cron = "${wisepen.user.group-dashboard-aggregate-cron:0 */10 * * * ?}")
+    @Scheduled(cron = "${wisepen.user.dashboard-aggregate.cron:0 */10 * * * ?}")
     public void aggregateGroupResourceDashboardMetrics() {
         try {
             groupDashboardService.aggregateRecentResourceMetrics();

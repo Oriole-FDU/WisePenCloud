@@ -334,6 +334,7 @@ public class ResourceItemResponseAssembler {
             ResourceTagBindResponse tagBindResponse = new ResourceTagBindResponse();
             tagBindResponse.setGroupId(groupBind.getGroupId());
             tagBindResponse.setPrimaryTagId(groupBind.getTagIds().getFirst());
+            tagBindResponse.setAiBillingApproved(Boolean.TRUE.equals(groupBind.getAiBillingApproved()));
             tagBindResponse.setTags(resolveTags(groupBind.getTagIds(), tagMap));
             return tagBindResponse;
         }).toList();

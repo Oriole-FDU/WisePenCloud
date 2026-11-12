@@ -81,11 +81,11 @@ public class OnlyOfficeEditServiceImpl implements IOnlyOfficeEditService {
         this.eventPublisher = eventPublisher;
         this.documentServerClient = new ApacheHttpclientDocumentServerClient(
                 DocumentServerClientSettings.builder()
-                        .baseUrl(documentProperties.getOnlyofficeInternalUrl())
+                        .baseUrl(documentProperties.getIntegration().getOnlyoffice().getInternalUrl())
                         .security(Security.builder()
-                                .key(documentProperties.getOnlyofficeJwtSecret())
-                                .header(documentProperties.getOnlyofficeJwtHeader())
-                                .prefix(documentProperties.getOnlyofficeJwtPrefix())
+                                .key(documentProperties.getIntegration().getOnlyoffice().getJwtSecret())
+                                .header(documentProperties.getIntegration().getOnlyoffice().getJwtHeader())
+                                .prefix(documentProperties.getIntegration().getOnlyoffice().getJwtPrefix())
                                 .build())
                         .ignoreSSLCertificate(false)
                         .build()
@@ -123,7 +123,7 @@ public class OnlyOfficeEditServiceImpl implements IOnlyOfficeEditService {
                     .sourceObjectKey(versionEntity.getSourceObjectKey())
                     .initiatorUserId(userId)
                     .status(DocumentEditSessionStatus.ACTIVE)
-                    .expiresAt(LocalDateTime.now().plusSeconds(documentProperties.getOnlyofficeEditSessionTtlSeconds()))
+                    .expiresAt(LocalDateTime.now().plusSeconds(documentProperties.getEditSession().getTtlSeconds()))
                     .build();
             return editSessionRepository.save(entity);
         });
@@ -141,7 +141,7 @@ public class OnlyOfficeEditServiceImpl implements IOnlyOfficeEditService {
         try {
             sourceUrl = remoteStorageService.getDownloadUrl(
                     versionEntity.getSourceObjectKey(),
-                    documentProperties.getOnlyofficeSourceUrlDurationSeconds(),
+                    documentProperties.getConversionRuntime().getSourceUrlDurationSeconds(),
                     null
             ).getData();
         } catch (Exception exception){
@@ -188,7 +188,7 @@ public class OnlyOfficeEditServiceImpl implements IOnlyOfficeEditService {
                 .build();
 
         // 构建回调 URL
-        String callbackUrl = documentProperties.getOnlyofficeCallbackBaseUrl() + ONLY_OFFICE_CALLBACK_PATH  + session.getSessionId();
+        String callbackUrl = documentProperties.getIntegration().getOnlyoffice().getCallbackBaseUrl() + ONLY_OFFICE_CALLBACK_PATH  + session.getSessionId();
 
         // 构建 editorConfig
         EditorConfig editorConfig = EditorConfig.builder()
@@ -211,7 +211,7 @@ public class OnlyOfficeEditServiceImpl implements IOnlyOfficeEditService {
                 .editorConfig(editorConfig)
                 .build();
 
-        config.setToken(SecurityUtils.createToken(config, documentProperties.getOnlyofficeJwtSecret()));
+        config.setToken(SecurityUtils.createToken(config, documentProperties.getIntegration().getOnlyoffice().getJwtSecret()));
         return config;
     }
 
@@ -223,7 +223,7 @@ public class OnlyOfficeEditServiceImpl implements IOnlyOfficeEditService {
 
         // 校验回调
         try {
-            SecurityUtils.verifyToken(request.getToken(), documentProperties.getOnlyofficeJwtSecret());
+            SecurityUtils.verifyToken(request.getToken(), documentProperties.getIntegration().getOnlyoffice().getJwtSecret());
         } catch (Exception e) {
             throw new ServiceException(DocumentError.DOCUMENT_EDIT_CALLBACK_INVALID);
         }
@@ -271,7 +271,7 @@ public class OnlyOfficeEditServiceImpl implements IOnlyOfficeEditService {
         File file = null;
         try {
             // 构建临时文件夹与临时文件
-            Path dir = Path.of(documentProperties.getCachePath());
+            Path dir = Path.of(documentProperties.getLocalResources().getCachePath());
             Files.createDirectories(dir);
             file = Files.createTempFile(dir, session.getResourceId() + "_edit", "." + session.getFileType().getExtension()).toFile();
 

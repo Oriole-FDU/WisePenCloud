@@ -1,7 +1,6 @@
 package com.oriole.wisepen.user.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
-import com.oriole.wisepen.common.core.domain.enums.GroupType;
 import com.oriole.wisepen.user.api.domain.base.GroupInfoBase;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -17,7 +16,7 @@ import java.time.LocalDateTime;
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("sys_group")
+@TableName("user_group")
 public class GroupEntity extends GroupInfoBase {
     @Serial
     private static final long serialVersionUID = 1L;

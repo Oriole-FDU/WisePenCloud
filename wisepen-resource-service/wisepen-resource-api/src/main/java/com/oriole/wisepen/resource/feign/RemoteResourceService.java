@@ -32,6 +32,9 @@ public interface RemoteResourceService {
     @PostMapping("/internal/resource/checkResPermission")
     R<ResourceCheckPermissionResDTO> checkResPermission(@RequestBody ResourceCheckPermissionReqDTO dto);
 
+    @PostMapping("/internal/resource/listAiBillingApprovedGroupIds")
+    R<List<String>> listAiBillingApprovedGroupIds(@RequestParam("resourceId") String resourceId);
+
     @PostMapping("/internal/resource/ensurePersonalFolder")
     R<String> ensurePersonalFolder(@RequestBody PersonalFolderEnsureReqDTO dto);
 
