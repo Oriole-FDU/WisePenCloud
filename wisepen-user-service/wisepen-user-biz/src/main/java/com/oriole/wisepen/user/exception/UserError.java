@@ -26,6 +26,7 @@ public enum UserError implements IResult {
     USER_PASSWORD_RESET_EXPIRED(3221,  new ResultKey(BusinessDomain.USER, UserSubject.USER, ErrorReason.EXPIRED),"重置密码链接已过期"),
     USER_PASSWORD_RESET_EMAIL_SEND_FAILED(3231, new ResultKey(BusinessDomain.USER, UserSubject.USER, ErrorReason.FAILED),"重置密码邮件发送失败"),
     USER_PASSWORD_UNCHANGED(3241, new ResultKey(BusinessDomain.USER, UserSubject.USER, ErrorReason.CONFLICT), "新密码不能与当前密码相同"),
+    USER_DEFAULT_PASSWORD_NOT_CONFIGURED(3251, new ResultKey(BusinessDomain.USER, UserSubject.USER, ErrorReason.REQUIRED_MISSING), "用户服务未配置默认密码"),
 
     // 用户验证相关异常
     CANNOT_OPERATE_BEFORE_AUTH_VERIFICATION(3311, new ResultKey(BusinessDomain.USER, UserSubject.AUTH_VERIFICATION, ErrorReason.STATE_INVALID), "未完成身份验证的账号，不能进行该操作"),

@@ -6,6 +6,7 @@ import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.user.api.domain.base.GroupDisplayBase;
 import com.oriole.wisepen.user.api.domain.base.UserDisplayBase;
 import com.oriole.wisepen.user.api.domain.dto.req.MessagePublishRequest;
+import com.oriole.wisepen.user.api.domain.dto.req.UserRegisterReqDTO;
 import com.oriole.wisepen.user.api.domain.dto.req.WalletSettleCoinTradeRequest;
 import com.oriole.wisepen.user.api.feign.RemoteUserMessageService;
 import com.oriole.wisepen.user.api.feign.RemoteUserService;
@@ -13,6 +14,7 @@ import com.oriole.wisepen.user.api.feign.RemoteWalletService;
 import com.oriole.wisepen.user.service.IDisplayService;
 import com.oriole.wisepen.user.service.IGroupMemberService;
 import com.oriole.wisepen.user.service.IMessageService;
+import com.oriole.wisepen.user.service.IUserService;
 import com.oriole.wisepen.user.service.IWalletService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,7 +31,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-@Tag(name = "内部 - 用户", description = "供其他微服务查询用户与小组展示信息、发布站内消息并结算钱包交易")
+@Tag(name = "内部 - 用户", description = "供其他微服务创建用户、查询用户与小组展示信息、发布站内消息并结算钱包交易")
 @RestController
 @RequestMapping("/internal")
 @RequiredArgsConstructor
@@ -37,6 +39,7 @@ public class InternalController implements RemoteUserService, RemoteWalletServic
 
     private final IDisplayService displayService;
     private final IGroupMemberService groupMemberService;
+    private final IUserService userService;
     private final IWalletService walletService;
     private final IMessageService messageService;
 
@@ -89,6 +92,25 @@ public class InternalController implements RemoteUserService, RemoteWalletServic
     @GetMapping("/group/member/listGroupMemberIds")
     public R<List<Long>> listGroupMemberIds(@RequestParam("groupId") Long groupId) {
         return R.ok(groupMemberService.listGroupMemberIds(groupId));
+    }
+
+    @Override
+    @Operation(
+            summary = "内部创建用户",
+            description = """
+                    - 用途：供系统服务执行已授权的用户创建任务。
+                    - 请求：username 指定新账号用户名；nickname、avatar、identityType、realName、campusNo、email、mobile、verificationMode、verificationProviderCode、userStatus 为可选账号字段；profile 为可选用户资料。
+                    - 约束：调用方必须来自可信服务链路；username 必须符合用户规则且全局唯一；用户服务必须已配置默认初始密码；学工号、邮箱、手机号和认证方式组合必须满足用户注册校验。
+                    - 处理：在同一事务中使用服务端默认密码创建账号，userId 由系统自动生成；随后初始化资料和钱包，复用管理员账号更新和资料更新逻辑写入请求字段，不绑定邀请关系。
+                    - 失败：默认密码未配置 -> UserError.USER_DEFAULT_PASSWORD_NOT_CONFIGURED；用户名重复 -> UserError.USERNAME_ALREADY_EXISTS；学工号冲突 -> UserError.CAMPUS_NO_ALREADY_EXISTS。
+                    - 响应：返回新创建用户的 userId。
+                    """
+    )
+    @Log(title = "内部创建用户", businessType = BusinessType.INSERT,
+            isSaveRequestData = false, isSaveResponseData = false)
+    @PostMapping("/user/createUser")
+    public R<Long> createUser(@RequestBody @Valid UserRegisterReqDTO req) {
+        return R.ok(userService.createUserAdmin(req));
     }
 
     @Override

@@ -85,4 +85,5 @@ public class FeignConfiguration {
         ObjectFactory<HttpMessageConverters> factory = () -> converters;
         return new ResponseEntityDecoder(new SpringDecoder(factory));
     }
+
 }

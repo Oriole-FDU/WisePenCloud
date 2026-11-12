@@ -8,7 +8,8 @@ import lombok.Getter;
 @Getter
 @AllArgsConstructor
 public enum BatchTaskType {
-    RESOURCE_FORK("RESOURCE_FORK");
+    RESOURCE_FORK("RESOURCE_FORK"),
+    USER_REGISTER("USER_REGISTER");
 
     @EnumValue
     @JsonValue
