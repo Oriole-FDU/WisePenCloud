@@ -166,29 +166,60 @@ public class UserServiceImpl implements IUserService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long createUserAdmin(UserRegisterReqDTO req) {
-        String defaultPassword = userProperties.getDefaultPassword();
-        if (StrUtil.isBlank(defaultPassword)) {
-            throw new ServiceException(UserError.USER_DEFAULT_PASSWORD_NOT_CONFIGURED);
+        // 校验用户名是否存在
+        if (userMapper
+                .selectCount(Wrappers.<UserEntity>lambdaQuery().eq(UserEntity::getUsername, req.getUsername())) > 0) {
+            throw new ServiceException(UserError.USERNAME_ALREADY_EXISTS);
         }
 
-        AuthRegisterRequest registerRequest = new AuthRegisterRequest();
-        registerRequest.setUsername(req.getUsername());
-        registerRequest.setPassword(defaultPassword);
-        Long userId = register(registerRequest);
+        // 校验学工号冲突
+        if (StrUtil.isNotBlank(req.getCampusNo()) && userMapper.selectCount(Wrappers.<UserEntity>lambdaQuery()
+                .eq(UserEntity::getCampusNo, req.getCampusNo())
+                .eq(UserEntity::getUserStatus, UserStatus.NORMAL)) > 0) {
+            throw new ServiceException(UserError.CAMPUS_NO_ALREADY_EXISTS);
+        }
 
-        UserInfoAdminUpdateRequest userInfoUpdate =
-                BeanUtil.copyProperties(req, UserInfoAdminUpdateRequest.class);
-        userInfoUpdate.setUserId(userId);
-        updateUserInfoAdmin(userInfoUpdate);
+        UserEntity user = BeanUtil.copyProperties(req, UserEntity.class, "password", "profile");
 
+        // 补齐可选账号字段的默认值
+        if (StrUtil.isBlank(user.getNickname())) {
+            user.setNickname(req.getUsername());
+        }
+        if (user.getIdentityType() == null) {
+            user.setIdentityType(IdentityType.STUDENT);
+        }
+        if (user.getUserStatus() == null) {
+            user.setUserStatus(req.getVerificationMode() != null ? UserStatus.NORMAL : UserStatus.UNIDENTIFIED);
+        }
+
+        // 加密用户密码
+        String password = req.getPassword();
+        if (StrUtil.isBlank(password)){
+            // 如未提供用户密码，则使用默认密码
+            password = userProperties.getAdminPassword().getDefaultPassword();
+            if (StrUtil.isBlank(password)) {
+                throw new ServiceException(UserError.USER_DEFAULT_PASSWORD_NOT_CONFIGURED);
+            }
+        }
+        user.setPassword(BCrypt.hashpw(password));
+        userMapper.insert(user);
+
+        // 新建档案
+        UserProfileEntity userProfile;
         if (req.getProfile() != null) {
-            UserProfileAdminUpdateRequest profileUpdate =
-                    BeanUtil.copyProperties(req.getProfile(), UserProfileAdminUpdateRequest.class);
-            profileUpdate.setUserId(userId);
-            updateProfileAdmin(profileUpdate);
+            userProfile = BeanUtil.copyProperties(req.getProfile(), UserProfileEntity.class);
+        } else {
+            userProfile = UserProfileEntity.builder().build();
         }
+        userProfile.setUserId(user.getUserId());
+        userProfile.setInviteCode(userInviteService.generateInviteCode());
+        userProfileMapper.insert(userProfile);
 
-        return userId;
+        UserWalletEntity userWallets = UserWalletEntity.builder().userId(user.getUserId())
+                .tokenBalance(0).tokenUsed(0).coinBalance(0).build();
+        userWalletsMapper.insert(userWallets);
+
+        return user.getUserId();
     }
 
     @Override

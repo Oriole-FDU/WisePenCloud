@@ -31,9 +31,9 @@ public class AdminUserController {
             summary = "管理员新建用户",
             description = """
                     - 用途：管理员直接创建完整用户账号。
-                    - 请求：username 为新账号用户名；nickname、avatar、identityType、realName、campusNo、email、mobile、verificationMode、verificationProviderCode、userStatus 为可选账号字段；profile 为可选用户资料。
-                    - 约束：当前操作者必须具备管理员身份；username 必须符合用户规则且全局唯一；Nacos 中用户服务配置必须提供默认初始密码；学工号、邮箱、手机号和认证方式组合必须满足用户注册校验。
-                    - 处理：在同一事务中使用服务端默认密码创建账号，userId 由系统自动生成；随后初始化资料和钱包，复用管理员账号更新和资料更新逻辑写入请求字段，不绑定邀请关系。未传 userStatus 但传入 verificationMode 时使用 NORMAL 状态。
+                    - 请求：username 指定新账号用户名；nickname、avatar、identityType、realName、campusNo、email、mobile、verificationMode、verificationProviderCode、userStatus 为可选账号字段；profile 为可选用户资料；password 为可选用户密码。
+                    - 约束：当前操作者必须具备管理员身份；username 必须符合用户规则且全局唯一；用户服务必须已配置默认初始密码；学工号、邮箱、手机号和认证方式组合必须满足用户注册校验。
+                    - 处理：password 未指定时使用服务端默认密码创建账号，userId 由系统自动生成，随后初始化资料和钱包。
                     - 失败：当前操作者不是管理员 -> PermissionError.UNAUTHORIZED；默认密码未配置 -> UserError.USER_DEFAULT_PASSWORD_NOT_CONFIGURED；用户名重复 -> UserError.USERNAME_ALREADY_EXISTS；学工号冲突 -> UserError.CAMPUS_NO_ALREADY_EXISTS。
                     - 响应：返回新创建用户的 userId。
                     """

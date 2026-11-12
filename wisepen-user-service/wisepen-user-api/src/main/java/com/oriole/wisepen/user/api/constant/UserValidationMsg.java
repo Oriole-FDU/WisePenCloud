@@ -35,7 +35,7 @@ public interface UserValidationMsg {
      */
     String EMAIL_INVALID = "邮箱格式不正确";
     String MOBILE_INVALID = "手机号格式不正确";
-    String CAMPUS_NO_REQUIRES_VERIFICATION = "指定学工号时必须指定认证方式，且账号不能为未认证状态";
+    String USER_REGISTRATION_INVALID = "用户注册信息不正确";
     String VERIFIED_ACCOUNT_REQUIRES_MODE = "已认证账号必须指定认证方式";
     String VERIFICATION_MODE_REQUIRES_VERIFIED_STATUS = "指定认证方式时账号不能为未认证状态";
     String CAMPUS_VERIFICATION_REQUIRES_CAMPUS_NO_AND_EMAIL = "校园身份认证必须同时指定学工号和邮箱";

@@ -21,10 +21,6 @@ public class ValidUserRegistrationValidator
         boolean emailPresent = StringUtils.hasText(user.getEmail());
         UserVerificationMode verificationMode = user.getVerificationMode();
 
-        if (campusNoPresent
-                && (verificationMode == null || user.getUserStatus() == UserStatus.UNIDENTIFIED)) {
-            return reject(context, UserValidationMsg.CAMPUS_NO_REQUIRES_VERIFICATION);
-        }
         if (user.getUserStatus() == UserStatus.NORMAL && verificationMode == null) {
             return reject(context, UserValidationMsg.VERIFIED_ACCOUNT_REQUIRES_MODE);
         }

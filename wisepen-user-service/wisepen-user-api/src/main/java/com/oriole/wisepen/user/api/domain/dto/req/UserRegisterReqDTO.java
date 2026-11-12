@@ -18,10 +18,6 @@ import lombok.EqualsAndHashCode;
 @ValidUserRegistration
 public class UserRegisterReqDTO extends UserInfoBase {
 
-    @Valid
-    @JsonIgnoreProperties("inviteCode")
-    private UserProfileBase profile;
-
     @Override
     @NotBlank(message = UserValidationMsg.USERNAME_EMPTY)
     @ValidUsername
@@ -46,4 +42,9 @@ public class UserRegisterReqDTO extends UserInfoBase {
     public String getMobile() {
         return super.getMobile();
     }
+
+    private String password;
+
+    @Valid
+    private UserProfileBase profile;
 }

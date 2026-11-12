@@ -147,7 +147,7 @@ public class ResourceForkBatchTaskExecutor implements BatchTaskExecutor {
     public BatchTaskItemEntity executeItem(BatchTaskItemEntity taskItem) {
         try {
             ResourceForkTaskMeta taskMeta = objectMapper.readValue(taskItem.getMeta(), ResourceForkTaskMeta.class);
-            long targetUserId = taskMeta.getTargetUserIds().get(0);
+            long targetUserId = taskMeta.getTargetUserIds().getFirst();
 
             String targetTagId = null;
             if (taskMeta.getTargetFolderPath() != null && !taskMeta.getTargetFolderPath().isEmpty()) {

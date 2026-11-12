@@ -1,5 +1,6 @@
 package com.oriole.wisepen.user.api.validation;
 
+import com.oriole.wisepen.user.api.constant.UserValidationMsg;
 import jakarta.validation.Constraint;
 import jakarta.validation.Payload;
 
@@ -12,7 +13,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Constraint(validatedBy = ValidUserRegistrationValidator.class)
 public @interface ValidUserRegistration {
-    String message() default "用户认证信息不一致";
+    String message() default UserValidationMsg.USER_REGISTRATION_INVALID;
 
     Class<?>[] groups() default {};
 

@@ -99,9 +99,9 @@ public class InternalController implements RemoteUserService, RemoteWalletServic
             summary = "内部创建用户",
             description = """
                     - 用途：供系统服务执行已授权的用户创建任务。
-                    - 请求：username 指定新账号用户名；nickname、avatar、identityType、realName、campusNo、email、mobile、verificationMode、verificationProviderCode、userStatus 为可选账号字段；profile 为可选用户资料。
+                    - 请求：username 指定新账号用户名；nickname、avatar、identityType、realName、campusNo、email、mobile、verificationMode、verificationProviderCode、userStatus 为可选账号字段；profile 为可选用户资料；password 为可选用户密码。
                     - 约束：调用方必须来自可信服务链路；username 必须符合用户规则且全局唯一；用户服务必须已配置默认初始密码；学工号、邮箱、手机号和认证方式组合必须满足用户注册校验。
-                    - 处理：在同一事务中使用服务端默认密码创建账号，userId 由系统自动生成；随后初始化资料和钱包，复用管理员账号更新和资料更新逻辑写入请求字段，不绑定邀请关系。
+                    - 处理：password 未指定时使用服务端默认密码创建账号，userId 由系统自动生成，随后初始化资料和钱包。
                     - 失败：默认密码未配置 -> UserError.USER_DEFAULT_PASSWORD_NOT_CONFIGURED；用户名重复 -> UserError.USERNAME_ALREADY_EXISTS；学工号冲突 -> UserError.CAMPUS_NO_ALREADY_EXISTS。
                     - 响应：返回新创建用户的 userId。
                     """
