@@ -193,10 +193,10 @@ public class CampusIdentityVerificationStrategy implements UserVerificationStrat
             throw new ServiceException(UserError.VERIFICATION_CAMPUS_IDENTITY_FAILED, "用户认证资料更新失败");
         }
 
-        redisCacheManager.updateUserStatusInSession(userId, UserStatus.NORMAL);
+        redisCacheManager.updateUserStatusInContext(userId, UserStatus.NORMAL);
 
         if (teacherProfile) {
-            redisCacheManager.updateUserIdentityTypeInSession(userId, IdentityType.TEACHER);
+            redisCacheManager.updateUserIdentityTypeInContext(userId, IdentityType.TEACHER);
             kafkaUserEventPublisher.publishUserTaskComplete(UserTaskCompleteMessage.builder()
                     .userId(userId)
                     .taskCode(UserTaskCode.TEACHER_VERIFICATION)

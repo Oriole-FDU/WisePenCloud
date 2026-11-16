@@ -151,7 +151,7 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
             throw new ServiceException(UserError.VERIFICATION_EMAIL_UPDATE_FAILED);
         }
 
-        redisCacheManager.updateUserStatusInSession(userId, UserStatus.NORMAL);
+        redisCacheManager.updateUserStatusInContext(userId, UserStatus.NORMAL);
         log.info("email verification succeeded. userId={} emailDomain={} university={}",
                 userId, school.getDomain(), school.getNameZh());
         return VerificationResultDTO.success();

@@ -66,7 +66,7 @@ public class GroupMemberServiceImpl implements IGroupMemberService {
 		groupMemberMapper.insert(member);
 
 		// 更新 Redis
-		redisCacheManager.updateGroupRoleMapInSession(userId, groupId, groupRoleType);
+		redisCacheManager.updateGroupRoleMapInContext(userId, groupId, groupRoleType);
 	}
 
 	@Override
@@ -81,7 +81,7 @@ public class GroupMemberServiceImpl implements IGroupMemberService {
 		groupMemberMapper.delete(deleteWrapper);
 
 		// 更新 Redis
-		redisCacheManager.updateGroupRoleMapInSession(userId, req.getGroupId(), GroupRoleType.NOT_MEMBER);
+		redisCacheManager.updateGroupRoleMapInContext(userId, req.getGroupId(), GroupRoleType.NOT_MEMBER);
 	}
 
 	@Override
@@ -123,7 +123,7 @@ public class GroupMemberServiceImpl implements IGroupMemberService {
 
 		// 更新 Redis
 		validUserIdsToDelete.forEach(targetId ->
-				redisCacheManager.updateGroupRoleMapInSession(targetId, req.getGroupId(), GroupRoleType.NOT_MEMBER)
+				redisCacheManager.updateGroupRoleMapInContext(targetId, req.getGroupId(), GroupRoleType.NOT_MEMBER)
 		);
 	}
 
@@ -275,7 +275,7 @@ public class GroupMemberServiceImpl implements IGroupMemberService {
 		groupMemberMapper.update(null, wrapper);
 
 		actualUserIdsToUpdate.forEach(targetId ->
-						redisCacheManager.updateGroupRoleMapInSession(targetId, req.getGroupId(), req.getRole())
+						redisCacheManager.updateGroupRoleMapInContext(targetId, req.getGroupId(), req.getRole())
 		);
 	}
 
@@ -289,7 +289,7 @@ public class GroupMemberServiceImpl implements IGroupMemberService {
 
 		// 3. 精准同步：遍历所有被踢出的成员，将他们的 Redis 状态置为 NOT_MEMBER
 		allMembers.forEach(member ->
-				redisCacheManager.updateGroupRoleMapInSession(member.getUserId(), groupId, GroupRoleType.NOT_MEMBER)
+				redisCacheManager.updateGroupRoleMapInContext(member.getUserId(), groupId, GroupRoleType.NOT_MEMBER)
 		);
 	}
 }

@@ -44,6 +44,9 @@ public class RedisCacheManager {
 	private static final String REDIS_EMAIL_VERIFY_TOKEN_PREFIX = "wisepen:user:auth:verify:";
     private static final long SESSION_TIMEOUT_DAYS = 7;
 
+	private static final String REDIS_USER_CONTEXT_PREFIX = "wisepen:user:auth:context:";
+	private static final long CONTEXT_TIMEOUT_DAYS = 30;
+
 	public Map<String, Integer> listGroupDashboardMetricCounters(LocalDate statDate) {
 		String indexKey = GroupDashboardMetricConstants.actorIndexKey(statDate);
 		Set<String> metricKeys = stringRedisTemplateDB0.opsForSet().members(indexKey);
@@ -95,18 +98,18 @@ public class RedisCacheManager {
 	}
 
 	public String setSession(Long userId, IdentityType identityType, UserStatus userStatus, Map<String, Integer> groupRoleMap) {
-		// 构建 Session 上下文数据
-		Map<String, Object> sessionData = new HashMap<>();
-		sessionData.put("userId", userId);
-		sessionData.put("identityType", identityType.getCode());
-		sessionData.put("status", userStatus.getCode());
-		sessionData.put("groupRoleMap", groupRoleMap);
+		Map<String, Object> contextData = new HashMap<>();
+		contextData.put("identityType", identityType.getCode());
+		contextData.put("status", userStatus.getCode());
+		contextData.put("groupRoleMap", groupRoleMap);
+		redisTemplate.opsForValue().set(REDIS_USER_CONTEXT_PREFIX + userId, contextData, CONTEXT_TIMEOUT_DAYS, TimeUnit.DAYS);
 
 		String sessionId = stringRedisTemplateDB0.opsForValue().get(REDIS_SESSION_TO_USER_PREFIX + userId);
 		if (StrUtil.isBlank(sessionId)) {
 			sessionId = IdUtil.fastSimpleUUID();
 		}
-		// sessionId不存在则新增；sessionId存在则刷新一下时间
+		Map<String, Object> sessionData = new HashMap<>();
+		sessionData.put("userId", userId);
 		redisTemplate.opsForValue().set(REDIS_SESSION_PREFIX + sessionId, sessionData,
 				SESSION_TIMEOUT_DAYS, TimeUnit.DAYS); // 存储Session
 		stringRedisTemplateDB0.opsForValue().set(REDIS_SESSION_TO_USER_PREFIX + userId, sessionId,
@@ -124,48 +127,42 @@ public class RedisCacheManager {
 	 */
 	public void deleteSessionsByUserId(Long userId) {
 		String sessionId = stringRedisTemplateDB0.opsForValue().get(REDIS_SESSION_TO_USER_PREFIX + userId);
-		if (sessionId == null) return;
-		// 删除 session 和 user->session 映射
-		redisTemplate.delete(REDIS_SESSION_PREFIX + sessionId);
-		stringRedisTemplateDB0.delete(REDIS_SESSION_TO_USER_PREFIX + userId);
+		if (sessionId != null) {
+			// 删除 session 和 user->session 映射
+			redisTemplate.delete(REDIS_SESSION_PREFIX + sessionId);
+			stringRedisTemplateDB0.delete(REDIS_SESSION_TO_USER_PREFIX + userId);
+		}
+		// 安全事件（封禁/改密/角色变更）同步清除身份 context，使 MCP 立即失效且不再提供旧身份
+		redisTemplate.delete(REDIS_USER_CONTEXT_PREFIX + userId);
 	}
 
-	public void updateUserStatusInSession(Long userId, UserStatus userStatus) {
-		String sessionId = stringRedisTemplateDB0.opsForValue().get(REDIS_SESSION_TO_USER_PREFIX + userId);
-		if (StrUtil.isBlank(sessionId)) return;
-
+	public void updateUserStatusInContext(Long userId, UserStatus userStatus) {
 		@SuppressWarnings("unchecked")
-		Map<String, Object> sessionData = (Map<String, Object>) redisTemplate.opsForValue().get(REDIS_SESSION_PREFIX + sessionId);
-		if (sessionData == null) return;
+		Map<String, Object> contextData = (Map<String, Object>) redisTemplate.opsForValue().get(REDIS_USER_CONTEXT_PREFIX + userId);
+		if (contextData == null) return;
 
-		sessionData.put("status", userStatus.getCode());
-		redisTemplate.opsForValue().set(REDIS_SESSION_PREFIX + sessionId, sessionData,
-				SESSION_TIMEOUT_DAYS, TimeUnit.DAYS);
+		contextData.put("status", userStatus.getCode());
+		redisTemplate.opsForValue().set(REDIS_USER_CONTEXT_PREFIX + userId, contextData,
+				CONTEXT_TIMEOUT_DAYS, TimeUnit.DAYS);
 	}
 
-	public void updateUserIdentityTypeInSession(Long userId, IdentityType identityType) {
-		String sessionId = stringRedisTemplateDB0.opsForValue().get(REDIS_SESSION_TO_USER_PREFIX + userId);
-		if (StrUtil.isBlank(sessionId)) return;
-
+	public void updateUserIdentityTypeInContext(Long userId, IdentityType identityType) {
 		@SuppressWarnings("unchecked")
-		Map<String, Object> sessionData = (Map<String, Object>) redisTemplate.opsForValue().get(REDIS_SESSION_PREFIX + sessionId);
-		if (sessionData == null) return;
+		Map<String, Object> contextData = (Map<String, Object>) redisTemplate.opsForValue().get(REDIS_USER_CONTEXT_PREFIX + userId);
+		if (contextData == null) return;
 
-		sessionData.put("identityType", identityType.getCode());
-		redisTemplate.opsForValue().set(REDIS_SESSION_PREFIX + sessionId, sessionData,
-				SESSION_TIMEOUT_DAYS, TimeUnit.DAYS);
+		contextData.put("identityType", identityType.getCode());
+		redisTemplate.opsForValue().set(REDIS_USER_CONTEXT_PREFIX + userId, contextData,
+				CONTEXT_TIMEOUT_DAYS, TimeUnit.DAYS);
 	}
 
-	public void updateGroupRoleMapInSession(Long userId, Long groupId, GroupRoleType groupRoleType) {
-		String sessionId = stringRedisTemplateDB0.opsForValue().get(REDIS_SESSION_TO_USER_PREFIX + userId);
-		if (StrUtil.isBlank(sessionId)) return; // 用户未登录则直接返回
+	public void updateGroupRoleMapInContext(Long userId, Long groupId, GroupRoleType groupRoleType) {
+		@SuppressWarnings("unchecked")
+		Map<String, Object> contextData = (Map<String, Object>) redisTemplate.opsForValue().get(REDIS_USER_CONTEXT_PREFIX + userId);
+		if (contextData == null) return;
 
 		@SuppressWarnings("unchecked")
-		Map<String, Object> sessionData = (Map<String, Object>) redisTemplate.opsForValue().get(REDIS_SESSION_PREFIX + sessionId);
-		if (sessionData == null) return;
-
-		@SuppressWarnings("unchecked")
-		Map<String, Integer> groupRoleMap = (Map<String, Integer>) sessionData.get("groupRoleMap");
+		Map<String, Integer> groupRoleMap = (Map<String, Integer>) contextData.get("groupRoleMap");
 		if (groupRoleMap == null) groupRoleMap = new HashMap<>();
 
 		if (groupRoleType.equals(GroupRoleType.NOT_MEMBER)) {
@@ -173,10 +170,10 @@ public class RedisCacheManager {
 		} else {
 			groupRoleMap.put(groupId.toString(), groupRoleType.getCode());
 		}
-		sessionData.put("groupRoleMap", groupRoleMap);
+		contextData.put("groupRoleMap", groupRoleMap);
 
-		redisTemplate.opsForValue().set(REDIS_SESSION_PREFIX + sessionId, sessionData,
-				SESSION_TIMEOUT_DAYS, TimeUnit.DAYS);
+		redisTemplate.opsForValue().set(REDIS_USER_CONTEXT_PREFIX + userId, contextData,
+				CONTEXT_TIMEOUT_DAYS, TimeUnit.DAYS);
 	}
 
 	// 用户个人欠费达到硬阈值后封禁全部平台付费 AI；个人欠费清零后解封（DB1）
