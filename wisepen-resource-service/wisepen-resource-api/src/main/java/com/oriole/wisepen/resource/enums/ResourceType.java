@@ -36,6 +36,8 @@ public enum ResourceType {
     SKILL(31, "SKILL", "skill"),
     /** 无扩展名的 Agent，由 AI资产 服务管理 */
     AGENT(32, "AGENT", "agent"),
+    /** 无扩展名的问卷，由问卷服务管理 */
+    QUESTIONNAIRE(33, "QUESTIONNAIRE", "questionnaire"),
 
     /** 单文件 HTML 页面，由 Web App 服务管理 */
     SINGLE_HTML_PAGE(41, "SINGLE_HTML_PAGE", "html"),
