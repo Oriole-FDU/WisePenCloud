@@ -284,6 +284,8 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
                     probe.width(),
                     probe.height());
         } catch (Exception e) {
+            log.error("packageVideo failed. mediaId={}, sourceObjectKey={}, uploadedObjectKeys={}",
+                    mediaInfo.getMediaId(), mediaInfo.getSourceObjectKey(), uploadedObjectKeys, e);
             if (!uploadedObjectKeys.isEmpty()) {
                 eventPublisher.publishFileDeleteEvent(uploadedObjectKeys);
             }
@@ -551,6 +553,7 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
             }
             return output;
         } catch (Exception e) {
+            log.error("media command failed. command={}, timeout={}", command, timeout, e);
             throw new ServiceException(MediaError.MEDIA_PROCESS_FAILED);
         }
     }
@@ -584,6 +587,7 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
             // 返回存储服务确认后的 objectKey，避免调用方依赖本地拼接结果
             return uploadInitResp.getObjectKey();
         } catch (Exception e) {
+            log.error("media product upload failed. objectKey={}, mediaId={}", objectKey, mediaId, e);
             throw new ServiceException(MediaError.MEDIA_PROCESS_FAILED);
         }
     }
