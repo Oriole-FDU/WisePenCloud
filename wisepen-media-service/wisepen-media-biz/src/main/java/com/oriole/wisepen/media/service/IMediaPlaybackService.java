@@ -6,5 +6,5 @@ public interface IMediaPlaybackService {
 
     MediaPlaybackResponse getPlayback(String resourceId);
 
-    String getPlaybackManifest(String resourceId);
+    String getPlaybackManifest(String resourceId, String manifestPath);
 }

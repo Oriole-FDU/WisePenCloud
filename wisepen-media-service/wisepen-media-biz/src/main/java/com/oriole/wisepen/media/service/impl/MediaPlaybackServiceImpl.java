@@ -68,7 +68,7 @@ public class MediaPlaybackServiceImpl implements IMediaPlaybackService {
     }
 
     @Override
-    public String getPlaybackManifest(String resourceId) {
+    public String getPlaybackManifest(String resourceId, String manifestPath) {
         MediaInfoEntity mediaInfo = mediaInfoRepository.findByResourceId(resourceId)
                 .orElseThrow(() -> new ServiceException(MediaError.MEDIA_NOT_FOUND));
         if (mediaInfo.getMediaStatus() == null || mediaInfo.getMediaStatus().getStatus() != MediaStatusEnum.READY) {
@@ -77,8 +77,15 @@ public class MediaPlaybackServiceImpl implements IMediaPlaybackService {
         if (mediaInfo.getResourceType() != ResourceType.VIDEO || StrUtil.isBlank(mediaInfo.getSourceHlsPrefix())) {
             throw new ServiceException(MediaError.MEDIA_PREVIEW_NOT_READY);
         }
-        String manifestObjectKey = mediaInfo.getSourceHlsPrefix() + "/index.m3u8";
-        return hlsManifestService.getSignedManifest(mediaInfo.getMediaId(), manifestObjectKey, mediaInfo.getDurationMs());
+        // 清单由本服务生成且放在同一目录，只允许访问已登记的清单文件。
+        if (manifestPath == null || !manifestPath.matches("[A-Za-z0-9_-]+\\.m3u8")) {
+            throw new ServiceException(MediaError.MEDIA_PLAYBACK_FAILED);
+        }
+        String manifestObjectKey = mediaInfo.getSourceHlsPrefix() + "/" + manifestPath;
+        if (mediaInfo.getSourceHlsObjectKeys() == null || !mediaInfo.getSourceHlsObjectKeys().contains(manifestObjectKey)) {
+            throw new ServiceException(MediaError.MEDIA_PLAYBACK_FAILED);
+        }
+        return hlsManifestService.getSignedManifest(resourceId, manifestObjectKey, mediaInfo.getDurationMs());
     }
 
 }

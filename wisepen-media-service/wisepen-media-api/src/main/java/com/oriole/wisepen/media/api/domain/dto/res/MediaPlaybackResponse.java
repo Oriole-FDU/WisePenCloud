@@ -20,7 +20,7 @@ public class MediaPlaybackResponse {
     /** 图片或视频封面图 URL */
     private String coverUrl;
 
-    /** 视频源 HLS manifest URL */
+    /** 视频 HLS 播放入口 URL */
     private String manifestUrl;
 
     /** 图片或音频源文件播放 URL */

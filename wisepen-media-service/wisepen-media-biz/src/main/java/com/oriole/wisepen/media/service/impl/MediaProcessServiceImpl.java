@@ -248,7 +248,7 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
             VideoProbe probe = probeVideo(sourcePath);
             Path hlsDir = workDir.resolve("hls");
             Files.createDirectories(hlsDir);
-            runFfmpegToHls(sourcePath, hlsDir);
+            runFfmpegToHls(sourcePath, hlsDir, probe);
 
             // HLS 产物统一上传到 private media 目录，播放时再由 manifest 服务签发分片 URL
             String hlsPrefix = StorageSceneEnum.PRIVATE_MEDIA.getPrefix()
@@ -388,24 +388,34 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
     }
 
     private VideoProbe probeVideo(Path sourcePath) throws IOException {
-        // ffprobe 输出 JSON，读取首个视频流尺寸和容器时长
+        // 同时探测音轨，生成无声视频的 variant 时不能引用不存在的音频流。
         String output = runCommand(List.of(
                 mediaProperties.getLocalResources().getFfprobePath(),
                 "-v", "error",
-                "-select_streams", "v:0",
-                "-show_entries", "stream=width,height:format=duration",
+                "-show_entries", "stream=codec_type,width,height:format=duration",
                 "-of", "json",
                 sourcePath.toString()
         ), Duration.ofMillis(mediaProperties.getProcessingRuntime().getFfmpegTimeoutMs()));
         JsonNode root = objectMapper.readTree(output);
-        JsonNode stream = root.path("streams").isArray() && !root.path("streams").isEmpty()
-                ? root.path("streams").get(0) : objectMapper.createObjectNode();
+        JsonNode videoStream = null;
+        boolean hasAudio = false;
+        for (JsonNode stream : root.path("streams")) {
+            if (videoStream == null && "video".equals(stream.path("codec_type").asText())) {
+                videoStream = stream;
+            }
+            if ("audio".equals(stream.path("codec_type").asText())) {
+                hasAudio = true;
+            }
+        }
+        if (videoStream == null || videoStream.path("width").asInt() < 2 || videoStream.path("height").asInt() < 2) {
+            throw new ServiceException(MediaError.MEDIA_PROCESS_FAILED, "视频尺寸无效");
+        }
         double durationSeconds = root.path("format").path("duration").asDouble(0D);
-        // duration 缺失时按 0 处理；宽高缺失时保留 null
         return new VideoProbe(
                 Math.round(durationSeconds * 1000D),
-                stream.path("width").isMissingNode() ? null : stream.path("width").asInt(),
-                stream.path("height").isMissingNode() ? null : stream.path("height").asInt()
+                videoStream.path("width").asInt(),
+                videoStream.path("height").asInt(),
+                hasAudio
         );
     }
 
@@ -429,22 +439,65 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
         return new AudioProbe(Math.round(durationSeconds * 1000D));
     }
 
-    private void runFfmpegToHls(Path sourcePath, Path hlsDir) {
-        // 转成 VOD HLS：视频统一编码为 H.264，音频存在时转 AAC，并输出 index.m3u8 与 TS 分片
-        runCommand(List.of(
+    private void runFfmpegToHls(Path sourcePath, Path hlsDir, VideoProbe probe) {
+        int segmentSeconds = mediaProperties.getProcessingRuntime().getHlsSegmentSeconds();
+        if (segmentSeconds <= 0) {
+            throw new ServiceException(MediaError.MEDIA_PROCESS_FAILED, "HLS 分片时长必须为正数");
+        }
+        // 按短边选择档位，兼顾竖屏；最后一档保留不超过 1080 的源尺寸，不放大小视频。
+        int sourceShortSide = Math.min(probe.width(), probe.height()) / 2 * 2;
+        List<HlsRendition> renditions = new ArrayList<>();
+        for (HlsRendition target : List.of(
+                new HlsRendition(480, 1000), new HlsRendition(720, 2500), new HlsRendition(1080, 5000))) {
+            renditions.add(new HlsRendition(Math.min(sourceShortSide, target.shortSide()), target.bitrateKbps()));
+            if (sourceShortSide <= target.shortSide()) {
+                break;
+            }
+        }
+
+        List<String> command = new ArrayList<>(List.of(
                 mediaProperties.getLocalResources().getFfmpegPath(),
-                "-y",
-                "-i", sourcePath.toString(),
-                "-map", "0:v:0",
-                "-map", "0:a?",
+                "-y", "-i", sourcePath.toString()));
+        List<String> variants = new ArrayList<>();
+        for (int i = 0; i < renditions.size(); i++) {
+            HlsRendition rendition = renditions.get(i);
+            String shortSide = String.valueOf(rendition.shortSide());
+            command.addAll(List.of("-map", "0:v:0"));
+            if (probe.hasAudio()) {
+                command.addAll(List.of("-map", "0:a:0"));
+            }
+            // FFmpeg 自动应用旋转信息后再缩放；长边按比例计算并取偶数，保留画面比例。
+            command.addAll(List.of(
+                    "-filter:v:" + i, "scale=w='if(gte(iw,ih),-2," + shortSide
+                            + ")':h='if(gte(iw,ih)," + shortSide + ",-2)'",
+                    "-b:v:" + i, rendition.bitrateKbps() + "k",
+                    "-maxrate:v:" + i, rendition.bitrateKbps() + "k",
+                    "-bufsize:v:" + i, (rendition.bitrateKbps() * 2) + "k"));
+            variants.add("v:" + i + (probe.hasAudio() ? ",a:" + i : "") + ",name:" + shortSide + "p");
+        }
+        command.addAll(List.of(
                 "-c:v", "libx264",
                 "-preset", "veryfast",
+                "-pix_fmt", "yuv420p",
+                "-flags:v", "+cgop",
+                "-sc_threshold:v", "0",
+                // 各档在相同时间强制关键帧，保证切档时分片边界与解码起点对齐。
+                "-force_key_frames:v", "expr:gte(t,n_forced*" + segmentSeconds + ")",
                 "-c:a", "aac",
-                "-hls_time", String.valueOf(mediaProperties.getProcessingRuntime().getHlsSegmentSeconds()),
+                "-b:a", "128k", "-ac", "2", "-ar", "48000",
+                "-f", "hls",
+                "-hls_time", String.valueOf(segmentSeconds),
                 "-hls_playlist_type", "vod",
-                "-hls_segment_filename", hlsDir.resolve("seg-%05d.ts").toString(),
-                hlsDir.resolve("index.m3u8").toString()
-        ), Duration.ofMillis(mediaProperties.getProcessingRuntime().getFfmpegTimeoutMs()));
+                "-hls_segment_type", "fmp4",
+                "-hls_flags", "independent_segments",
+                // FFmpeg 仅在多档时展开 init 文件名的 %v；输出路径用 / 保证 Windows 下也正确定位 init。
+                "-hls_fmp4_init_filename", renditions.size() == 1
+                        ? "init-" + renditions.getFirst().shortSide() + "p.mp4" : "init-%v.mp4",
+                "-hls_segment_filename", hlsDir.resolve("%v-seg-%05d.m4s").toString().replace('\\', '/'),
+                "-master_pl_name", "index.m3u8",
+                "-var_stream_map", String.join(" ", variants),
+                hlsDir.resolve("%v.m3u8").toString().replace('\\', '/')));
+        runCommand(command, Duration.ofMillis(mediaProperties.getProcessingRuntime().getFfmpegTimeoutMs()));
     }
 
     private void runFfmpegToImagePreview(Path sourcePath, Path previewPath) {
@@ -600,7 +653,10 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
     private record ImageSize(Integer width, Integer height) {
     }
 
-    private record VideoProbe(Long durationMs, Integer width, Integer height) {
+    private record VideoProbe(Long durationMs, Integer width, Integer height, boolean hasAudio) {
+    }
+
+    private record HlsRendition(int shortSide, int bitrateKbps) {
     }
 
     private record AudioProbe(Long durationMs) {

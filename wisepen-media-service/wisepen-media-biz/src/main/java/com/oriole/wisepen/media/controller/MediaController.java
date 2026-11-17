@@ -146,7 +146,7 @@ public class MediaController {
                     - 用途：为有查看权限的用户获取媒体播放地址。
                     - 请求：resourceId 指定媒体资源。
                     - 约束：当前用户必须拥有 VIEW 动作；媒体必须已经处理完成。
-                    - 处理：图片签发原图和低清封面图 OSS 短时 URL；音频签发源文件 OSS 短时 URL；视频返回封面图和媒体服务的源 HLS manifest 地址。
+                    - 处理：图片签发原图和低清封面图 OSS 短时 URL；音频签发源文件 OSS 短时 URL；视频返回封面图和媒体服务的 HLS 播放入口，提供 fMP4 自适应码率主清单。
                     - 失败：无查看权限 -> MediaError.MEDIA_PERMISSION_DENIED；媒体不存在 -> MediaError.MEDIA_NOT_FOUND；媒体未就绪 -> MediaError.MEDIA_PREVIEW_NOT_READY。
                     - 响应：resourceType 标识媒体类型；图片通过 playbackUrl 返回原图、coverUrl 返回低清封面图；视频通过 coverUrl 返回封面图、manifestUrl 返回 HLS 地址；音频通过 playbackUrl 返回源文件。
                     """
@@ -161,19 +161,22 @@ public class MediaController {
     @Operation(
             summary = "获取媒体播放 HLS manifest",
             description = """
-                    - 用途：为视频播放返回当前可播放的源 HLS manifest。
-                    - 请求：resourceId 指定媒体资源。
+                    - 用途：为视频播放返回 HLS 主清单或指定清晰度的媒体清单。
+                    - 请求：resourceId 指定媒体资源；manifestPath 默认为 index.m3u8，子清单地址由主清单提供。
                     - 约束：当前用户必须拥有 VIEW 动作；媒体必须是已就绪视频。
-                    - 处理：读取源 HLS manifest，并将 segment URI 改写为 OSS 短时防盗链 URL；按媒体缓存签名后的清单。
-                    - 失败：无查看权限 -> MediaError.MEDIA_PERMISSION_DENIED；媒体不存在 -> MediaError.MEDIA_NOT_FOUND；媒体未就绪或不是视频 -> MediaError.MEDIA_PREVIEW_NOT_READY；播放清单获取失败 -> MediaError.MEDIA_PLAYBACK_FAILED。
+                    - 处理：子清单继续通过本接口鉴权访问，初始化文件与分片改写为 OSS 短时防盗链 URL；每份清单独立缓存。
+                    - 失败：无查看权限 -> MediaError.MEDIA_PERMISSION_DENIED；媒体不存在 -> MediaError.MEDIA_NOT_FOUND；媒体未就绪或不是视频 -> MediaError.MEDIA_PREVIEW_NOT_READY；清单路径非法、不属于当前媒体或获取失败 -> MediaError.MEDIA_PLAYBACK_FAILED。
                     - 响应：返回 application/vnd.apple.mpegurl 文本。
                     """
     )
     @GetMapping(value = "/getPlaybackManifest", produces = "application/vnd.apple.mpegurl")
     public String getPlaybackManifest(
-            @RequestParam @NotBlank(message = MediaValidationMsg.RESOURCE_ID_EMPTY) String resourceId) {
+            @RequestParam @NotBlank(message = MediaValidationMsg.RESOURCE_ID_EMPTY) String resourceId,
+            @RequestParam(defaultValue = "index.m3u8") String manifestPath,
+            HttpServletResponse response) {
         assertResourceAction(resourceId, ResourceAction.VIEW);
-        return mediaPlaybackService.getPlaybackManifest(resourceId);
+        response.setHeader("Cache-Control", "no-store");
+        return mediaPlaybackService.getPlaybackManifest(resourceId, manifestPath);
     }
 
     @Operation(

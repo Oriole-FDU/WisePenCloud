@@ -20,27 +20,27 @@ public class RedisCacheManager {
 
     private final StringRedisTemplate stringRedisTemplate;
 
-    public String getPlaybackManifest(String mediaId) {
-        return stringRedisTemplate.opsForValue().get(REDIS_PLAYBACK_MANIFEST_PREFIX + mediaId);
+    public String getPlaybackManifest(String manifestObjectKey) {
+        return stringRedisTemplate.opsForValue().get(REDIS_PLAYBACK_MANIFEST_PREFIX + manifestObjectKey);
     }
 
-    public void setPlaybackManifest(String mediaId, String manifest, long ttlSeconds) {
+    public void setPlaybackManifest(String manifestObjectKey, String manifest, long ttlSeconds) {
         if (ttlSeconds <= 0 || manifest == null || manifest.isBlank()) {
             return;
         }
-        stringRedisTemplate.opsForValue().set(REDIS_PLAYBACK_MANIFEST_PREFIX + mediaId, manifest, ttlSeconds, TimeUnit.SECONDS);
+        stringRedisTemplate.opsForValue().set(REDIS_PLAYBACK_MANIFEST_PREFIX + manifestObjectKey, manifest, ttlSeconds, TimeUnit.SECONDS);
     }
 
-    public Boolean tryLockPlaybackManifestBuild(String mediaId, String lockToken, long ttlSeconds) {
+    public Boolean tryLockPlaybackManifestBuild(String manifestObjectKey, String lockToken, long ttlSeconds) {
         if (ttlSeconds <= 0) {
             return Boolean.FALSE;
         }
-        return stringRedisTemplate.opsForValue().setIfAbsent(REDIS_PLAYBACK_MANIFEST_LOCK_PREFIX + mediaId, lockToken, ttlSeconds, TimeUnit.SECONDS);
+        return stringRedisTemplate.opsForValue().setIfAbsent(REDIS_PLAYBACK_MANIFEST_LOCK_PREFIX + manifestObjectKey, lockToken, ttlSeconds, TimeUnit.SECONDS);
     }
 
-    public void unlockPlaybackManifestBuild(String mediaId, String lockToken) {
+    public void unlockPlaybackManifestBuild(String manifestObjectKey, String lockToken) {
         stringRedisTemplate.execute(UNLOCK_PLAYBACK_MANIFEST_BUILD_SCRIPT,
-                List.of(REDIS_PLAYBACK_MANIFEST_LOCK_PREFIX + mediaId),
+                List.of(REDIS_PLAYBACK_MANIFEST_LOCK_PREFIX + manifestObjectKey),
                 lockToken);
     }
 
