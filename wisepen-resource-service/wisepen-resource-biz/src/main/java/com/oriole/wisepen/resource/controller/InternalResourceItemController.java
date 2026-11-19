@@ -4,10 +4,12 @@ import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.resource.domain.dto.*;
+import com.oriole.wisepen.resource.domain.dto.req.MarketSaleVersionCheckRequest;
 import com.oriole.wisepen.resource.domain.dto.req.PersonalFolderEnsureReqDTO;
 import com.oriole.wisepen.resource.domain.dto.res.ResourceItemResponse;
 import com.oriole.wisepen.resource.feign.RemoteResourceService;
 import com.oriole.wisepen.resource.service.IGroupResService;
+import com.oriole.wisepen.resource.service.IMarketService;
 import com.oriole.wisepen.resource.service.IResourceService;
 import com.oriole.wisepen.resource.service.ITagService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -26,6 +28,7 @@ public class InternalResourceItemController implements RemoteResourceService {
 
     // 内部 Feign 接口，不打 @Log。被调用方（Document/User Controller）负责在自己的入口处审计。
     private final IResourceService resourceService;
+    private final IMarketService marketService;
     private final IGroupResService groupResService;
     private final ITagService tagService;
 
@@ -115,6 +118,24 @@ public class InternalResourceItemController implements RemoteResourceService {
     public R<ResourceCheckPermissionResDTO> checkResPermission(@RequestBody ResourceCheckPermissionReqDTO dto) {
         ResourceCheckPermissionResDTO hasPermission = resourceService.checkPermission(dto);
         return R.ok(hasPermission);
+    }
+
+    @Operation(
+            summary = "内部校验集市资源版本",
+            description = """
+                    - 用途：供管理员审核预览在读取文件内容前确认目标版本仍对应当前集市销售信息。
+                    - 请求：resourceId、marketGroupId 和 offerVersion 指定集市资源及售卖版本。
+                    - 约束：调用方必须通过内部服务调用边界；集市销售信息必须存在且 offerVersion 必须匹配。
+                    - 处理：读取资源当前集市销售信息并校验版本；不改变售卖状态、资源权限或文件内容。
+                    - 失败：资源不存在 -> ResourceError.RESOURCE_NOT_FOUND；集市销售信息不存在 -> ResourceError.MARKET_SALE_INFO_NOT_FOUND；版本与当前售卖版本不一致 -> ResourceError.MARKET_AUDIT_VERSION_CONFLICT。
+                    - 响应：校验成功时返回空结果。
+                    """
+    )
+    @Override
+    @PostMapping("/assertMarketSaleVersion")
+    public R<Void> assertMarketSaleVersion(@Validated @RequestBody MarketSaleVersionCheckRequest request) {
+        marketService.assertMarketSaleVersion(request);
+        return R.ok();
     }
 
     @Override
