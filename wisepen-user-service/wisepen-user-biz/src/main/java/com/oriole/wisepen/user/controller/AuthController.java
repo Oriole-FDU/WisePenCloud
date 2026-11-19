@@ -2,6 +2,7 @@ package com.oriole.wisepen.user.controller;
 
 import java.io.IOException;
 import cn.hutool.core.util.StrUtil;
+import com.oriole.wisepen.campus.extension.api.domain.dto.CampusProviderCatalogDTO;
 import com.oriole.wisepen.campus.extension.api.domain.dto.ClassicAuthTaskResultDTO;
 import com.oriole.wisepen.common.core.context.SecurityContextHolder;
 import com.oriole.wisepen.common.core.domain.R;
@@ -10,6 +11,7 @@ import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.security.annotation.CheckLogin;
 import com.oriole.wisepen.user.api.config.UserProperties;
 import com.oriole.wisepen.user.api.domain.dto.req.*;
+import com.oriole.wisepen.user.campus.CampusProviderCatalogService;
 import com.oriole.wisepen.user.campus.strategy.CampusClassicAuthFlowStrategy;
 import com.oriole.wisepen.user.campus.strategy.CampusOAuth2FlowStrategy;
 import com.oriole.wisepen.user.service.AuthService;
@@ -39,6 +41,7 @@ public class AuthController {
     private final UserLoginService userLoginService;
     private final CampusOAuth2FlowStrategy campusOAuth2FlowStrategy;
     private final CampusClassicAuthFlowStrategy campusClassicAuthFlowStrategy;
+    private final CampusProviderCatalogService campusProviderCatalogService;
 
     @Operation(
             summary = "用户登录",
@@ -88,13 +91,29 @@ public class AuthController {
     }
 
     @Operation(
+            summary = "查询校园登录与身份认证 Provider",
+            description = """
+                    - 用途：一次性返回可用于校园登录和校园身份认证的 Provider 入口，供前端渲染登录窗口和认证窗口。
+                    - 请求：无需请求参数，无需登录。
+                    - 约束：Provider 由用户服务配置，展示信息来自对应扩展服务。
+                    - 处理：按配置的 login/identity 协议分别向扩展服务获取描述，归一化为统一入口；OAUTH2 为跳转授权，CLASSIC 为表单登录/认证。
+                    - 失败：扩展服务不可用或 Provider 未配置 -> UserError.AUTH_CAMPUS_OAUTH_PROVIDER_NOT_FOUND / AUTH_CAMPUS_CLASSIC_PROVIDER_NOT_FOUND。
+                    - 响应：返回 login 与 identity 两组 Provider 入口。
+                    """
+    )
+    @GetMapping("/campus/listCampusProviders")
+    public R<CampusProviderCatalogDTO> listCampusProviders() {
+        return R.ok(campusProviderCatalogService.listProviders());
+    }
+
+    @Operation(
             summary = "发起校园 OAuth2.0 登录",
             description = """
                     - 用途：用户选择 OAuth2.0 登录时，跳转到对应 Provider 的授权页。
                     - 请求：providerCode 指定 OAuth2.0 登录 Provider。
                     - 约束：Provider 必须已启用且配置路由；回调地址必须已配置。
                     - 处理：生成一次性 state 并缓存，拼接回调地址，向 Provider 换取授权页完整地址后 302 跳转。
-                    - 失败：Provider 不存在或未声明 OAuth2.0 登录 -> UserError.OAUTH_LOGIN_PROVIDER_NOT_FOUND；OAuth2.0 回调地址未配置 -> UserError.OAUTH_LOGIN_FAILED；扩展服务调用失败 -> UserError.OAUTH_LOGIN_REQUEST_FAILED。
+                    - 失败：Provider 不存在或未声明 OAuth2.0 登录 -> UserError.AUTH_CAMPUS_OAUTH_PROVIDER_NOT_FOUND；OAuth2.0 回调地址未配置 -> UserError.OAUTH_AUTH_FAILED；扩展服务调用失败 -> UserError.OAUTH_AUTH_REQUEST_FAILED。
                     - 响应：成功时 302 重定向到 Provider 授权页。
                     """
     )
@@ -112,7 +131,7 @@ public class AuthController {
                     - 请求：code 为授权码；state 为发起登录时生成的一次性状态。
                     - 约束：state 必须有效且未过期，并从中解析出 Provider；Provider 返回的用户信息必须包含身份标识。
                     - 处理：校验 state 并解析 Provider 后换取令牌、拉取用户信息，按身份标识匹配已有账号，不存在时自动注册并登录；写入 Redis 会话，并在响应中设置认证 Cookie。
-                    - 失败：state 无效或过期 -> UserError.OAUTH_LOGIN_STATE_INVALID；Provider 未声明 OAuth2.0 登录 -> UserError.OAUTH_LOGIN_PROVIDER_NOT_FOUND；登录失败 -> UserError.OAUTH_LOGIN_FAILED；账号被禁用 -> UserError.AUTH_USER_LOCKED。
+                    - 失败：state 无效或过期 -> UserError.OAUTH_AUTH_STATE_INVALID；Provider 未声明 OAuth2.0 登录 -> UserError.AUTH_CAMPUS_OAUTH_PROVIDER_NOT_FOUND；登录失败 -> UserError.OAUTH_AUTH_FAILED；账号被禁用 -> UserError.AUTH_USER_LOCKED。
                     - 响应：返回 sessionId，可同时通过 Cookie 或请求头用于后续认证。
                     """
     )
@@ -135,7 +154,7 @@ public class AuthController {
                     - 请求：providerCode 指定学校；inputs 携带该 Provider 声明的字符串输入，例如 account 和 password。
                     - 约束：providerCode 必须已配置且声明经典登录协议。
                     - 处理：向扩展服务发起登录任务并返回任务当前状态；不在本接口直接建立会话。
-                    - 失败：Provider 未配置或未声明经典登录 -> UserError.CLASSIC_LOGIN_PROVIDER_NOT_FOUND；扩展请求失败 -> UserError.CLASSIC_LOGIN_REQUEST_FAILED。
+                    - 失败：Provider 未配置或未声明经典登录 -> UserError.AUTH_CAMPUS_CLASSIC_PROVIDER_NOT_FOUND；扩展请求失败 -> UserError.CAMPUS_CLASSIC_AUTH_REQUEST_FAILED。
                     - 响应：返回登录任务当前状态。
                     """
     )
@@ -157,7 +176,7 @@ public class AuthController {
                     - 请求：providerCode 指定学校；taskId 为发起登录时返回的任务标识。
                     - 约束：providerCode 必须已配置且声明经典登录协议；任务必须归属该登录流程。
                     - 处理：向扩展服务查询任务状态，成功时按学工号匹配或自动注册账号并建立会话，同时写入认证 Cookie；不修改账号资料。
-                    - 失败：Provider 未配置或未声明经典登录 -> UserError.CLASSIC_LOGIN_PROVIDER_NOT_FOUND；任务查询失败、归属不一致或资料缺失 -> UserError.CLASSIC_LOGIN_FAILED；账号被禁用 -> UserError.AUTH_USER_LOCKED。
+                    - 失败：Provider 未配置或未声明经典登录 -> UserError.AUTH_CAMPUS_CLASSIC_PROVIDER_NOT_FOUND；任务查询失败、归属不一致或资料缺失 -> UserError.CAMPUS_CLASSIC_AUTH_FAILED；账号被禁用 -> UserError.AUTH_USER_LOCKED。
                     - 响应：处理中返回空；成功时返回 sessionId，并同时通过 Cookie 用于后续认证。
                     """
     )

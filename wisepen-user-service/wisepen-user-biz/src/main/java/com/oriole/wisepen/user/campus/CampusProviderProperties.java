@@ -1,5 +1,6 @@
 package com.oriole.wisepen.user.campus;
 
+import com.oriole.wisepen.campus.extension.api.enums.CampusAuthProtocol;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.user.exception.UserError;
 import lombok.Data;

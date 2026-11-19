@@ -19,17 +19,13 @@ public enum UserError implements IResult {
     AUTH_USERNAME_OR_PASSWORD_INVALID(3111, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.INVALID),"用户名或密码错误"),
     AUTH_USER_LOCKED(3121, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.LOCKED), "账号已禁用"),
     AUTH_CURRENT_PASSWORD_INVALID(3131, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.INVALID), "旧密码错误"),
-
-    // OAuth2.0 登录相关异常
-    OAUTH_LOGIN_PROVIDER_NOT_FOUND(3141, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.NOT_FOUND), "OAuth2.0 登录 Provider 不存在"),
-    OAUTH_LOGIN_REQUEST_FAILED(3151, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.FAILED), "OAuth2.0 登录请求发送失败"),
-    OAUTH_LOGIN_STATE_INVALID(3161, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.INVALID), "OAuth2.0 登录状态无效"),
-    OAUTH_LOGIN_FAILED(3171, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.FAILED), "OAuth2.0 登录失败"),
-
-    // 经典（账号密码）登录相关异常
-    CLASSIC_LOGIN_PROVIDER_NOT_FOUND(3181, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.NOT_FOUND), "经典登录 Provider 不存在"),
-    CLASSIC_LOGIN_REQUEST_FAILED(3191, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.FAILED), "经典登录请求发送失败"),
-    CLASSIC_LOGIN_FAILED(3192, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.FAILED), "经典登录失败"),
+    AUTH_CAMPUS_OAUTH_PROVIDER_NOT_FOUND(3141, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.NOT_FOUND), "高校 OAuth2.0 认证 Provider 不存在"),
+    AUTH_CAMPUS_CLASSIC_PROVIDER_NOT_FOUND(3142, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.NOT_FOUND), "高校经典认证 Provider 不存在"),
+    OAUTH_AUTH_REQUEST_FAILED(3151, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.FAILED), "OAuth2.0 认证请求发送失败"),
+    OAUTH_AUTH_STATE_INVALID(3161, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.INVALID), "OAuth2.0 认证状态无效"),
+    OAUTH_AUTH_FAILED(3152, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.FAILED), "OAuth2.0 认证失败"),
+    CAMPUS_CLASSIC_AUTH_REQUEST_FAILED(3153, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.FAILED), "经典认证请求发送失败"),
+    CAMPUS_CLASSIC_AUTH_FAILED(3154, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.FAILED), "经典认证失败"),
 
     // 用户相关异常
     USERNAME_ALREADY_EXISTS(3211, new ResultKey(BusinessDomain.USER, UserSubject.USER, ErrorReason.ALREADY_EXISTS), "用户名已存在"),
@@ -50,9 +46,7 @@ public enum UserError implements IResult {
     VERIFICATION_EMAIL_TOKEN_EXPIRED(3331, new ResultKey(BusinessDomain.USER, UserSubject.AUTH_VERIFICATION, ErrorReason.EXPIRED), "身份验证链接已过期"),
     VERIFICATION_EMAIL_SEND_FAILED(3341, new ResultKey(BusinessDomain.USER, UserSubject.AUTH_VERIFICATION, ErrorReason.FAILED), "身份验证邮件发送失败"),
     VERIFICATION_EMAIL_UPDATE_FAILED(3342, new ResultKey(BusinessDomain.USER, UserSubject.AUTH_VERIFICATION, ErrorReason.FAILED), "身份验证信息更新失败"),
-    VERIFICATION_CAMPUS_IDENTITY_REQUEST_FAILED(3343, new ResultKey(BusinessDomain.USER, UserSubject.AUTH_VERIFICATION, ErrorReason.FAILED), "校园身份认证请求发送失败"),
     VERIFICATION_CAMPUS_IDENTITY_FAILED(3344, new ResultKey(BusinessDomain.USER, UserSubject.AUTH_VERIFICATION, ErrorReason.FAILED), "校园身份认证失败"),
-    VERIFICATION_CAMPUS_IDENTITY_PROVIDER_NOT_FOUND(3351, new ResultKey(BusinessDomain.USER, UserSubject.AUTH_VERIFICATION, ErrorReason.NOT_FOUND), "校园身份认证 Provider 不存在"),
 
     // 小组相关异常
     GROUP_NOT_EXIST(3411, new ResultKey(BusinessDomain.USER, UserSubject.GROUP, ErrorReason.NOT_FOUND),"小组不存在"),

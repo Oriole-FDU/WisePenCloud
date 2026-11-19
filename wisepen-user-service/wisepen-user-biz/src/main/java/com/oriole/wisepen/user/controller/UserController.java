@@ -4,7 +4,6 @@ import cn.hutool.core.util.StrUtil;
 import com.oriole.wisepen.common.core.context.SecurityContextHolder;
 import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.log.annotation.Log;
-import com.oriole.wisepen.campus.extension.api.domain.dto.ClassicAuthProviderDescriptorDTO;
 import com.oriole.wisepen.campus.extension.api.domain.dto.ClassicAuthTaskResultDTO;
 import com.oriole.wisepen.campus.extension.api.enums.ChallengeArtifactEncoding;
 import com.oriole.wisepen.campus.extension.api.enums.ClassicAuthTaskState;
@@ -194,30 +193,13 @@ public class UserController {
     }
 
     @Operation(
-            summary = "查询校园身份认证 Provider",
-            description = """
-                    - 用途：查询当前可用的校园身份认证 Provider。
-                    - 请求：无需请求参数。
-                    - 约束：当前用户必须已登录。
-                    - 处理：读取用户服务配置的 Provider，并向扩展服务获取展示描述。
-                    - 失败：未登录 -> PermissionError.NOT_LOGIN；Provider 不存在或扩展服务不可用 -> UserError.VERIFICATION_CAMPUS_IDENTITY_PROVIDER_NOT_FOUND。
-                    - 响应：返回 Provider 展示信息、所属学校和所需输入。
-                    """
-    )
-    @CheckLogin
-    @GetMapping("/verify/listCampusIdentityProviders")
-    public R<List<ClassicAuthProviderDescriptorDTO>> listCampusIdentityProviders() {
-        return R.ok(campusClassicAuthFlowStrategy.listProviders());
-    }
-
-    @Operation(
             summary = "发起校园身份认证（经典模式）",
             description = """
                     - 用途：当前用户通过指定校园身份认证 Provider 发起校内身份认证流程。
                     - 请求：providerCode 指定 Provider；inputs 传递该 Provider 声明的字符串输入。
                     - 约束：当前用户必须已登录且仍处于未完成身份认证状态。
                     - 处理：将请求转交校园身份认证扩展服务；不在本接口直接完成用户认证落库。
-                    - 失败：未登录 -> PermissionError.NOT_LOGIN；账号状态不允许认证 -> UserError.VERIFICATION_CAMPUS_IDENTITY_STATE_INVALID；扩展请求失败 -> UserError.VERIFICATION_CAMPUS_IDENTITY_REQUEST_FAILED。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；账号状态不允许认证 -> UserError.VERIFICATION_CAMPUS_IDENTITY_STATE_INVALID；扩展请求失败 -> UserError.CAMPUS_CLASSIC_AUTH_REQUEST_FAILED。
                     - 响应：返回认证任务当前状态；需要扫码或验证码时返回 loginChallenge。
                     """
     )
@@ -241,7 +223,7 @@ public class UserController {
                     - 请求：providerCode 指定 Provider；taskId、challengeId 来自当前认证任务，answers 提交字符串答案。
                     - 约束：当前用户必须已登录且仍处于未完成身份认证状态。
                     - 处理：将 Challenge 响应转交校园身份认证扩展服务。
-                    - 失败：未登录 -> PermissionError.NOT_LOGIN；账号状态不允许认证 -> UserError.VERIFICATION_CAMPUS_IDENTITY_STATE_INVALID；扩展请求失败 -> UserError.VERIFICATION_CAMPUS_IDENTITY_REQUEST_FAILED。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；账号状态不允许认证 -> UserError.VERIFICATION_CAMPUS_IDENTITY_STATE_INVALID；扩展请求失败 -> UserError.CAMPUS_CLASSIC_AUTH_REQUEST_FAILED。
                     - 响应：返回认证任务当前状态。
                     """
     )
@@ -267,7 +249,7 @@ public class UserController {
                     - 请求：providerCode 指定 Provider；taskId 指定一次具体认证尝试。
                     - 约束：当前用户必须已登录且仍处于未完成身份认证状态。
                     - 处理：按 taskId 查询扩展服务任务状态；成功时根据标准身份 claims 更新用户资料、认证状态和奖励。
-                    - 失败：未登录 -> PermissionError.NOT_LOGIN；账号状态不允许认证 -> UserError.VERIFICATION_CAMPUS_IDENTITY_STATE_INVALID；任务失败或资料缺失 -> UserError.VERIFICATION_CAMPUS_IDENTITY_FAILED；学工号已被其他账号绑定 -> UserError.VERIFICATION_CAMPUS_NO_ALREADY_EXISTS。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；账号状态不允许认证 -> UserError.VERIFICATION_CAMPUS_IDENTITY_STATE_INVALID；任务失败或资料缺失 -> UserError.CAMPUS_CLASSIC_AUTH_FAILED；学工号已被其他账号绑定 -> UserError.VERIFICATION_CAMPUS_NO_ALREADY_EXISTS。
                     - 响应：返回认证任务当前状态。
                     """
     )
@@ -292,7 +274,7 @@ public class UserController {
                     - 请求：providerCode 指定校园身份认证 Provider。
                     - 约束：当前用户必须已登录；Provider 必须声明 OAuth2.0 身份认证协议且已配置回调地址。
                     - 处理：生成一次性 state（含当前 userId）并缓存，向扩展服务换取授权页地址后 302 跳转；不立即改变用户认证状态。
-                    - 失败：Provider 不存在或未声明 OAuth2.0 身份认证协议 -> UserError.VERIFICATION_CAMPUS_IDENTITY_PROVIDER_NOT_FOUND；扩展请求失败 -> UserError.VERIFICATION_CAMPUS_IDENTITY_FAILED。
+                    - 失败：Provider 不存在或未声明 OAuth2.0 身份认证协议 -> UserError.AUTH_CAMPUS_OAUTH_PROVIDER_NOT_FOUND；扩展请求失败 -> UserError.OAUTH_AUTH_FAILED。
                     - 响应：成功时 302 重定向到 Provider 授权页。
                     """
     )
@@ -311,7 +293,7 @@ public class UserController {
                     - 请求：code 为授权码；state 为发起认证时生成的一次性状态。
                     - 约束：state 必须有效且未过期，并从中解析出 Provider 与目标用户；该用户仍必须处于未完成身份认证状态。
                     - 处理：校验 state 后向扩展服务换取身份 claims，并按策略更新该用户身份资料、认证状态和奖励；不依赖当前登录上下文。
-                    - 失败：state 无效或过期 -> UserError.OAUTH_LOGIN_STATE_INVALID；Provider 未声明 OAuth2.0 身份认证 -> UserError.VERIFICATION_CAMPUS_IDENTITY_PROVIDER_NOT_FOUND；认证失败或资料缺失 -> UserError.VERIFICATION_CAMPUS_IDENTITY_FAILED；账号状态不允许认证 -> UserError.VERIFICATION_CAMPUS_IDENTITY_STATE_INVALID；学工号已被其他账号绑定 -> UserError.VERIFICATION_CAMPUS_NO_ALREADY_EXISTS。
+                    - 失败：state 无效或过期 -> UserError.OAUTH_AUTH_STATE_INVALID；Provider 未声明 OAuth2.0 身份认证 -> UserError.AUTH_CAMPUS_OAUTH_PROVIDER_NOT_FOUND；认证失败或资料缺失 -> UserError.OAUTH_AUTH_FAILED；账号状态不允许认证 -> UserError.VERIFICATION_CAMPUS_IDENTITY_STATE_INVALID；学工号已被其他账号绑定 -> UserError.VERIFICATION_CAMPUS_NO_ALREADY_EXISTS。
                     - 响应：成功时返回空结果。
                     """
     )
@@ -329,7 +311,7 @@ public class UserController {
                     - 请求：uisAccount 为 UIS 账号；uisPassword 为 UIS 密码。
                     - 约束：当前用户必须已登录且仍处于未完成身份认证状态。
                     - 处理：将 UIS 凭据映射为 FUDAN Provider 输入，并复用校园身份认证通用流程；不在本接口直接返回最终认证资料。
-                    - 失败：未登录 -> PermissionError.NOT_LOGIN；账号状态不允许认证 -> UserError.VERIFICATION_CAMPUS_IDENTITY_STATE_INVALID；扩展请求失败 -> UserError.VERIFICATION_CAMPUS_IDENTITY_REQUEST_FAILED。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；账号状态不允许认证 -> UserError.VERIFICATION_CAMPUS_IDENTITY_STATE_INVALID；扩展请求失败 -> UserError.CAMPUS_CLASSIC_AUTH_REQUEST_FAILED。
                     - 响应：成功受理时返回空结果，认证进度通过状态检查接口查询。
                     """
     )
@@ -358,7 +340,7 @@ public class UserController {
                     - 请求：无需请求参数，目标用户来自当前认证上下文。
                     - 约束：当前用户必须已登录，并且已发起过 FUDAN 校园身份认证流程。
                     - 处理：复用校园身份认证通用流程查询任务状态，并在认证成功时根据标准身份资料更新用户身份和认证结果。
-                    - 失败：未登录 -> PermissionError.NOT_LOGIN；账号状态不允许认证 -> UserError.VERIFICATION_CAMPUS_IDENTITY_STATE_INVALID；任务失败或资料缺失 -> UserError.VERIFICATION_CAMPUS_IDENTITY_FAILED；学工号已被其他账号绑定 -> UserError.VERIFICATION_CAMPUS_NO_ALREADY_EXISTS。
+                    - 失败：未登录 -> PermissionError.NOT_LOGIN；账号状态不允许认证 -> UserError.VERIFICATION_CAMPUS_IDENTITY_STATE_INVALID；任务失败或资料缺失 -> UserError.CAMPUS_CLASSIC_AUTH_FAILED；学工号已被其他账号绑定 -> UserError.VERIFICATION_CAMPUS_NO_ALREADY_EXISTS。
                     - 响应：返回认证结果信息。
                     """
     )
@@ -400,6 +382,6 @@ public class UserController {
         if (taskResult.getState() == ClassicAuthTaskState.SUCCESS) {
             return VerificationResultDTO.success();
         }
-        throw new ServiceException(UserError.VERIFICATION_CAMPUS_IDENTITY_FAILED, taskResult.getMessage());
+        throw new ServiceException(UserError.CAMPUS_CLASSIC_AUTH_FAILED, taskResult.getMessage());
     }
 }

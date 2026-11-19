@@ -3,12 +3,12 @@ package com.oriole.wisepen.user.campus.strategy;
 import cn.hutool.core.util.StrUtil;
 import com.oriole.wisepen.campus.extension.api.domain.dto.VerifiedIdentityClaimsDTO;
 import com.oriole.wisepen.campus.extension.api.domain.dto.req.OAuth2ExchangeCodeRequest;
+import com.oriole.wisepen.campus.extension.api.enums.CampusAuthProtocol;
 import com.oriole.wisepen.campus.extension.api.feign.RemoteOAuth2Service;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.user.api.config.UserProperties;
 import com.oriole.wisepen.user.cache.RedisCacheManager;
-import com.oriole.wisepen.user.campus.CampusAuthProtocol;
 import com.oriole.wisepen.user.campus.CampusProviderProperties;
 import com.oriole.wisepen.user.campus.CampusOAuth2ProviderRegistry;
 import com.oriole.wisepen.user.exception.UserError;
@@ -38,12 +38,12 @@ public class CampusOAuth2FlowStrategy {
     /** OAuth2.0 登录回调：校验 state、换取 claims 并建立会话。 */
     public String completeLogin(String code, String state) {
         String providerCode = redisCacheManager.getOAuth2LoginState(state);
-        if (!StringUtils.hasText(providerCode)) throw new ServiceException(UserError.OAUTH_LOGIN_STATE_INVALID);
+        if (!StringUtils.hasText(providerCode)) throw new ServiceException(UserError.OAUTH_AUTH_STATE_INVALID);
 
-        properties.requireLoginProtocol(providerCode, CampusAuthProtocol.OAUTH2, UserError.OAUTH_LOGIN_PROVIDER_NOT_FOUND);
+        properties.requireLoginProtocol(providerCode, CampusAuthProtocol.OAUTH2, UserError.AUTH_CAMPUS_OAUTH_PROVIDER_NOT_FOUND);
 
         String callbackBaseUrl = StrUtil.blankToDefault(userProperties.getEndpoint().getApiDomain(), "").trim();
-        if (callbackBaseUrl.isEmpty()) throw new ServiceException(UserError.OAUTH_LOGIN_FAILED, "OAuth2.0 回调地址未配置");
+        if (callbackBaseUrl.isEmpty()) throw new ServiceException(UserError.OAUTH_AUTH_FAILED, "OAuth2.0 回调地址未配置");
 
         String redirectUri = CampusOAuth2InitStrategy.buildLoginRedirectUri(callbackBaseUrl);
 
@@ -54,11 +54,11 @@ public class CampusOAuth2FlowStrategy {
                         .code(code)
                         .redirectUri(redirectUri)
                         .build()),
-                UserError.OAUTH_LOGIN_FAILED
+                UserError.OAUTH_AUTH_FAILED
         );
 
         if (claims == null || StrUtil.isBlank(claims.getCampusNo())) {
-            throw new ServiceException(UserError.OAUTH_LOGIN_FAILED, "校园用户信息缺少学工号");
+            throw new ServiceException(UserError.OAUTH_AUTH_FAILED, "校园用户信息缺少学工号");
         }
         return userLoginService.completeLogin(new UserLoginCompleteStrategy.CampusProviderCompleteCommand(providerCode, claims));
     }
@@ -67,15 +67,15 @@ public class CampusOAuth2FlowStrategy {
     public void completeIdentity(String code, String state) {
         ImmutablePair<Long, String> bound = redisCacheManager.getOAuth2IdentityState(state);
         if (bound == null) {
-            throw new ServiceException(UserError.OAUTH_LOGIN_STATE_INVALID);
+            throw new ServiceException(UserError.OAUTH_AUTH_STATE_INVALID);
         }
         String providerCode = bound.getRight();
         Long userId = bound.getLeft();
 
-        properties.requireIdentityProtocol(providerCode, CampusAuthProtocol.OAUTH2, UserError.VERIFICATION_CAMPUS_IDENTITY_PROVIDER_NOT_FOUND);
+        properties.requireIdentityProtocol(providerCode, CampusAuthProtocol.OAUTH2, UserError.AUTH_CAMPUS_OAUTH_PROVIDER_NOT_FOUND);
 
         String callbackBaseUrl = StrUtil.blankToDefault(userProperties.getEndpoint().getApiDomain(), "").trim();
-        if (callbackBaseUrl.isEmpty()) throw new ServiceException(UserError.VERIFICATION_CAMPUS_IDENTITY_FAILED, "OAuth2.0 回调地址未配置");
+        if (callbackBaseUrl.isEmpty()) throw new ServiceException(UserError.OAUTH_AUTH_FAILED, "OAuth2.0 回调地址未配置");
 
         String redirectUri = CampusOAuth2InitStrategy.buildVerifyRedirectUri(callbackBaseUrl);
 
@@ -86,7 +86,7 @@ public class CampusOAuth2FlowStrategy {
                         .code(code)
                         .redirectUri(redirectUri)
                         .build()),
-                UserError.VERIFICATION_CAMPUS_IDENTITY_FAILED
+                UserError.OAUTH_AUTH_FAILED
         );
 
         userVerificationService.completeVerification(

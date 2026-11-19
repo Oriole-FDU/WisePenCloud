@@ -1,4 +1,4 @@
-package com.oriole.wisepen.user.campus;
+package com.oriole.wisepen.campus.extension.api.enums;
 
 /**
  * 校园认证协议

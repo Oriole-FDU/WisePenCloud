@@ -3,12 +3,12 @@ package com.oriole.wisepen.user.campus.strategy;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import com.oriole.wisepen.campus.extension.api.domain.dto.req.OAuth2AuthorizeRequest;
+import com.oriole.wisepen.campus.extension.api.enums.CampusAuthProtocol;
 import com.oriole.wisepen.campus.extension.api.feign.RemoteOAuth2Service;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.user.api.config.UserProperties;
 import com.oriole.wisepen.user.cache.RedisCacheManager;
-import com.oriole.wisepen.user.campus.CampusAuthProtocol;
 import com.oriole.wisepen.user.campus.CampusProviderProperties;
 import com.oriole.wisepen.user.campus.CampusOAuth2ProviderRegistry;
 import com.oriole.wisepen.user.exception.UserError;
@@ -40,10 +40,10 @@ public class CampusOAuth2InitStrategy implements
 
     /** 发起 OAuth2 登录授权，返回学校授权页地址。 */
     private String buildLoginAuthorizationUrl(String providerCode) {
-        properties.requireLoginProtocol(providerCode, CampusAuthProtocol.OAUTH2, UserError.OAUTH_LOGIN_PROVIDER_NOT_FOUND);
+        properties.requireLoginProtocol(providerCode, CampusAuthProtocol.OAUTH2, UserError.AUTH_CAMPUS_OAUTH_PROVIDER_NOT_FOUND);
 
         String callbackBaseUrl = StrUtil.blankToDefault(userProperties.getEndpoint().getApiDomain(), "").trim();
-        if (callbackBaseUrl.isEmpty()) throw new ServiceException(UserError.OAUTH_LOGIN_FAILED, "OAuth2.0 回调地址未配置");
+        if (callbackBaseUrl.isEmpty()) throw new ServiceException(UserError.OAUTH_AUTH_FAILED, "OAuth2.0 回调地址未配置");
 
         String state = IdUtil.fastSimpleUUID();
         redisCacheManager.setOAuth2LoginState(state, providerCode);
@@ -54,16 +54,16 @@ public class CampusOAuth2InitStrategy implements
                         .redirectUri(buildLoginRedirectUri(callbackBaseUrl))
                         .state(state)
                         .build()),
-                UserError.OAUTH_LOGIN_REQUEST_FAILED
+                UserError.OAUTH_AUTH_REQUEST_FAILED
         );
     }
 
     /** 发起 OAuth2 身份认证授权，返回学校授权页地址。 */
     private String buildVerifyAuthorizationUrl(Long userId, String providerCode) {
-        properties.requireIdentityProtocol(providerCode, CampusAuthProtocol.OAUTH2, UserError.VERIFICATION_CAMPUS_IDENTITY_PROVIDER_NOT_FOUND);
+        properties.requireIdentityProtocol(providerCode, CampusAuthProtocol.OAUTH2, UserError.AUTH_CAMPUS_OAUTH_PROVIDER_NOT_FOUND);
 
         String callbackBaseUrl = StrUtil.blankToDefault(userProperties.getEndpoint().getApiDomain(), "").trim();
-        if (callbackBaseUrl.isEmpty()) throw new ServiceException(UserError.VERIFICATION_CAMPUS_IDENTITY_FAILED, "OAuth2.0 回调地址未配置");
+        if (callbackBaseUrl.isEmpty()) throw new ServiceException(UserError.OAUTH_AUTH_FAILED, "OAuth2.0 回调地址未配置");
 
         String state = IdUtil.fastSimpleUUID();
         redisCacheManager.setOAuth2IdentityState(state, userId, providerCode);
@@ -74,7 +74,7 @@ public class CampusOAuth2InitStrategy implements
                         .redirectUri(buildVerifyRedirectUri(callbackBaseUrl))
                         .state(state)
                         .build()),
-                UserError.VERIFICATION_CAMPUS_IDENTITY_FAILED
+                UserError.OAUTH_AUTH_REQUEST_FAILED
         );
     }
 

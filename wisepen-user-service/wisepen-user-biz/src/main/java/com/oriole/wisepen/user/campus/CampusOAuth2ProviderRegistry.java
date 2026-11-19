@@ -25,6 +25,6 @@ public class CampusOAuth2ProviderRegistry extends CampusProviderClientRegistry<R
 
     @Override
     protected UserError notFoundError() {
-        return UserError.OAUTH_LOGIN_PROVIDER_NOT_FOUND;
+        return UserError.AUTH_CAMPUS_OAUTH_PROVIDER_NOT_FOUND;
     }
 }
