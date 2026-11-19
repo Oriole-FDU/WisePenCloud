@@ -18,6 +18,7 @@
 - `wisepen-system-service`：系统邮件、用户反馈、操作日志接收和系统级辅助能力。
 - `wisepen-resource-service`：统一资源主档、标签树、资源标签绑定、资源权限、互动统计、搜索同步和资源删除事件。
 - `wisepen-document-service`：文档上传初始化、文档处理状态、文档解析、PDF 预览、水印和文档资源信息组合。
+- `wisepen-media-service`：图片、视频和音频上传处理、预览图与视频 HLS 生成、播放授权和源文件下载；播放按媒体资源交付，不维护观看者会话。
 - `wisepen-file-storage-service`：对象存储配置、上传凭证、上传回调、小文件代理上传、存储记录和文件删除事件。
 - `wisepen-note-service`：笔记主档、协同笔记版本、笔记操作日志、笔记快照消费和笔记资源信息组合。
 - `wisepen-ai-asset-service`：技能资产主档、技能版本、技能文件上传、技能发布和技能相关资源联动。

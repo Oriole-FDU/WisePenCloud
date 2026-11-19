@@ -14,6 +14,7 @@ import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.file.storage.api.domain.base.StorageRecordBase;
 import com.oriole.wisepen.file.storage.api.domain.base.UploadUrlBase;
 import com.oriole.wisepen.file.storage.api.domain.dto.CopyReqDTO;
+import com.oriole.wisepen.file.storage.api.domain.dto.DownloadUrlsReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.StorageRecordDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.StsTokenDTO;
@@ -40,6 +41,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -62,17 +64,43 @@ public class StorageServiceImpl implements IStorageService {
     @WithSpan("storage.upload.initialize")
     public UploadInitRespDTO initUpload(UploadInitReqDTO req) {
         StorageProvider provider = storageManager.getProvider(req.getProviderCode());
+        String newObjectKey = resolveObjectKey(req.getScene(), req.getBizTag(), req.getExtension(), req.getTargetObjectKey());
+        String domain = provider.getDomain();
+
+        StorageRecordEntity targetRecord = storageRecordMapper.selectOne(
+                Wrappers.<StorageRecordEntity>lambdaQuery()
+                        .eq(StorageRecordEntity::getObjectKey, newObjectKey)
+                        .orderByDesc(StorageRecordEntity::getUpdateTime)
+                        .last("LIMIT 1")
+        );
+        if (targetRecord != null) {
+            if (StorageStatusEnum.AVAILABLE.equals(targetRecord.getStatus())
+                    && StrUtil.isNotBlank(req.getMd5())
+                    && StrUtil.equals(req.getMd5(), targetRecord.getMd5())) {
+                if (Boolean.TRUE.equals(req.getIsNeedCallback())) {
+                    FileUploadedMessage message = BeanUtil.copyProperties(targetRecord, FileUploadedMessage.class);
+                    message.setDomain(domain);
+                    message.setFlashUploaded(true);
+                    eventPublisher.publishFileUploadedEvent(message);
+                }
+                return UploadInitRespDTO.builder()
+                        .flashUploaded(true)
+                        .domain(domain)
+                        .objectKey(newObjectKey)
+                        .build();
+            }
+            return getPutUrl(req, newObjectKey, provider, targetRecord);
+        }
 
         // 查询库中是否存在同 MD5 且同配置区的文件 (秒传判定)
-        StorageRecordEntity existRecord = storageRecordMapper.selectOne(
+        StorageRecordEntity existRecord = StrUtil.isBlank(req.getMd5()) ? null : storageRecordMapper.selectOne(
                 Wrappers.<StorageRecordEntity>lambdaQuery()
                         .eq(StorageRecordEntity::getMd5, req.getMd5())
                         .eq(StorageRecordEntity::getProviderCode, provider.getProviderCode())
+                        .eq(StorageRecordEntity::getStatus, StorageStatusEnum.AVAILABLE)
+                        .ne(StorageRecordEntity::getObjectKey, newObjectKey)
                         .last("LIMIT 1")
         );
-
-        String newObjectKey = buildObjectKey(req.getScene().getPrefix(), req.getBizTag(), req.getExtension());
-        String domain = provider.getDomain();
 
         if (existRecord != null) {
             log.info("storage flash upload started. md5={} sourceObjectKey={} targetObjectKey={}",
@@ -82,13 +110,14 @@ public class StorageServiceImpl implements IStorageService {
                 provider.copyObject(existRecord.getObjectKey(), newObjectKey);
             }  catch (Exception e) {
                 // 秒传异常，获取直传 PUT URL
-                return this.getPutUrl(req.getScene(), newObjectKey, provider, req.getIsNeedCallback());
+                return getPutUrl(req, newObjectKey, provider, null);
             }
 
             StorageRecordEntity newRecord = BeanUtil.copyProperties(existRecord, StorageRecordEntity.class,
                     "fileId", "createTime", "objectKey");
             newRecord.setStatus(StorageStatusEnum.AVAILABLE);
             newRecord.setObjectKey(newObjectKey);
+            newRecord.setScene(req.getScene());
             storageRecordMapper.insert(newRecord);
 
             FileUploadedMessage fileUploadedMessage = BeanUtil.copyProperties(newRecord, FileUploadedMessage.class);
@@ -106,14 +135,15 @@ public class StorageServiceImpl implements IStorageService {
         }
 
         // 没命中秒传，获取直传 PUT URL
-        return this.getPutUrl(req.getScene(), newObjectKey, provider, req.getIsNeedCallback());
+        return getPutUrl(req, newObjectKey, provider, null);
     }
 
     private StorageRecordEntity getStorageRecordWithCompensateStatus(String ObjectKey){
         StorageRecordEntity entity = storageRecordMapper.selectOne(
                 Wrappers.<StorageRecordEntity>lambdaQuery()
-                        .eq(StorageRecordEntity::getObjectKey,ObjectKey)
+                        .eq(StorageRecordEntity::getObjectKey, ObjectKey)
                         .ne(StorageRecordEntity::getStatus, StorageStatusEnum.DELETED)
+                        .orderByDesc(StorageRecordEntity::getUpdateTime)
                         .last("LIMIT 1")
         );
         if (entity == null) throw new ServiceException(FileStorageError.FILE_RECORD_NOT_FOUND);
@@ -163,12 +193,22 @@ public class StorageServiceImpl implements IStorageService {
         }
     }
 
-    private UploadInitRespDTO getPutUrl(StorageSceneEnum scene, String newObjectKey, StorageProvider provider, Boolean isNeedCallback) {
-        StorageRecordEntity newRecord = StorageRecordEntity.builder()
-                .scene(scene).objectKey(newObjectKey).status(StorageStatusEnum.UPLOADING).providerCode(provider.getProviderCode())
-                .build();
-        storageRecordMapper.insert(newRecord);
-        UploadUrlBase uploadUrl = provider.generateUploadTicket(newObjectKey, storageProperties.getUpload().getDefaultTicketDuration(), storageProperties.getEndpoint().getApiDomain(), isNeedCallback);
+    private UploadInitRespDTO getPutUrl(UploadInitReqDTO req, String newObjectKey,
+                                        StorageProvider provider, StorageRecordEntity existingRecord) {
+        StorageRecordEntity record = existingRecord != null ? existingRecord : new StorageRecordEntity();
+        record.setScene(req.getScene());
+        record.setObjectKey(newObjectKey);
+        record.setStatus(StorageStatusEnum.UPLOADING);
+        record.setProviderCode(provider.getProviderCode());
+        record.setMd5(req.getMd5());
+        record.setSize(req.getExpectedSize());
+        if (existingRecord == null) {
+            storageRecordMapper.insert(record);
+        } else {
+            storageRecordMapper.updateById(record);
+        }
+        UploadUrlBase uploadUrl = provider.generateUploadTicket(newObjectKey, storageProperties.getUpload().getDefaultTicketDuration(),
+                storageProperties.getEndpoint().getApiDomain(), req.getIsNeedCallback());
 
         log.info("storage upload ticket created. objectKey={} status={}", newObjectKey, StorageStatusEnum.UPLOADING);
 
@@ -240,6 +280,34 @@ public class StorageServiceImpl implements IStorageService {
     }
 
     @Override
+    public Map<String, String> getDownloadUrls(DownloadUrlsReqDTO req) {
+        List<StorageRecordEntity> records = storageRecordMapper.selectList(
+                Wrappers.<StorageRecordEntity>lambdaQuery()
+                        .in(StorageRecordEntity::getObjectKey, req.getObjectKeys())
+                        .orderByDesc(StorageRecordEntity::getUpdateTime));
+        Map<String, StorageRecordEntity> recordsByKey = records.stream().collect(Collectors.toMap(
+                StorageRecordEntity::getObjectKey, record -> record, (latest, older) -> latest));
+        Map<String, String> downloadUrls = new LinkedHashMap<>();
+        long durationSeconds = req.getDurationSeconds() == null ? 900L : req.getDurationSeconds();
+        for (String objectKey : req.getObjectKeys()) {
+            if (downloadUrls.containsKey(objectKey)) {
+                continue;
+            }
+            StorageRecordEntity record = recordsByKey.get(objectKey);
+            if (record == null || record.getStatus() == StorageStatusEnum.DELETED) {
+                throw new ServiceException(FileStorageError.FILE_RECORD_NOT_FOUND);
+            }
+            // 仅未收到回调的上传记录需要逐个 HEAD 确认；每批最多 500 个，沿用单文件补偿契约。
+            if (record.getStatus() == StorageStatusEnum.UPLOADING && compensateStatus(record) == null) {
+                throw new ServiceException(FileStorageError.FILE_RECORD_NOT_FOUND);
+            }
+            StorageProvider provider = storageManager.getProvider(record.getProviderCode());
+            downloadUrls.put(objectKey, provider.generateDownloadUrl(objectKey, durationSeconds, null));
+        }
+        return downloadUrls;
+    }
+
+    @Override
     public void deleteFiles(List<String> objectKeys) {
         int updateCount = storageRecordMapper.update(null,
                 Wrappers.<StorageRecordEntity>lambdaUpdate()
@@ -281,8 +349,13 @@ public class StorageServiceImpl implements IStorageService {
         StorageRecordEntity record = storageRecordMapper.selectOne(
                 Wrappers.<StorageRecordEntity>lambdaQuery()
                         .eq(StorageRecordEntity::getObjectKey, objectKey)
+                        .orderByDesc(StorageRecordEntity::getUpdateTime)
                         .last("LIMIT 1")
         );
+
+        if (record == null) {
+            throw new ServiceException(FileStorageError.FILE_RECORD_NOT_FOUND);
+        }
 
         StorageProvider provider = storageManager.getProvider(record.getProviderCode());
 
@@ -309,6 +382,21 @@ public class StorageServiceImpl implements IStorageService {
         log.info("storage callback persisted. objectKey={} domain={} status={}", objectKey, provider.getDomain(), StorageStatusEnum.AVAILABLE);
     }
 
+    private String resolveObjectKey(StorageSceneEnum scene, String bizTag, String extension, String targetObjectKey) {
+        if (StrUtil.isBlank(targetObjectKey)) {
+            return buildObjectKey(scene.getPrefix(), bizTag, extension);
+        }
+
+        String cleanObjectKey = targetObjectKey.replace('\\', '/')
+                .replaceAll("^/+", "")
+                .replaceAll("/+$", "");
+        String scenePrefix = scene.getPrefix() + "/";
+        if (!cleanObjectKey.startsWith(scenePrefix) || cleanObjectKey.contains("..")) {
+            throw new ServiceException(FileStorageError.FILE_URL_INVALID);
+        }
+        return cleanObjectKey;
+    }
+
     private String buildObjectKey(String scenePrefix, String bizTag, String extension) {
         String cleanBizTag = StrUtil.isNotBlank(bizTag)
                 ? bizTag.replaceAll("^/+", "").replaceAll("/+$", "")
@@ -328,6 +416,7 @@ public class StorageServiceImpl implements IStorageService {
         StorageRecordEntity record = storageRecordMapper.selectOne(
                 Wrappers.<StorageRecordEntity>lambdaQuery()
                         .eq(StorageRecordEntity::getObjectKey, objectKey)
+                        .orderByDesc(StorageRecordEntity::getUpdateTime)
                         .last("LIMIT 1")
         );
 

@@ -2,6 +2,7 @@ package com.oriole.wisepen.file.storage.service;
 
 import com.oriole.wisepen.file.storage.api.domain.dto.StorageRecordDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.CopyReqDTO;
+import com.oriole.wisepen.file.storage.api.domain.dto.DownloadUrlsReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.StsTokenDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitRespDTO;
@@ -11,6 +12,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 public interface IStorageService {
 
@@ -49,6 +51,9 @@ public interface IStorageService {
      * @param contentDisposition         OSS 下载响应的 Content-Disposition
      */
     String getDownloadUrl(String objectKey, Long durationSeconds, String contentDisposition);
+
+    /** 批量查询存储记录并签发下载地址。 */
+    Map<String, String> getDownloadUrls(DownloadUrlsReqDTO req);
 
     /**
      * 颁发 STS 临时凭证（支持前端批量加载受保护目录）
