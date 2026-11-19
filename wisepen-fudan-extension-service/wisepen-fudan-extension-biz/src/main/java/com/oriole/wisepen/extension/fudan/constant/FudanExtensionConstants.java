@@ -5,8 +5,8 @@ package com.oriole.wisepen.extension.fudan.constant;
  */
 public final class FudanExtensionConstants {
 
-    /** CAMPUS_EXTENSION_CODE 编码 */
-    public static final String CAMPUS_EXTENSION_CODE = "FUDAN_UIS";
+    /** 复旦校园扩展 Provider 编码 */
+    public static final String PROVIDER_CODE = "FUDAN";
 
     /** 学校展示名称 */
     public static final String UNIVERSITY_NAME = "复旦大学";

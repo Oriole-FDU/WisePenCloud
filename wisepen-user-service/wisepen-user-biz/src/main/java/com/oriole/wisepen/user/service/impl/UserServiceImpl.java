@@ -34,11 +34,9 @@ import com.oriole.wisepen.user.service.IUserInviteService;
 import com.oriole.wisepen.user.service.IUserService;
 import com.oriole.wisepen.user.mapper.UserMapper;
 import com.oriole.wisepen.user.mapper.UserProfileMapper;
-import com.oriole.wisepen.user.strategy.UserVerificationStrategy;
-import com.oriole.wisepen.user.strategy.VerificationStrategyFactory;
+import com.oriole.wisepen.user.strategy.verification.UserVerificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.thymeleaf.TemplateEngine;
@@ -64,8 +62,7 @@ public class UserServiceImpl implements IUserService {
 
     private final UserProperties userProperties;
 
-    @Autowired
-    private VerificationStrategyFactory strategyFactory;
+    private final UserVerificationService userVerificationService;
 
     @Override
     public UserEntity getUserCoreInfoByAccount(String account) {
@@ -276,8 +273,7 @@ public class UserServiceImpl implements IUserService {
         // 如果已验证
         if (userEntity.getUserStatus() != UserStatus.UNIDENTIFIED) {
             // 设置只读字段
-            List<String> readonlyFields = strategyFactory.getStrategy(userEntity.getVerificationMode())
-                    .getReadonlyFields();
+            List<String> readonlyFields = userVerificationService.getReadonlyFields(userEntity.getVerificationMode());
             res.setReadonlyFields(readonlyFields);
         }
         return res;
@@ -336,8 +332,7 @@ public class UserServiceImpl implements IUserService {
             throw new ServiceException(UserError.CANNOT_OPERATE_BEFORE_AUTH_VERIFICATION);
         }
 
-        UserVerificationStrategy strategy = strategyFactory.getStrategy(userEntity.getVerificationMode());
-        List<String> readonlyFields = strategy.getReadonlyFields();
+        List<String> readonlyFields = userVerificationService.getReadonlyFields(userEntity.getVerificationMode());
 
         CopyOptions copyOptions = CopyOptions.create()
                 .setIgnoreNullValue(true)

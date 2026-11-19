@@ -5,7 +5,8 @@ import com.oriole.wisepen.common.core.domain.IBusinessSubject;
 import java.util.Locale;
 
 public enum FudanExtensionSubject implements IBusinessSubject {
-    UIS;
+    UIS,
+    OAUTH;
 
     @Override
     public String key() {

@@ -1,9 +1,9 @@
 package com.oriole.wisepen.campus.extension.api.feign;
 
-import com.oriole.wisepen.campus.extension.api.domain.dto.CampusIdentityProviderDescriptorDTO;
-import com.oriole.wisepen.campus.extension.api.domain.dto.CampusIdentityTaskResultDTO;
-import com.oriole.wisepen.campus.extension.api.domain.dto.req.CampusIdentityChallengeSubmitRequest;
-import com.oriole.wisepen.campus.extension.api.domain.dto.req.CampusIdentityInitiateRequest;
+import com.oriole.wisepen.campus.extension.api.domain.dto.ClassicAuthProviderDescriptorDTO;
+import com.oriole.wisepen.campus.extension.api.domain.dto.ClassicAuthTaskResultDTO;
+import com.oriole.wisepen.campus.extension.api.domain.dto.req.ClassicAuthChallengeSubmitRequest;
+import com.oriole.wisepen.campus.extension.api.domain.dto.req.ClassicAuthInitiateRequest;
 import com.oriole.wisepen.common.core.domain.R;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  *
  * <p>调用方根据 Provider 配置动态创建 Feign 客户端，因此协议本身不绑定固定服务名。</p>
  */
-public interface RemoteIdentityService {
+public interface RemoteClassicAuthService {
 
     @Operation(
             summary = "获取校园身份认证 Provider 描述",
@@ -31,13 +31,13 @@ public interface RemoteIdentityService {
                     """
     )
     @GetMapping("/internal/campusIdentity/getProviderDescriptor")
-    R<CampusIdentityProviderDescriptorDTO> getProviderDescriptor();
+    R<ClassicAuthProviderDescriptorDTO> getProviderDescriptor();
 
     @Operation(
             summary = "发起校园身份认证任务",
             description = """
                     - 用途：受理一次校园身份认证。
-                    - 请求：userId 指定 WisePen 用户；providerCode 为当前服务声明的 CAMPUS_EXTENSION_CODE；inputs 携带校园身份认证 Provider 支持的字符串输入项。
+                    - 请求：userId 指定 WisePen 用户；providerCode 为扩展服务声明的 Provider 编码；inputs 携带校园身份认证 Provider 支持的字符串输入项。
                     - 约束：调用方必须通过内部服务调用边界访问本接口。
                     - 处理：初始化校园认证业务。
                     - 失败：发生未处理异常 -> CommonError.INTERNAL_ERROR。
@@ -45,7 +45,7 @@ public interface RemoteIdentityService {
                     """
     )
     @PostMapping("/internal/campusIdentity/initiateVerifyTask")
-    R<CampusIdentityTaskResultDTO> initiateVerifyTask(@Valid @RequestBody CampusIdentityInitiateRequest request);
+    R<ClassicAuthTaskResultDTO> initiateVerifyTask(@Valid @RequestBody ClassicAuthInitiateRequest request);
 
     @Operation(
             summary = "提交登录 Challenge（可选）",
@@ -59,7 +59,7 @@ public interface RemoteIdentityService {
                     """
     )
     @PostMapping("/internal/campusIdentity/submitLoginChallenge")
-    R<CampusIdentityTaskResultDTO> submitLoginChallenge(@Valid @RequestBody CampusIdentityChallengeSubmitRequest request);
+    R<ClassicAuthTaskResultDTO> submitLoginChallenge(@Valid @RequestBody ClassicAuthChallengeSubmitRequest request);
 
     @Operation(
             summary = "检查校园身份认证任务状态（可选）",
@@ -73,7 +73,7 @@ public interface RemoteIdentityService {
                     """
     )
     @GetMapping("/internal/campusIdentity/checkVerifyTaskStatus")
-    R<CampusIdentityTaskResultDTO> checkVerifyTaskStatus(
+    R<ClassicAuthTaskResultDTO> checkVerifyTaskStatus(
             @RequestParam(value = "taskId", required = false) String taskId,
-            @RequestParam("userId") Long userId);
+            @RequestParam(value = "userId", required = false) Long userId);
 }

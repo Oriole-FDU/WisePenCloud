@@ -94,12 +94,12 @@
         }
       }
     },
-    "campus-identity-provider-switches": {
-      "name": "校园身份 Provider 开关",
-      "description": "用户服务可调用的校园身份 Provider 启停状态。",
+    "campus-provider-registry": {
+      "name": "校园 Provider 注册表",
+      "description": "按学校配置校园扩展服务路由，以及登录和身份认证各自使用的协议。",
       "path": [
         "wisepen",
-        "campus-identity",
+        "campus",
         "providers"
       ],
       "restartRequired": false,
@@ -110,10 +110,31 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "enabled": {
-              "type": "boolean",
-              "title": "是否启用",
-              "default": true
+            "service-name": {
+              "type": "string",
+              "title": "扩展服务名（注册中心）"
+            },
+            "login": {
+              "type": "array",
+              "title": "登录协议",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "oauth2",
+                  "classic"
+                ]
+              }
+            },
+            "identity": {
+              "type": "array",
+              "title": "身份认证协议",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "oauth2",
+                  "classic"
+                ]
+              }
             }
           }
         }

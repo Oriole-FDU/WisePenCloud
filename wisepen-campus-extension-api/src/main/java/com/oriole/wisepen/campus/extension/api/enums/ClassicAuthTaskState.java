@@ -1,7 +1,7 @@
 package com.oriole.wisepen.campus.extension.api.enums;
 
 /** 跨服务统一的校园身份认证任务状态 */
-public enum CampusIdentityTaskState {
+public enum ClassicAuthTaskState {
     /** 扩展服务任务排队中 */
     QUEUED,
 

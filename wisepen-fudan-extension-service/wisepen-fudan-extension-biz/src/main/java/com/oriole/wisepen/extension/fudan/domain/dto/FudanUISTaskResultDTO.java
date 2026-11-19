@@ -1,6 +1,6 @@
 package com.oriole.wisepen.extension.fudan.domain.dto;
 
-import com.oriole.wisepen.campus.extension.api.enums.CampusIdentityTaskState;
+import com.oriole.wisepen.campus.extension.api.enums.ClassicAuthTaskState;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -20,7 +20,7 @@ public class FudanUISTaskResultDTO {
     private String taskId;
 
     /** 复旦 UIS 任务状态码 */
-    private CampusIdentityTaskState state;
+    private ClassicAuthTaskState state;
 
     /** 面向扩展服务日志和内部诊断的状态描述 */
     private String message;
@@ -37,7 +37,7 @@ public class FudanUISTaskResultDTO {
     /** UIS 登录成功后解析出的原始资料，键名保持复旦页面字段原文 */
     private Map<String, String> profile;
 
-    public static FudanUISTaskResultDTO of(Long userId, String taskId, CampusIdentityTaskState state) {
+    public static FudanUISTaskResultDTO of(Long userId, String taskId, ClassicAuthTaskState state) {
         FudanUISTaskResultDTO dto = new FudanUISTaskResultDTO();
         dto.setUserId(userId);
         dto.setTaskId(taskId);
@@ -45,7 +45,7 @@ public class FudanUISTaskResultDTO {
         return dto;
     }
 
-    public static FudanUISTaskResultDTO of(Long userId, String taskId, CampusIdentityTaskState state, String message) {
+    public static FudanUISTaskResultDTO of(Long userId, String taskId, ClassicAuthTaskState state, String message) {
         FudanUISTaskResultDTO resultDTO = of(userId, taskId, state);
         resultDTO.setMessage(message);
         return resultDTO;

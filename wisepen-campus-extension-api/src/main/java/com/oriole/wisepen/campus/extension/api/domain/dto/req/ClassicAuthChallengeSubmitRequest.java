@@ -18,7 +18,7 @@ import java.util.Map;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CampusIdentityChallengeSubmitRequest implements Serializable {
+public class ClassicAuthChallengeSubmitRequest implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;

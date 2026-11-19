@@ -1,10 +1,10 @@
 package com.oriole.wisepen.extension.fudan.controller;
 
-import com.oriole.wisepen.campus.extension.api.domain.dto.CampusIdentityProviderDescriptorDTO;
-import com.oriole.wisepen.campus.extension.api.domain.dto.CampusIdentityTaskResultDTO;
-import com.oriole.wisepen.campus.extension.api.domain.dto.req.CampusIdentityChallengeSubmitRequest;
-import com.oriole.wisepen.campus.extension.api.domain.dto.req.CampusIdentityInitiateRequest;
-import com.oriole.wisepen.campus.extension.api.feign.RemoteIdentityService;
+import com.oriole.wisepen.campus.extension.api.domain.dto.ClassicAuthProviderDescriptorDTO;
+import com.oriole.wisepen.campus.extension.api.domain.dto.ClassicAuthTaskResultDTO;
+import com.oriole.wisepen.campus.extension.api.domain.dto.req.ClassicAuthChallengeSubmitRequest;
+import com.oriole.wisepen.campus.extension.api.domain.dto.req.ClassicAuthInitiateRequest;
+import com.oriole.wisepen.campus.extension.api.feign.RemoteClassicAuthService;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.extension.fudan.exception.FudanExtensionError;
@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/internal/campusIdentity")
 @RequiredArgsConstructor
-public class CampusIdentityController implements RemoteIdentityService {
+public class CampusIdentityController implements RemoteClassicAuthService {
 
     private final FudanUISAuthTaskService fudanUISAuthTaskService;
 
@@ -36,7 +36,7 @@ public class CampusIdentityController implements RemoteIdentityService {
                     """
     )
     @GetMapping("/getProviderDescriptor")
-    public R<CampusIdentityProviderDescriptorDTO> getProviderDescriptor() {
+    public R<ClassicAuthProviderDescriptorDTO> getProviderDescriptor() {
         return R.ok(fudanUISAuthTaskService.getProviderDescriptor());
     }
 
@@ -44,7 +44,7 @@ public class CampusIdentityController implements RemoteIdentityService {
             summary = "发起复旦 UIS 校园身份认证任务",
             description = """
                     - 用途：受理一次复旦 UIS 校园身份认证，并启动扩展服务内部的异步浏览器任务。
-                    - 请求：userId 指定 WisePen 用户；providerCode 必须为 FUDAN_UIS；inputs 携带 account 和 password。
+                    - 请求：userId 指定 WisePen 用户；providerCode 必须为 FUDAN；inputs 携带 account 和 password。
                     - 约束：调用方必须通过内部服务调用边界访问本接口；UIS 凭据只在复旦扩展服务内部使用，不写入任务快照。
                     - 处理：校验请求后保存 PENDING 状态并异步执行 UIS 登录；不会把密码写入 Redis 或标准身份 claims。
                     - 失败：发生未处理异常 -> CommonError.INTERNAL_ERROR。
@@ -52,7 +52,7 @@ public class CampusIdentityController implements RemoteIdentityService {
                     """
     )
     @PostMapping("/initiateVerifyTask")
-    public R<CampusIdentityTaskResultDTO> initiateVerifyTask(@Valid @RequestBody CampusIdentityInitiateRequest request) {
+    public R<ClassicAuthTaskResultDTO> initiateVerifyTask(@Valid @RequestBody ClassicAuthInitiateRequest request) {
         String taskId = fudanUISAuthTaskService.initiateVerifyTask(request);
         return R.ok(fudanUISAuthTaskService.checkVerifyTask(taskId, request.getUserId()));
     }
@@ -69,7 +69,7 @@ public class CampusIdentityController implements RemoteIdentityService {
                     """
     )
     @PostMapping("/submitLoginChallenge")
-    public R<CampusIdentityTaskResultDTO> submitLoginChallenge(@Valid @RequestBody CampusIdentityChallengeSubmitRequest request) {
+    public R<ClassicAuthTaskResultDTO> submitLoginChallenge(@Valid @RequestBody ClassicAuthChallengeSubmitRequest request) {
         throw new ServiceException(
                 FudanExtensionError.UIS_REQUEST_INVALID,
                 "复旦 UIS 二维码 Challenge 应通过轮询完成，无需提交"
@@ -88,8 +88,9 @@ public class CampusIdentityController implements RemoteIdentityService {
                     """
     )
     @GetMapping("/checkVerifyTaskStatus")
-    public R<CampusIdentityTaskResultDTO> checkVerifyTaskStatus(
-            @RequestParam(value = "taskId", required = false) String taskId, @RequestParam Long userId
+    public R<ClassicAuthTaskResultDTO> checkVerifyTaskStatus(
+            @RequestParam(value = "taskId", required = false) String taskId,
+            @RequestParam(value = "userId", required = false) Long userId
     ) {
         return R.ok(fudanUISAuthTaskService.checkVerifyTask(taskId, userId));
     }

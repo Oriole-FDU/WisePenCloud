@@ -42,6 +42,8 @@ public class RedisCacheManager {
 	private static final String REDIS_SESSION_TO_USER_PREFIX = "wisepen:user:auth:user2session:";
 	private static final String REDIS_USER_CHAT_BLOCK_PREFIX = "wisepen:chat:block:user:";
 	private static final String REDIS_EMAIL_VERIFY_TOKEN_PREFIX = "wisepen:user:auth:verify:";
+	private static final String REDIS_OAUTH_LOGIN_STATE_PREFIX = "wisepen:user:auth:oauth:state:";
+	private static final String REDIS_OAUTH_IDENTITY_STATE_PREFIX = "wisepen:user:auth:oauth:identity:state:";
     private static final long SESSION_TIMEOUT_DAYS = 7;
 
 	private static final String REDIS_USER_CONTEXT_PREFIX = "wisepen:user:auth:context:";
@@ -95,6 +97,30 @@ public class RedisCacheManager {
 		Object userId = redisTemplate.opsForValue().get(REDIS_PWD_RESET_TOKEN_PREFIX + token);
 		redisTemplate.delete(REDIS_PWD_RESET_TOKEN_PREFIX + token); // 立即删除
 		return userId != null ? Long.parseLong(userId.toString()) : null;
+	}
+
+	public void setOAuth2LoginState(String state, String providerCode) {
+		stringRedisTemplateDB0.opsForValue().set(REDIS_OAUTH_LOGIN_STATE_PREFIX + state, providerCode, 10, TimeUnit.MINUTES);
+	}
+
+	public String getOAuth2LoginState(String state) {
+		String providerCode = stringRedisTemplateDB0.opsForValue().get(REDIS_OAUTH_LOGIN_STATE_PREFIX + state);
+		stringRedisTemplateDB0.delete(REDIS_OAUTH_LOGIN_STATE_PREFIX + state); // 一次性 state，读取后立即删除
+		return providerCode;
+	}
+
+	public void setOAuth2IdentityState(String state, Long userId, String providerCode) {
+		stringRedisTemplateDB0.opsForValue().set(REDIS_OAUTH_IDENTITY_STATE_PREFIX + state, userId + ":" + providerCode, 10, TimeUnit.MINUTES);
+	}
+
+	public ImmutablePair<Long, String> getOAuth2IdentityState(String state) {
+		String value = stringRedisTemplateDB0.opsForValue().get(REDIS_OAUTH_IDENTITY_STATE_PREFIX + state);
+		stringRedisTemplateDB0.delete(REDIS_OAUTH_IDENTITY_STATE_PREFIX + state); // 一次性 state，读取后立即删除
+		if (StrUtil.isBlank(value)) {
+			return null;
+		}
+		String[] parts = value.split(":", 2);
+		return ImmutablePair.of(Long.parseLong(parts[0]), parts[1]);
 	}
 
 	public String setSession(Long userId, IdentityType identityType, UserStatus userStatus, Map<String, Integer> groupRoleMap) {

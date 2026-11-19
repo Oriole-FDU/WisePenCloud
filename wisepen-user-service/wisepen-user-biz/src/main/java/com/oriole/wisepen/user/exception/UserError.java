@@ -20,6 +20,17 @@ public enum UserError implements IResult {
     AUTH_USER_LOCKED(3121, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.LOCKED), "账号已禁用"),
     AUTH_CURRENT_PASSWORD_INVALID(3131, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.INVALID), "旧密码错误"),
 
+    // OAuth2.0 登录相关异常
+    OAUTH_LOGIN_PROVIDER_NOT_FOUND(3141, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.NOT_FOUND), "OAuth2.0 登录 Provider 不存在"),
+    OAUTH_LOGIN_REQUEST_FAILED(3151, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.FAILED), "OAuth2.0 登录请求发送失败"),
+    OAUTH_LOGIN_STATE_INVALID(3161, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.INVALID), "OAuth2.0 登录状态无效"),
+    OAUTH_LOGIN_FAILED(3171, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.FAILED), "OAuth2.0 登录失败"),
+
+    // 经典（账号密码）登录相关异常
+    CLASSIC_LOGIN_PROVIDER_NOT_FOUND(3181, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.NOT_FOUND), "经典登录 Provider 不存在"),
+    CLASSIC_LOGIN_REQUEST_FAILED(3191, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.FAILED), "经典登录请求发送失败"),
+    CLASSIC_LOGIN_FAILED(3192, new ResultKey(BusinessDomain.USER, UserSubject.AUTH, ErrorReason.FAILED), "经典登录失败"),
+
     // 用户相关异常
     USERNAME_ALREADY_EXISTS(3211, new ResultKey(BusinessDomain.USER, UserSubject.USER, ErrorReason.ALREADY_EXISTS), "用户名已存在"),
     CAMPUS_NO_ALREADY_EXISTS(3212, new ResultKey(BusinessDomain.USER, UserSubject.USER, ErrorReason.ALREADY_EXISTS), "学号已存在"),

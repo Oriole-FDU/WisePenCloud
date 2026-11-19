@@ -1,4 +1,4 @@
-package com.oriole.wisepen.user.strategy.impl;
+package com.oriole.wisepen.user.strategy.verification;
 
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
@@ -8,7 +8,6 @@ import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.system.api.domain.dto.MailSendDTO;
 import com.oriole.wisepen.system.api.feign.RemoteMailService;
 import com.oriole.wisepen.user.api.config.UserProperties;
-import com.oriole.wisepen.user.api.domain.dto.VerificationResultDTO;
 import com.oriole.wisepen.user.api.enums.UserVerificationMode;
 import com.oriole.wisepen.user.cache.RedisCacheManager;
 import com.oriole.wisepen.user.domain.entity.UserEntity;
@@ -16,9 +15,8 @@ import com.oriole.wisepen.user.domain.entity.UserProfileEntity;
 import com.oriole.wisepen.user.exception.UserError;
 import com.oriole.wisepen.user.mapper.UserMapper;
 import com.oriole.wisepen.user.mapper.UserProfileMapper;
-import com.oriole.wisepen.user.strategy.email.EducationEmailSchool;
-import com.oriole.wisepen.user.strategy.email.EducationEmailSchoolResolver;
-import com.oriole.wisepen.user.strategy.UserVerificationStrategy;
+import com.oriole.wisepen.user.strategy.verification.email.EducationEmailSchool;
+import com.oriole.wisepen.user.strategy.verification.email.EducationEmailSchoolResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -31,14 +29,15 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class EmailVerificationStrategy implements UserVerificationStrategy {
+public class EmailVerificationStrategy implements
+        UserVerificationInitStrategy<UserVerificationInitStrategy.EmailInitCommand, Void>,
+        UserVerificationCompleteStrategy<UserVerificationCompleteStrategy.EmailCompleteCommand>  {
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@([A-Za-z0-9-]+\\.)+[A-Za-z]{2,}$");
     private static final Set<String> PARTNER_UNIVERSITIES_EMAIL_DOMAINS = Set.of("fudan.edu.cn", "shmu.edu.cn", "m.fudan.edu.cn");
@@ -53,12 +52,9 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
 
     private final TemplateEngine templateEngine;
 
-    @Override
-    public UserVerificationMode getMode() {
-        return UserVerificationMode.EDU_EMAIL; // 策略标识
-    }
-
-    public void initiateEmailVerification(Long userId, String email) {
+    public Void initVerification(UserVerificationInitStrategy.EmailInitCommand emailInitCommand) {
+        String email = emailInitCommand.email();
+        Long userId = emailInitCommand.userId();
         if (StrUtil.isBlank(email) || !EMAIL_PATTERN.matcher(email).matches()) {
             log.warn("email verification skipped. email={} userId={} reason=\"invalid email format\"", email, userId);
             throw new ServiceException(UserError.VERIFICATION_EMAIL_INVALID);
@@ -105,10 +101,12 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
         } catch (Exception e) {
             throw new ServiceException(UserError.VERIFICATION_EMAIL_SEND_FAILED);
         }
+        return null;
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public VerificationResultDTO completeEmailVerification(String token) {
+    public void completeVerification(UserVerificationCompleteStrategy.EmailCompleteCommand emailCompleteCommand) {
+        String token = emailCompleteCommand.token();
         ImmutablePair<Long, String> verifyInfo = redisCacheManager.getEmailVerificationUser(token);
         if (verifyInfo == null) {
             throw new ServiceException(UserError.VERIFICATION_EMAIL_TOKEN_EXPIRED);
@@ -154,7 +152,6 @@ public class EmailVerificationStrategy implements UserVerificationStrategy {
         redisCacheManager.updateUserStatusInContext(userId, UserStatus.NORMAL);
         log.info("email verification succeeded. userId={} emailDomain={} university={}",
                 userId, school.getDomain(), school.getNameZh());
-        return VerificationResultDTO.success();
     }
 
     @Override

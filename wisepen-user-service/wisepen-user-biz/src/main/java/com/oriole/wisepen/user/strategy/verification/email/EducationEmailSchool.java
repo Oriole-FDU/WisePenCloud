@@ -1,4 +1,4 @@
-package com.oriole.wisepen.user.strategy.email;
+package com.oriole.wisepen.user.strategy.verification.email;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

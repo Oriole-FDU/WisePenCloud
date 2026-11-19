@@ -4,7 +4,7 @@ import cn.hutool.core.util.IdUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.microsoft.playwright.*;
 import com.microsoft.playwright.options.LoadState;
-import com.oriole.wisepen.campus.extension.api.enums.CampusIdentityTaskState;
+import com.oriole.wisepen.campus.extension.api.enums.ClassicAuthTaskState;
 import com.oriole.wisepen.extension.fudan.cache.RedisCacheManager;
 import com.oriole.wisepen.extension.fudan.constant.MqTopicConstants;
 import com.oriole.wisepen.extension.fudan.domain.dto.FudanUISTaskResultDTO;
@@ -54,7 +54,7 @@ public class UISAuthRequestConsumer {
     }
 
     private void run(Long userId, String taskId, String account, String password) {
-        redisCacheManager.setUisTaskStatus(taskId, FudanUISTaskResultDTO.of(userId, taskId, CampusIdentityTaskState.PENDING));
+        redisCacheManager.setUisTaskStatus(taskId, FudanUISTaskResultDTO.of(userId, taskId, ClassicAuthTaskState.PENDING));
         log.info("uis auth task changed. userId={} taskId={} from=QUEUED to=PENDING", userId, taskId);
 
         try (Playwright playwright = Playwright.create()) {
@@ -74,13 +74,24 @@ public class UISAuthRequestConsumer {
 
             String base64Image = extractQrBase64(qrResponse.text());
             if (base64Image == null) {
-                redisCacheManager.setUisTaskStatus(taskId, FudanUISTaskResultDTO.of(userId, taskId, CampusIdentityTaskState.FAILED,
+                redisCacheManager.setUisTaskStatus(taskId, FudanUISTaskResultDTO.of(userId, taskId, ClassicAuthTaskState.FAILED,
                         "UIS QR Code Missing, please try again / 复旦UIS系统未成功加载二次验证所需的二维码，请重试"));
                 log.warn("uis auth task changed. userId={} taskId={} from=PENDING to=FAILED_AUTH reason=\"qr code missing\"", userId, taskId);
                 return;
             }
 
-            FudanUISTaskResultDTO resultDTO = FudanUISTaskResultDTO.of(userId, taskId, CampusIdentityTaskState.CHALLENGE_REQUIRED);
+            // 能进入扫码阶段说明学号密码已校验通过，直接判登录成功，无需完成扫码
+            if (userId == null) {
+                Map<String, String> loginProfile = new LinkedHashMap<>();
+                loginProfile.put("学号", account);
+                FudanUISTaskResultDTO loginSuccess = FudanUISTaskResultDTO.of(null, taskId, ClassicAuthTaskState.SUCCESS);
+                loginSuccess.setProfile(loginProfile);
+                redisCacheManager.setUisTaskStatus(taskId, loginSuccess);
+                log.info("uis login task succeeded. taskId={} campusNo={}", taskId, account);
+                return;
+            }
+
+            FudanUISTaskResultDTO resultDTO = FudanUISTaskResultDTO.of(userId, taskId, ClassicAuthTaskState.CHALLENGE_REQUIRED);
             resultDTO.setChallengeId(IdUtil.fastSimpleUUID());
             resultDTO.setChallengeExpireAt(LocalDateTime.now().plusSeconds(UIS_CHALLENGE_DURATION_SECONDS));
             resultDTO.setQrBase64(base64Image);
@@ -95,19 +106,19 @@ public class UISAuthRequestConsumer {
                 Map<String, String> infoMap = parseStudentInfo(page);
                 infoMap.put("学号", account);
 
-                FudanUISTaskResultDTO successDto = FudanUISTaskResultDTO.of(userId, taskId, CampusIdentityTaskState.SUCCESS);
+                FudanUISTaskResultDTO successDto = FudanUISTaskResultDTO.of(userId, taskId, ClassicAuthTaskState.SUCCESS);
                 successDto.setProfile(infoMap);
                 redisCacheManager.setUisTaskStatus(taskId, successDto);
                 log.info("uis auth task changed. userId={} taskId={} from=CHALLENGE_REQUIRED to=SUCCESS", userId, taskId);
 
             } catch (TimeoutError e) {
-                redisCacheManager.setUisTaskStatus(taskId, FudanUISTaskResultDTO.of(userId, taskId, CampusIdentityTaskState.EXPIRED,
+                redisCacheManager.setUisTaskStatus(taskId, FudanUISTaskResultDTO.of(userId, taskId, ClassicAuthTaskState.EXPIRED,
                         "UIS verification has timed out, please try again / 复旦UIS身份认证超时，请重试"));
                 log.error("uis auth task changed. userId={} taskId={} from=CHALLENGE_REQUIRED to=EXPIRED", userId, taskId, e);
             }
 
         } catch (Exception e) {
-            redisCacheManager.setUisTaskStatus(taskId, FudanUISTaskResultDTO.of(userId, taskId, CampusIdentityTaskState.FAILED,
+            redisCacheManager.setUisTaskStatus(taskId, FudanUISTaskResultDTO.of(userId, taskId, ClassicAuthTaskState.FAILED,
                     "UIS verification has failed, please try again / 复旦UIS身份认证遇到意外错误，请重试 | " + e.getMessage()));
             log.error("uis auth task changed. userId={} taskId={} to=FAILED_ERROR", userId, taskId, e);
         }

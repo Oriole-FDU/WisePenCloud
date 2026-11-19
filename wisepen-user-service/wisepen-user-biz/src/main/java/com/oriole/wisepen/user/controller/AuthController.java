@@ -1,25 +1,28 @@
 package com.oriole.wisepen.user.controller;
 
+import java.io.IOException;
 import cn.hutool.core.util.StrUtil;
+import com.oriole.wisepen.campus.extension.api.domain.dto.ClassicAuthTaskResultDTO;
 import com.oriole.wisepen.common.core.context.SecurityContextHolder;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.security.annotation.CheckLogin;
 import com.oriole.wisepen.user.api.config.UserProperties;
-import com.oriole.wisepen.user.api.domain.dto.req.AuthLoginRequest;
-import com.oriole.wisepen.user.api.domain.dto.req.AuthRegisterRequest;
-import com.oriole.wisepen.user.api.domain.dto.req.AuthPwdResetRequest;
-import com.oriole.wisepen.user.api.domain.dto.req.AuthPwdChangeRequest;
-import com.oriole.wisepen.user.api.domain.dto.req.AuthPwdResetVerifyRequest;
+import com.oriole.wisepen.user.api.domain.dto.req.*;
+import com.oriole.wisepen.user.campus.strategy.CampusClassicAuthFlowStrategy;
+import com.oriole.wisepen.user.campus.strategy.CampusOAuth2FlowStrategy;
 import com.oriole.wisepen.user.service.AuthService;
 import com.oriole.wisepen.user.service.IUserService;
+import com.oriole.wisepen.user.strategy.login.UserLoginInitStrategy;
+import com.oriole.wisepen.user.strategy.login.UserLoginService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import static com.oriole.wisepen.common.core.constant.SecurityConstants.AUTHORIZATION_TOKEN;
@@ -33,6 +36,9 @@ public class AuthController {
     private final AuthService authService;
     private final IUserService userService;
     private final UserProperties userProperties;
+    private final UserLoginService userLoginService;
+    private final CampusOAuth2FlowStrategy campusOAuth2FlowStrategy;
+    private final CampusClassicAuthFlowStrategy campusClassicAuthFlowStrategy;
 
     @Operation(
             summary = "用户登录",
@@ -79,6 +85,92 @@ public class AuthController {
         Cookie clearCookie = buildAuthCookie(null, 0); // Max-Age=0 会强制浏览器立刻彻底删除该 Cookie
         response.addCookie(clearCookie);
         return R.ok();
+    }
+
+    @Operation(
+            summary = "发起校园 OAuth2.0 登录",
+            description = """
+                    - 用途：用户选择 OAuth2.0 登录时，跳转到对应 Provider 的授权页。
+                    - 请求：providerCode 指定 OAuth2.0 登录 Provider。
+                    - 约束：Provider 必须已启用且配置路由；回调地址必须已配置。
+                    - 处理：生成一次性 state 并缓存，拼接回调地址，向 Provider 换取授权页完整地址后 302 跳转。
+                    - 失败：Provider 不存在或未声明 OAuth2.0 登录 -> UserError.OAUTH_LOGIN_PROVIDER_NOT_FOUND；OAuth2.0 回调地址未配置 -> UserError.OAUTH_LOGIN_FAILED；扩展服务调用失败 -> UserError.OAUTH_LOGIN_REQUEST_FAILED。
+                    - 响应：成功时 302 重定向到 Provider 授权页。
+                    """
+    )
+    @GetMapping("/campus/oauth/login")
+    public void campusOAuthLogin(@RequestParam("providerCode") String providerCode, HttpServletResponse response) throws IOException {
+        response.sendRedirect(
+                (String) userLoginService.initLogin(new UserLoginInitStrategy.CampusProviderOAuthInitCommand(providerCode))
+        );
+    }
+
+    @Operation(
+            summary = "OAuth2.0 登录回调",
+            description = """
+                    - 用途：接收 OAuth2.0 登录回调，完成登录并建立后端会话。
+                    - 请求：code 为授权码；state 为发起登录时生成的一次性状态。
+                    - 约束：state 必须有效且未过期，并从中解析出 Provider；Provider 返回的用户信息必须包含身份标识。
+                    - 处理：校验 state 并解析 Provider 后换取令牌、拉取用户信息，按身份标识匹配已有账号，不存在时自动注册并登录；写入 Redis 会话，并在响应中设置认证 Cookie。
+                    - 失败：state 无效或过期 -> UserError.OAUTH_LOGIN_STATE_INVALID；Provider 未声明 OAuth2.0 登录 -> UserError.OAUTH_LOGIN_PROVIDER_NOT_FOUND；登录失败 -> UserError.OAUTH_LOGIN_FAILED；账号被禁用 -> UserError.AUTH_USER_LOCKED。
+                    - 响应：返回 sessionId，可同时通过 Cookie 或请求头用于后续认证。
+                    """
+    )
+    @GetMapping("/campus/oauth/callback")
+    public R<String> campusOAuthCallback(
+                              @RequestParam("code") String code,
+                              @RequestParam("state") String state,
+                              HttpServletResponse response) {
+        String sessionId = campusOAuth2FlowStrategy.completeLogin(code, state);
+        response.addCookie(buildAuthCookie(sessionId, 7 * 24 * 60 * 60));
+
+        // 返回 sessionId，以备加入请求头中
+        return R.ok(sessionId);
+    }
+
+    @Operation(
+            summary = "发起经典校园登录",
+            description = """
+                    - 用途：提交校园学号密码，发起一次异步经典登录，前端轮询 check 接口获取结果。
+                    - 请求：providerCode 指定学校；inputs 携带该 Provider 声明的字符串输入，例如 account 和 password。
+                    - 约束：providerCode 必须已配置且声明经典登录协议。
+                    - 处理：向扩展服务发起登录任务并返回任务当前状态；不在本接口直接建立会话。
+                    - 失败：Provider 未配置或未声明经典登录 -> UserError.CLASSIC_LOGIN_PROVIDER_NOT_FOUND；扩展请求失败 -> UserError.CLASSIC_LOGIN_REQUEST_FAILED。
+                    - 响应：返回登录任务当前状态。
+                    """
+    )
+    @PostMapping("/initiateCampusClassicLogin")
+    public R<ClassicAuthTaskResultDTO> initiateCampusClassicLogin(
+            @Validated @RequestBody CampusIdentityVerifyInitiateRequest req) {
+        ClassicAuthTaskResultDTO dto = (ClassicAuthTaskResultDTO) userLoginService.initLogin(
+                new UserLoginInitStrategy.CampusProviderClassicAuthInitCommand(
+                        req.getProviderCode(), req.getInputs()
+                )
+        );
+        return R.ok(dto);
+    }
+
+    @Operation(
+            summary = "轮询经典校园登录结果",
+            description = """
+                    - 用途：查询经典（账号密码）校园登录任务结果，成功时建立登录会话。
+                    - 请求：providerCode 指定学校；taskId 为发起登录时返回的任务标识。
+                    - 约束：providerCode 必须已配置且声明经典登录协议；任务必须归属该登录流程。
+                    - 处理：向扩展服务查询任务状态，成功时按学工号匹配或自动注册账号并建立会话，同时写入认证 Cookie；不修改账号资料。
+                    - 失败：Provider 未配置或未声明经典登录 -> UserError.CLASSIC_LOGIN_PROVIDER_NOT_FOUND；任务查询失败、归属不一致或资料缺失 -> UserError.CLASSIC_LOGIN_FAILED；账号被禁用 -> UserError.AUTH_USER_LOCKED。
+                    - 响应：处理中返回空；成功时返回 sessionId，并同时通过 Cookie 用于后续认证。
+                    """
+    )
+    @GetMapping("/checkCampusClassicLogin")
+    public R<String> checkCampusClassicLogin(
+            @RequestParam("providerCode") String providerCode,
+            @RequestParam("taskId") String taskId,
+            HttpServletResponse response) {
+        String sessionId = campusClassicAuthFlowStrategy.checkLogin(providerCode, taskId);
+        if (sessionId != null) {
+            response.addCookie(buildAuthCookie(sessionId, 7 * 24 * 60 * 60));
+        }
+        return R.ok(sessionId);
     }
 
     private Cookie buildAuthCookie (String value, Integer maxAge) {

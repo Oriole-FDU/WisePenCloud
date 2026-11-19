@@ -4,13 +4,13 @@ import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.oriole.wisepen.campus.extension.api.domain.dto.ChallengeArtifactDTO;
-import com.oriole.wisepen.campus.extension.api.domain.dto.CampusIdentityProviderDescriptorDTO;
-import com.oriole.wisepen.campus.extension.api.domain.dto.CampusIdentityTaskResultDTO;
+import com.oriole.wisepen.campus.extension.api.domain.dto.ClassicAuthProviderDescriptorDTO;
+import com.oriole.wisepen.campus.extension.api.domain.dto.ClassicAuthTaskResultDTO;
 import com.oriole.wisepen.campus.extension.api.domain.dto.InputDefinitionDTO;
 import com.oriole.wisepen.campus.extension.api.domain.dto.LoginChallengeDTO;
 import com.oriole.wisepen.campus.extension.api.domain.dto.VerifiedIdentityClaimsDTO;
-import com.oriole.wisepen.campus.extension.api.domain.dto.req.CampusIdentityInitiateRequest;
-import com.oriole.wisepen.campus.extension.api.enums.CampusIdentityTaskState;
+import com.oriole.wisepen.campus.extension.api.domain.dto.req.ClassicAuthInitiateRequest;
+import com.oriole.wisepen.campus.extension.api.enums.ClassicAuthTaskState;
 import com.oriole.wisepen.campus.extension.api.enums.ChallengeArtifactEncoding;
 import com.oriole.wisepen.campus.extension.api.enums.ChallengeCompletionMode;
 import com.oriole.wisepen.campus.extension.api.enums.InputControlType;
@@ -53,9 +53,9 @@ public class FudanUISAuthTaskService {
     /**
      * 返回复旦 Provider 的能力描述，供 user-service 和前端选择认证方式
      */
-    public CampusIdentityProviderDescriptorDTO getProviderDescriptor() {
-        return CampusIdentityProviderDescriptorDTO.builder()
-                .providerCode(FudanExtensionConstants.CAMPUS_EXTENSION_CODE)
+    public ClassicAuthProviderDescriptorDTO getProviderDescriptor() {
+        return ClassicAuthProviderDescriptorDTO.builder()
+                .providerCode(FudanExtensionConstants.PROVIDER_CODE)
                 .displayName("复旦 UIS 认证")
                 .universityName(UNIVERSITY_NAME)
                 .initiateInputs(List.of(
@@ -86,8 +86,8 @@ public class FudanUISAuthTaskService {
             payloadType = FudanUISAuthRequestMessage.class,
             message = @AsyncMessage(name = "FudanUISAuthRequestMessage", title = "复旦 UIS 认证请求")
     ))
-    public String initiateVerifyTask(CampusIdentityInitiateRequest request) {
-        if (!FudanExtensionConstants.CAMPUS_EXTENSION_CODE.equals(request.getProviderCode())) {
+    public String initiateVerifyTask(ClassicAuthInitiateRequest request) {
+        if (!FudanExtensionConstants.PROVIDER_CODE.equals(request.getProviderCode())) {
             throw new ServiceException(FudanExtensionError.UIS_REQUEST_INVALID, "Provider 编码不匹配");
         }
 
@@ -107,8 +107,10 @@ public class FudanUISAuthTaskService {
                 .userId(userId).taskId(taskId).account(account).password(password).build();
 
         // 建立可供前端轮询的状态
-        redisCacheManager.setUisTaskStatus(taskId, FudanUISTaskResultDTO.of(userId, taskId, CampusIdentityTaskState.QUEUED));
-        redisCacheManager.setCurrentTaskId(userId, taskId);
+        redisCacheManager.setUisTaskStatus(taskId, FudanUISTaskResultDTO.of(userId, taskId, ClassicAuthTaskState.QUEUED));
+        if (userId != null) {
+            redisCacheManager.setCurrentTaskId(userId, taskId);
+        }
         try {
             // 受理成功以 Kafka 确认为准
             kafkaTemplate.send(FUDAN_UIS_AUTH_REQ, objectMapper.writeValueAsString(message)).get(10, TimeUnit.SECONDS);
@@ -116,7 +118,7 @@ public class FudanUISAuthTaskService {
             if (e instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
             }
-            redisCacheManager.setUisTaskStatus(taskId, FudanUISTaskResultDTO.of(userId, taskId, CampusIdentityTaskState.FAILED));
+            redisCacheManager.setUisTaskStatus(taskId, FudanUISTaskResultDTO.of(userId, taskId, ClassicAuthTaskState.FAILED));
             ServiceException failure = new ServiceException(FudanExtensionError.UIS_TASK_SUBMIT_FAILED);
             failure.initCause(e);
             throw failure;
@@ -136,17 +138,18 @@ public class FudanUISAuthTaskService {
     /**
      * 读取指定复旦 UIS 任务并转换为标准校园身份认证结果。
      */
-    public CampusIdentityTaskResultDTO checkVerifyTask(String taskId, Long userId) {
+    public ClassicAuthTaskResultDTO checkVerifyTask(String taskId, Long userId) {
         if (taskId == null || taskId.isBlank()) { // 兼容旧接口
             taskId = redisCacheManager.getCurrentTaskId(userId);
         }
         var taskResult = redisCacheManager.getUisTaskStatus(taskId);
-        if (taskResult == null || !userId.equals(taskResult.getUserId())) {
+        if (taskResult == null
+                || (userId == null ? taskResult.getUserId() != null : !userId.equals(taskResult.getUserId()))) {
             throw new ServiceException(FudanExtensionError.UIS_TASK_NOT_FOUND);
         }
 
         LoginChallengeDTO challengeDTO = null;
-        if (taskResult.getState() == CampusIdentityTaskState.CHALLENGE_REQUIRED) {
+        if (taskResult.getState() == ClassicAuthTaskState.CHALLENGE_REQUIRED) {
             challengeDTO = LoginChallengeDTO.builder()
                     .challengeId(taskResult.getChallengeId())
                     .type(LoginChallengeType.QR_SCAN)
@@ -162,8 +165,8 @@ public class FudanUISAuthTaskService {
                     .build();
         }
 
-        return CampusIdentityTaskResultDTO.builder()
-                .providerCode(FudanExtensionConstants.CAMPUS_EXTENSION_CODE)
+        return ClassicAuthTaskResultDTO.builder()
+                .providerCode(FudanExtensionConstants.PROVIDER_CODE)
                 .userId(taskResult.getUserId())
                 .taskId(taskResult.getTaskId())
                 .message(taskResult.getMessage())

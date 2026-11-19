@@ -1,4 +1,4 @@
-package com.oriole.wisepen.user.strategy.email;
+package com.oriole.wisepen.user.strategy.verification.email;
 
 import cn.hutool.core.util.StrUtil;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;

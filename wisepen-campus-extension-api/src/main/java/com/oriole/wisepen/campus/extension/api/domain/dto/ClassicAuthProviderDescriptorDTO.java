@@ -11,13 +11,13 @@ import java.io.Serializable;
 import java.util.List;
 
 /**
- * Provider 能力描述，由扩展服务提供，用户服务原样转发给前端。
+ * Provider 能力描述，由扩展服务提供，用户服务原样转发给前端
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CampusIdentityProviderDescriptorDTO implements Serializable {
+public class ClassicAuthProviderDescriptorDTO implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;

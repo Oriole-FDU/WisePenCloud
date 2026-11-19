@@ -1,6 +1,6 @@
 package com.oriole.wisepen.campus.extension.api.domain.dto;
 
-import com.oriole.wisepen.campus.extension.api.enums.CampusIdentityTaskState;
+import com.oriole.wisepen.campus.extension.api.enums.ClassicAuthTaskState;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -16,7 +16,7 @@ import java.io.Serializable;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CampusIdentityTaskResultDTO implements Serializable {
+public class ClassicAuthTaskResultDTO implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;
@@ -31,7 +31,7 @@ public class CampusIdentityTaskResultDTO implements Serializable {
     private String taskId;
 
     /** 标准化任务状态 */
-    private CampusIdentityTaskState state;
+    private ClassicAuthTaskState state;
 
     /** 需要用户继续完成的登录挑战（state为 CHALLENGE_REQUIRED 时有值） */
     private LoginChallengeDTO challenge;

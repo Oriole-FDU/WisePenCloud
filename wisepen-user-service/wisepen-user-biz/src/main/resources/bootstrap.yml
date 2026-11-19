@@ -35,10 +35,12 @@ wisepen:
     endpoint:
       api-domain: ${WISEPEN_USER_API_DOMAIN:}
       auth-cookie-domain: ${WISEPEN_USER_AUTH_COOKIE_DOMAIN:}
-  campus-identity:
-    routing:
-      FUDAN_UIS:
-        service-name: ${WISEPEN_CAMPUS_IDENTITY_FUDAN_UIS_SERVICE_NAME:wisepen-fudan-extension-service}
+  campus:
+    providers:
+      FUDAN:
+        service-name: ${WISEPEN_CAMPUS_FUDAN_SERVICE_NAME:wisepen-fudan-extension-service}
+        login: [oauth2]
+        identity: [classic]
   openapi:
     title: 用户服务 API
     version: 1.0.0
