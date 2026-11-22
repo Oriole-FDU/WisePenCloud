@@ -4,9 +4,9 @@ import com.oriole.wisepen.media.api.domain.base.MediaStatus;
 import com.oriole.wisepen.media.api.domain.mq.MediaProcessTaskMessage;
 import com.oriole.wisepen.media.api.enums.MediaStatusEnum;
 import com.oriole.wisepen.media.config.MediaProperties;
-import com.oriole.wisepen.media.domain.entity.MediaInfoEntity;
+import com.oriole.wisepen.media.domain.entity.MediaEntity;
 import com.oriole.wisepen.media.mq.KafkaMediaEventPublisher;
-import com.oriole.wisepen.media.repository.MediaInfoRepository;
+import com.oriole.wisepen.media.repository.MediaEntityRepository;
 import com.oriole.wisepen.media.service.IMediaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,7 +25,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class MediaGcTask {
 
-    private final MediaInfoRepository mediaInfoRepository;
+    private final MediaEntityRepository mediaEntityRepository;
     private final IMediaService mediaService;
     private final MediaProperties mediaProperties;
     private final KafkaMediaEventPublisher eventPublisher;
@@ -36,24 +36,17 @@ public class MediaGcTask {
         log.info("media gc started. task=staleUpload");
         try {
             int batchSize = Math.max(1, mediaProperties.getStaleCheck().getBatchSize());
-            List<MediaInfoEntity> uploadingMediaEntities = mediaInfoRepository.findByStatus(
+            // 查找所有正在上传的文档版本
+            List<MediaEntity> uploadingMediaEntities = mediaEntityRepository.findByStatus(
                     MediaStatusEnum.UPLOADING, PageRequest.of(0, batchSize));
             LocalDateTime now = LocalDateTime.now();
             int timedOut = 0;
             int failed = 0;
-            for (MediaInfoEntity entity : uploadingMediaEntities) {
+            for (MediaEntity entity : uploadingMediaEntities) {
                 try {
-                    long timeoutMs = calculateTimeoutMs(entity.getSize());
-                    if (entity.getCreateTime() != null
-                            && now.isAfter(entity.getCreateTime().plusNanos(timeoutMs * 1_000_000L))) {
-                        // 主动查询 Storage
-                        MediaStatus currentStatus = mediaService.refreshMediaStatus(entity.getMediaId());
-                        // 状态依然是 UPLOADING，说明 OSS 真的没有收到文件，此时标记为超时
-                        if (currentStatus != null && currentStatus.getStatus() == MediaStatusEnum.UPLOADING) {
-                            mediaInfoRepository.updateStatusIfCurrent(
-                                    entity.getMediaId(), MediaStatusEnum.UPLOADING,
-                                    new MediaStatus(MediaStatusEnum.TRANSFER_TIMEOUT));
-                        }
+                    long timeoutMs = calculateTimeoutMs(entity.getUploadMeta().getSize());
+                    if (entity.getCreateTime() != null && now.isAfter(entity.getCreateTime().plusNanos(timeoutMs * 1_000_000L))) {
+                        handleStaleMedia(entity);
                         timedOut++;
                     }
                 } catch (Exception e) {
@@ -64,12 +57,10 @@ public class MediaGcTask {
 
             LocalDateTime processingCutoff = now.minusNanos(
                     mediaProperties.getProcessingRuntime().getProcessingTimeoutMs() * 1_000_000L);
-            int requeued = requeueStale(MediaStatusEnum.PROCESSING, processingCutoff, batchSize,
-                    MediaStatusEnum.UPLOADED);
-            requeued += requeueStale(MediaStatusEnum.UPLOADED, processingCutoff, batchSize,
-                    MediaStatusEnum.UPLOADED);
-            requeued += requeueStale(MediaStatusEnum.REGISTERING_RES, processingCutoff, batchSize,
-                    MediaStatusEnum.REGISTERING_RES_TIMEOUT);
+            int requeued = 0;
+            requeued += requeueStale(MediaStatusEnum.PROCESSING, processingCutoff, batchSize, MediaStatusEnum.UPLOADED);
+            requeued += requeueStale(MediaStatusEnum.UPLOADED, processingCutoff, batchSize, MediaStatusEnum.UPLOADED);
+            requeued += requeueStale(MediaStatusEnum.REGISTERING_RES, processingCutoff, batchSize, MediaStatusEnum.REGISTERING_RES_TIMEOUT);
             log.info("media gc finished. task=staleUpload processed={} timedOut={} requeued={} failed={} costMs={}",
                     uploadingMediaEntities.size(), timedOut, requeued, failed, System.currentTimeMillis() - start);
         } catch (Exception e) {
@@ -81,23 +72,30 @@ public class MediaGcTask {
         }
     }
 
+    private void handleStaleMedia(MediaEntity entity) {
+        // 主动查询 Storage
+        MediaStatus currentStatus = mediaService.refreshMediaStatus(entity.getMediaId());
+        // 状态依然是 UPLOADING，说明 OSS 真的没有收到文件，此时标记为超时
+        if (currentStatus != null && currentStatus.getStatus() == MediaStatusEnum.UPLOADING) {
+            mediaService.updateStatus(entity.getMediaId(), new MediaStatus(MediaStatusEnum.TRANSFER_TIMEOUT));
+        }
+    }
+
     private int requeueStale(MediaStatusEnum currentStatus, LocalDateTime cutoff,
                              int batchSize, MediaStatusEnum nextStatus) {
-        List<MediaInfoEntity> entities = mediaInfoRepository.findStaleByStatus(
+        List<MediaEntity> entities = mediaEntityRepository.findStaleByStatus(
                 currentStatus, cutoff, PageRequest.of(0, batchSize));
         int requeued = 0;
-        for (MediaInfoEntity entity : entities) {
+        for (MediaEntity entity : entities) {
             try {
-                if (mediaInfoRepository.updateStaleStatus(entity.getMediaId(), currentStatus, cutoff,
-                        new MediaStatus(nextStatus)) > 0) {
-                    eventPublisher.publishProcessTask(MediaProcessTaskMessage.builder()
-                            .mediaId(entity.getMediaId())
-                            .sourceObjectKey(entity.getSourceObjectKey())
-                            .resourceType(entity.getResourceType())
-                            .extension(entity.getSourceExtension())
-                            .build());
-                    requeued++;
-                }
+                mediaEntityRepository.updateStatusById(entity.getMediaId(), new MediaStatus(nextStatus));
+                eventPublisher.publishProcessTask(MediaProcessTaskMessage.builder()
+                        .mediaId(entity.getMediaId())
+                        .sourceObjectKey(entity.getSourceObjectKey())
+                        .resourceType(entity.getUploadMeta().getResourceType())
+                        .extension(entity.getUploadMeta().getSourceExtension())
+                        .build());
+                requeued++;
             } catch (Exception e) {
                 log.warn("media gc stale processing recovery failed. mediaId={} status={}",
                         entity.getMediaId(), currentStatus, e);

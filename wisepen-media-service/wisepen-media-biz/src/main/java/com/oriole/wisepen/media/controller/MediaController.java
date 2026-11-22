@@ -1,5 +1,6 @@
 package com.oriole.wisepen.media.controller;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.oriole.wisepen.common.core.context.SecurityContextHolder;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.enums.BusinessType;
@@ -7,12 +8,14 @@ import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.media.api.constant.MediaValidationMsg;
+import com.oriole.wisepen.media.api.domain.base.MediaBase;
 import com.oriole.wisepen.media.api.domain.base.MediaStatus;
 import com.oriole.wisepen.media.api.domain.dto.req.MediaUploadInitRequest;
-import com.oriole.wisepen.media.api.domain.dto.res.MediaDetailResponse;
 import com.oriole.wisepen.media.api.domain.dto.res.MediaInfoResponse;
+import com.oriole.wisepen.media.api.domain.dto.res.MediaResponse;
 import com.oriole.wisepen.media.api.domain.dto.res.MediaPlaybackResponse;
 import com.oriole.wisepen.media.api.domain.dto.res.MediaUploadInitResponse;
+import com.oriole.wisepen.media.domain.entity.MediaEntity;
 import com.oriole.wisepen.media.exception.MediaError;
 import com.oriole.wisepen.media.service.IMediaPlaybackService;
 import com.oriole.wisepen.media.service.IMediaService;
@@ -80,7 +83,7 @@ public class MediaController {
                     """
     )
     @GetMapping("/listPendingMedia")
-    public R<List<MediaInfoResponse>> listPendingMedia() {
+    public R<List<MediaBase>> listPendingMedia() {
         return R.ok(mediaService.listPendingMedia(SecurityContextHolder.getUserId()));
     }
 
@@ -169,14 +172,14 @@ public class MediaController {
                     - 响应：返回 application/vnd.apple.mpegurl 文本。
                     """
     )
-    @GetMapping(value = "/getPlaybackManifest", produces = "application/vnd.apple.mpegurl")
-    public String getPlaybackManifest(
+    @GetMapping(value = "/getVideoPlaybackManifest", produces = "application/vnd.apple.mpegurl")
+    public String getVideoPlaybackManifest(
             @RequestParam @NotBlank(message = MediaValidationMsg.RESOURCE_ID_EMPTY) String resourceId,
             @RequestParam(defaultValue = "index.m3u8") String manifestPath,
             HttpServletResponse response) {
         assertResourceAction(resourceId, ResourceAction.VIEW);
         response.setHeader("Cache-Control", "no-store");
-        return mediaPlaybackService.getPlaybackManifest(resourceId, manifestPath);
+        return mediaPlaybackService.getVideoPlaybackManifest(resourceId, manifestPath);
     }
 
     @Operation(
@@ -214,16 +217,20 @@ public class MediaController {
                     """
     )
     @GetMapping("/getMediaInfo")
-    public R<MediaDetailResponse> getMediaInfo(
+    public R<MediaInfoResponse> getMediaInfo(
             @RequestParam @NotBlank(message = MediaValidationMsg.RESOURCE_ID_EMPTY) String resourceId) {
         ResourceItemResponse resourceInfo = remoteResourceService.getResourceInfo(ResourceInfoGetReqDTO.builder()
                 .resourceId(resourceId)
                 .userId(SecurityContextHolder.getUserId())
                 .groupRoles(SecurityContextHolder.getGroupRoleMap())
                 .build()).getData();
-        return R.ok(MediaDetailResponse.builder()
+
+        MediaEntity mediaEntity = mediaService.getMedia(resourceId);
+        MediaResponse mediaResponse = BeanUtil.copyProperties(mediaEntity, MediaResponse.class);
+
+        return R.ok(MediaInfoResponse.builder()
                 .resourceInfo(resourceInfo)
-                .mediaInfo(mediaService.getMediaInfo(resourceId))
+                .mediaInfo(mediaResponse)
                 .build());
     }
 

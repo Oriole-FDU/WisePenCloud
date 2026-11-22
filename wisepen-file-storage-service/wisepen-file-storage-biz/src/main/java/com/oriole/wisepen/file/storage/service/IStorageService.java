@@ -1,6 +1,7 @@
 package com.oriole.wisepen.file.storage.service;
 
 import com.oriole.wisepen.file.storage.api.domain.dto.StorageRecordDTO;
+import com.oriole.wisepen.file.storage.api.domain.dto.ConfirmUploadReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.CopyReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.DownloadUrlsReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitReqDTO;
@@ -54,6 +55,11 @@ public interface IStorageService {
 
     /** 批量查询存储记录并签发下载地址。 */
     Map<String, String> getDownloadUrls(DownloadUrlsReqDTO req);
+
+    /**
+     * 批量确认服务端直传产物上传完成，将 UPLOADING 记录置为 AVAILABLE 并补充 md5/size
+     */
+    void confirmUpload(ConfirmUploadReqDTO req);
 
     /**
      * 颁发 STS 临时凭证（支持前端批量加载受保护目录）

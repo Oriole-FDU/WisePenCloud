@@ -1,6 +1,7 @@
 package com.oriole.wisepen.file.storage.controller;
 
 import com.oriole.wisepen.common.core.domain.R;
+import com.oriole.wisepen.file.storage.api.domain.dto.ConfirmUploadReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.CopyReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.DownloadUrlsReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.StorageRecordDTO;
@@ -47,6 +48,23 @@ public class InternalStorageController {
     @PostMapping("/initUpload")
     public R<UploadInitRespDTO> initUpload(@Validated @RequestBody UploadInitReqDTO req) {
         return R.ok(storageService.initUpload(req));
+    }
+
+    @Operation(
+            summary = "内部确认上传完成",
+            description = """
+                    - 用途：供业务服务在服务端直传产物成功后，批量将 UPLOADING 记录置为 AVAILABLE 并补充 md5/size。
+                    - 请求：items 列表每项包含 objectKey、md5、size。
+                    - 约束：调用方必须通过内部服务调用边界；目标记录必须存在且未删除。
+                    - 处理：批量查询存储记录，将 UPLOADING 记录置为 AVAILABLE；已 AVAILABLE 的记录幂等跳过；任一记录不存在或已删除则整批失败。
+                    - 失败：文件记录不存在或已删除 -> FileStorageError.FILE_RECORD_NOT_FOUND。
+                    - 响应：成功时返回空结果。
+                    """
+    )
+    @PostMapping("/confirmUpload")
+    public R<Void> confirmUpload(@Validated @RequestBody ConfirmUploadReqDTO req) {
+        storageService.confirmUpload(req);
+        return R.ok();
     }
 
     @PostMapping("/copy")

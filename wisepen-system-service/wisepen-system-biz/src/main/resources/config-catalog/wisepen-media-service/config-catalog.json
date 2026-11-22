@@ -80,7 +80,7 @@
     },
     "media-playback-policy": {
       "name": "媒体播放配置",
-      "description": "分片签名有效期为视频时长加额外有效时间；清单缓存扣除构建耗时及安全余量，保证新播放拥有完整播放窗口。",
+      "description": "分片签名有效期为视频时长加额外有效时间；HLS 清单缓存有效期与该额外有效时间相同。",
       "path": [
         "wisepen",
         "media",
@@ -95,18 +95,6 @@
             "type": "integer",
             "title": "视频时长之外的签名有效时间（秒）",
             "default": 900,
-            "minimum": 1
-          },
-          "manifest-cache-safety-seconds": {
-            "type": "integer",
-            "title": "清单缓存安全余量（秒）",
-            "default": 30,
-            "minimum": 0
-          },
-          "manifest-build-lock-ttl-seconds": {
-            "type": "integer",
-            "title": "清单构建锁有效期（秒）",
-            "default": 10,
             "minimum": 1
           }
         }

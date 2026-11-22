@@ -54,7 +54,7 @@ public class ResourceDeletedConsumer {
         }
 
         try {
-            mediaService.deleteMediaByResourceIds(resourceIds);
+            mediaService.deleteMedia(resourceIds);
             log.debug("media resource delete event consumed. topic={} count={} resourceIds={}",
                     TOPIC_RESOURCE_PHYSICAL_DESTROY, resourceIds.size(), summarizeIds(resourceIds));
         } catch (Exception e) {

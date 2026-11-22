@@ -1,217 +1,137 @@
 package com.oriole.wisepen.media.service.impl;
 
-import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.file.storage.api.domain.dto.DownloadUrlsReqDTO;
 import com.oriole.wisepen.file.storage.api.feign.RemoteStorageService;
+import com.oriole.wisepen.media.api.constant.MediaConstants;
 import com.oriole.wisepen.media.cache.RedisCacheManager;
 import com.oriole.wisepen.media.config.MediaProperties;
+import com.oriole.wisepen.media.domain.entity.MediaEntity;
+import com.oriole.wisepen.media.domain.entity.MediaEntity.MediaHlsRenditionObjectKeys;
+import com.oriole.wisepen.media.domain.entity.MediaMetaEntity.MediaHlsRendition;
+import com.oriole.wisepen.media.domain.entity.MediaMetaEntity;
 import com.oriole.wisepen.media.exception.MediaError;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
-import java.util.HashMap;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
- * HLS 清单交付：子清单经媒体接口鉴权，初始化文件与分片通过 OSS 短时签名 URL 交付。
+ * 媒体 HLS 服务
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class MediaHlsManifestService {
 
-    private static final int MANIFEST_CACHE_WAIT_ATTEMPTS = 10;
-    private static final long MANIFEST_CACHE_WAIT_MILLIS = 100L;
-    private static final Pattern URI_ATTRIBUTE = Pattern.compile("(?<=[:,])URI=\"([^\"]+)\"");
-    private static final Pattern HLS_FILE = Pattern.compile("[A-Za-z0-9_-]+\\.(?:m3u8|mp4|m4s)");
-    private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
-            .followRedirects(HttpClient.Redirect.NORMAL)
-            .connectTimeout(Duration.ofSeconds(10))
-            .build();
-
     private final RemoteStorageService remoteStorageService;
     private final MediaProperties mediaProperties;
     private final RedisCacheManager redisCacheManager;
 
-    public String getSignedManifest(String resourceId, String manifestObjectKey, Long durationMs) {
+    public String getSignedManifest(String resourceId, MediaEntity entity, MediaMetaEntity meta, String playlistName) {
         try {
-            // 读缓存
+            // 先读缓存，命中直接返回
             String cachedManifest = null;
             try {
-                cachedManifest = redisCacheManager.getPlaybackManifest(manifestObjectKey);
+                cachedManifest = redisCacheManager.getPlaybackManifest(resourceId, playlistName);
             } catch (Exception e) {
-                log.warn("media hls manifest cache read failed. manifestObjectKey={}", manifestObjectKey, e);
+                log.warn("media hls manifest cache read failed. resourceId={} playlistName={}", resourceId, playlistName, e);
             }
-            if (StrUtil.isNotBlank(cachedManifest)) {
-                return cachedManifest;
+            if (StrUtil.isNotBlank(cachedManifest)) return cachedManifest;
+
+            // 缓存未命中，构建清单
+
+            long playbackSeconds = meta.getDurationMs() == null ? 0 : (long) Math.ceil(meta.getDurationMs() / 1000.0);
+            // 确保从签名那一刻起，直到最晚拿到清单的观众 + 完整播放结束，分片 URL 都还有效
+            long segmentUrlTtlSeconds = mediaProperties.getPlayback().getHlsSegmentUrlTtlSeconds() + playbackSeconds;
+
+            String manifest;
+            if (MediaConstants.MASTER_PLAYLIST_NAME.equals(playlistName)) {
+                manifest = renderMaster(resourceId, meta.getHls());
+            } else {
+                // 分片 Meta
+                MediaHlsRendition rendition = meta.getHls().stream()
+                        .filter(r -> playlistName.equals(r.getPlaylistName()))
+                        .findFirst()
+                        .orElseThrow(() -> new ServiceException(MediaError.MEDIA_PLAYBACK_FAILED));
+                // 分片 Object
+                MediaHlsRenditionObjectKeys keys = entity.getHlsObjectKeys().stream()
+                        .filter(k -> playlistName.equals(k.getPlaylistName()))
+                        .findFirst()
+                        .orElseThrow(() -> new ServiceException(MediaError.MEDIA_PLAYBACK_FAILED));
+                manifest = renderMediaPlaylist(rendition, keys, segmentUrlTtlSeconds);
             }
 
-            // 没命中时尝试拿 Redis 构建锁
-            String lockToken = IdUtil.fastSimpleUUID();
-            Boolean lockResult = null;
-            try {
-                lockResult = redisCacheManager.tryLockPlaybackManifestBuild(
-                        manifestObjectKey,
-                        lockToken,
-                        mediaProperties.getPlayback().getManifestBuildLockTtlSeconds());
-            } catch (Exception e) {
-                log.warn("media hls manifest cache lock failed. manifestObjectKey={}", manifestObjectKey, e);
-            }
-
-            boolean lockAcquired = Boolean.TRUE.equals(lockResult);
-            try {
-                // 自己拿到锁
-                if (lockAcquired) {
-                    // 再读一次缓存，防止刚好别人已经写入
-                    try {
-                        cachedManifest = redisCacheManager.getPlaybackManifest(manifestObjectKey);
-                    } catch (Exception e) {
-                        log.warn("media hls manifest cache read failed. manifestObjectKey={}", manifestObjectKey, e);
-                    }
-                    if (StrUtil.isNotBlank(cachedManifest)) {
-                        return cachedManifest;
-                    }
-                }
-                // 别人拿到锁
-                else if (Boolean.FALSE.equals(lockResult)) {
-                    // 等对方写缓存
-                    cachedManifest = waitForCachedManifest(manifestObjectKey);
-                    if (cachedManifest != null) {
-                        return cachedManifest;
-                    }
-                }
-
-                // 缓存命中后的新播放仍需完整视频时长；构建耗时也计入签名寿命。
-                long buildStarted = System.nanoTime();
-                long playbackSeconds = durationMs == null ? 0 : (long) Math.ceil(durationMs / 1000.0);
-                long segmentUrlTtlSeconds = mediaProperties.getPlayback().getHlsSegmentUrlTtlSeconds() + playbackSeconds;
-                String manifest = buildSignedManifest(resourceId, manifestObjectKey, segmentUrlTtlSeconds);
-                long buildSeconds = (long) Math.ceil((System.nanoTime() - buildStarted) / 1_000_000_000.0);
-                long ttlSeconds = mediaProperties.getPlayback().getHlsSegmentUrlTtlSeconds()
-                        - mediaProperties.getPlayback().getManifestCacheSafetySeconds() - buildSeconds;
-                if (ttlSeconds > 0) {
-                    try {
-                        redisCacheManager.setPlaybackManifest(manifestObjectKey, manifest, ttlSeconds);
-                    } catch (Exception e) {
-                        log.warn("media hls manifest cache write failed. manifestObjectKey={}", manifestObjectKey, e);
-                    }
-                }
-                return manifest;
-            } finally {
-                if (lockAcquired) {
-                    try {
-                        redisCacheManager.unlockPlaybackManifestBuild(manifestObjectKey, lockToken);
-                    } catch (Exception e) {
-                        log.warn("media hls manifest cache unlock failed. manifestObjectKey={}", manifestObjectKey, e);
-                    }
+            long ttlSeconds = mediaProperties.getPlayback().getHlsSegmentUrlTtlSeconds();
+            if (ttlSeconds > 0) {
+                try {
+                    redisCacheManager.setPlaybackManifest(resourceId, playlistName, manifest, ttlSeconds);
+                } catch (Exception e) {
+                    log.warn("media hls manifest cache write failed. resourceId={} playlistName={}", resourceId, playlistName, e);
                 }
             }
+            return manifest;
         } catch (Exception e) {
             throw new ServiceException(MediaError.MEDIA_PLAYBACK_FAILED);
         }
     }
 
-    private String buildSignedManifest(String resourceId, String manifestObjectKey, long segmentUrlTtlSeconds) throws Exception {
-        String manifestUrl = remoteStorageService.getDownloadUrl(manifestObjectKey, null, null).getData();
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(manifestUrl))
-                .timeout(Duration.ofMillis(mediaProperties.getProcessingRuntime().getHttpRequestTimeoutMs()))
-                .GET()
-                .build();
-        HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() / 100 != 2) {
-            throw new IllegalStateException("媒体 HLS manifest 下载失败 StatusCode=" + response.statusCode());
-        }
-
-        String manifest = response.body();
-        if (!manifest.startsWith("#EXTM3U")) {
-            throw new ServiceException(MediaError.MEDIA_PLAYBACK_FAILED);
-        }
-        StringBuilder builder = new StringBuilder();
-        int lastSlash = manifestObjectKey.lastIndexOf('/');
-        String segmentPrefix = lastSlash >= 0 ? manifestObjectKey.substring(0, lastSlash) : "";
-        Map<String, String> segmentUrls = new HashMap<>();
-        Map<String, String> uriReplacements = new LinkedHashMap<>();
-        Map<String, String> objectKeysByUri = new LinkedHashMap<>();
-        for (String line : manifest.split("\\R", -1)) {
-            if (StrUtil.isNotBlank(line) && !line.startsWith("#")) {
-                uriReplacements.put(line, null);
-            } else {
-                Matcher matcher = URI_ATTRIBUTE.matcher(line);
-                while (matcher.find()) {
-                    uriReplacements.put(matcher.group(1), null);
-                }
-            }
-        }
-        for (Map.Entry<String, String> entry : uriReplacements.entrySet()) {
-            String uri = entry.getKey();
-            // 当前转码器生成同目录文件；拒绝外部地址和路径穿越，避免签发其他媒体的对象。
-            if (!HLS_FILE.matcher(uri).matches()) {
-                throw new ServiceException(MediaError.MEDIA_PLAYBACK_FAILED);
-            }
-            if (uri.endsWith(".m3u8")) {
-                // 相对于当前接口寻址，保留反向代理添加的外部路径前缀。
-                entry.setValue(UriComponentsBuilder.fromPath("getPlaybackManifest")
-                        .queryParam("resourceId", resourceId)
-                        .queryParam("manifestPath", uri)
-                        .build().encode().toUriString());
-            } else {
-                objectKeysByUri.put(uri, StrUtil.isBlank(segmentPrefix) ? uri : segmentPrefix + "/" + uri);
-            }
-        }
-        // EXT-X-MAP 的 init.mp4 与媒体分片一起批量签名，所有档位共用现有存储契约。
-        List<String> objectKeys = new ArrayList<>(objectKeysByUri.values().stream().distinct().toList());
-        for (int start = 0; start < objectKeys.size(); start += DownloadUrlsReqDTO.MAX_BATCH_SIZE) {
-            List<String> batch = objectKeys.subList(start, Math.min(start + DownloadUrlsReqDTO.MAX_BATCH_SIZE, objectKeys.size()));
-            Map<String, String> batchUrls = remoteStorageService.getDownloadUrls(DownloadUrlsReqDTO.builder()
-                    .objectKeys(batch)
-                    .durationSeconds(segmentUrlTtlSeconds)
-                    .build()).getData();
-            if (batchUrls == null || batch.stream().anyMatch(key -> StrUtil.isBlank(batchUrls.get(key)))) {
-                throw new ServiceException(MediaError.MEDIA_PLAYBACK_FAILED);
-            }
-            segmentUrls.putAll(batchUrls);
-        }
-        objectKeysByUri.forEach((uri, objectKey) -> uriReplacements.put(uri, segmentUrls.get(objectKey)));
-        for (String line : manifest.split("\\R", -1)) {
-            String replacement = uriReplacements.get(line);
-            builder.append(replacement != null ? replacement : URI_ATTRIBUTE.matcher(line).replaceAll(
-                    match -> Matcher.quoteReplacement("URI=\"" + uriReplacements.get(match.group(1)) + "\"")))
-                    .append('\n');
+    private String renderMaster(String resourceId, List<MediaHlsRendition> renditions) {
+        // 主清单格式：#EXTM3U 头 + 每个档位一条 STREAM-INF
+        StringBuilder builder = new StringBuilder("#EXTM3U\n#EXT-X-VERSION:7\n");
+        for (MediaHlsRendition rendition : renditions) {
+            // BANDWIDTH/RESOLUTION/CODECS 供播放器按带宽与解码能力选档
+            builder.append("#EXT-X-STREAM-INF:BANDWIDTH=").append(rendition.getBandwidth())
+                    .append(",RESOLUTION=").append(rendition.getResolution())
+                    .append(",CODECS=\"").append(rendition.getCodecs()).append("\"\n");
+            // 把子清单地址回指到媒体服务自己的接口
+            builder.append(UriComponentsBuilder.fromPath("getPlaybackManifest")
+                    .queryParam("resourceId", resourceId)
+                    .queryParam("manifestPath", rendition.getPlaylistName())
+                    .build().encode().toUriString()).append('\n');
         }
         return builder.toString();
     }
 
-    private String waitForCachedManifest(String manifestObjectKey) {
-        for (int i = 0; i < MANIFEST_CACHE_WAIT_ATTEMPTS; i++) {
-            try {
-                Thread.sleep(MANIFEST_CACHE_WAIT_MILLIS);
-                String manifest = redisCacheManager.getPlaybackManifest(manifestObjectKey);
-                if (StrUtil.isNotBlank(manifest)) {
-                    return manifest;
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return null;
-            } catch (Exception e) {
-                log.warn("media hls manifest cache wait failed. manifestObjectKey={}", manifestObjectKey, e);
-                return null;
-            }
+    private String renderMediaPlaylist(MediaHlsRendition rendition, MediaHlsRenditionObjectKeys keys, long segmentUrlTtlSeconds) {
+        // init 与全部分片一起批量签名
+        List<String> objectKeys = new ArrayList<>();
+        objectKeys.add(keys.getInitObjectKey());
+        objectKeys.addAll(keys.getSegmentObjectKeys());
+        Map<String, String> signedUrls = remoteStorageService.getDownloadUrls(DownloadUrlsReqDTO.builder()
+                .objectKeys(objectKeys)
+                .durationSeconds(segmentUrlTtlSeconds)
+                .build()).getData();
+        if (signedUrls == null || objectKeys.stream().anyMatch(key -> StrUtil.isBlank(signedUrls.get(key)))) {
+            // 有一个分片未能获取就全部失败
+            throw new ServiceException(MediaError.MEDIA_PLAYBACK_FAILED);
         }
-        return null;
+
+        // TARGETDURATION 必须是整数秒且 ≥ 最大分片时长（向上取整），否则不合 HLS 规范
+        int targetDuration = (int) Math.ceil(rendition.getSegmentDurations().stream()
+                .mapToDouble(Double::doubleValue)
+                .max()
+                .orElse(0D));
+
+        StringBuilder builder = new StringBuilder("#EXTM3U\n#EXT-X-VERSION:7\n");
+        builder.append("#EXT-X-TARGETDURATION:").append(targetDuration).append('\n');
+        // fMP4 需先用 EXT-X-MAP 声明 init 段，播放器下载分片前先取 init 的解码参数
+        builder.append("#EXT-X-MAP:URI=\"").append(signedUrls.get(keys.getInitObjectKey())).append("\"\n");
+        List<String> segmentKeys = keys.getSegmentObjectKeys();
+        List<Double> durations = rendition.getSegmentDurations();
+        for (int i = 0; i < segmentKeys.size(); i++) {
+            // 每个分片：EXTINF 声明时长，紧跟一行分片的 URL
+            builder.append("#EXTINF:").append(String.format(Locale.ROOT, "%.6f", durations.get(i))).append(",\n");
+            builder.append(signedUrls.get(segmentKeys.get(i))).append('\n');
+        }
+        // VOD 清单以 ENDLIST 收尾，播放器据此知道清单已完整、无需刷新
+        builder.append("#EXT-X-ENDLIST\n");
+        return builder.toString();
     }
 }

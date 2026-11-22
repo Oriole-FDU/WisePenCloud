@@ -10,6 +10,9 @@ import java.util.Set;
  */
 public final class MediaConstants {
 
+    /** HLS 主清单文件名，也是 getPlaybackManifest 的默认 manifestPath */
+    public static final String MASTER_PLAYLIST_NAME = "index.m3u8";
+
     public static final Set<String> IMAGE_EXTENSIONS = Set.of("jpg", "jpeg", "png", "webp", "gif");
 
     public static final Set<String> VIDEO_EXTENSIONS = Set.of("mp4", "mov", "webm", "m4v");

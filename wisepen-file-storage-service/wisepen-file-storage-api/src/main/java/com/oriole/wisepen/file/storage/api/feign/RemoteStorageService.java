@@ -1,6 +1,7 @@
 package com.oriole.wisepen.file.storage.api.feign;
 
 import com.oriole.wisepen.common.core.domain.R;
+import com.oriole.wisepen.file.storage.api.domain.dto.ConfirmUploadReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.CopyReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.DownloadUrlsReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.StorageRecordDTO;
@@ -26,6 +27,12 @@ public interface RemoteStorageService {
      */
     @PostMapping("/initUpload")
     R<UploadInitRespDTO> initUpload(@RequestBody UploadInitReqDTO req);
+
+    /**
+     * 批量确认服务端直传产物上传完成，将 UPLOADING 记录置为 AVAILABLE
+     */
+    @PostMapping("/confirmUpload")
+    R<Void> confirmUpload(@RequestBody ConfirmUploadReqDTO req);
 
     /**
      * 复制已有文件对象并生成独立存储记录

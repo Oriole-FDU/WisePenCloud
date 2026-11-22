@@ -1,28 +1,29 @@
 package com.oriole.wisepen.media.service.impl;
 
 import cn.hutool.core.io.FileUtil;
-import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.crypto.SecureUtil;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.oriole.wisepen.common.core.exception.ServiceException;
+import com.oriole.wisepen.file.storage.api.domain.dto.ConfirmUploadReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitRespDTO;
 import com.oriole.wisepen.file.storage.api.enums.StorageSceneEnum;
 import com.oriole.wisepen.file.storage.api.feign.RemoteStorageService;
+import com.oriole.wisepen.media.api.constant.MediaConstants;
 import com.oriole.wisepen.media.api.domain.base.MediaStatus;
 import com.oriole.wisepen.media.api.domain.mq.MediaProcessTaskMessage;
 import com.oriole.wisepen.media.api.enums.MediaStatusEnum;
 import com.oriole.wisepen.media.config.MediaProperties;
-import com.oriole.wisepen.media.domain.entity.MediaInfoEntity;
+import com.oriole.wisepen.media.domain.entity.MediaEntity.MediaHlsRenditionObjectKeys;
+import com.oriole.wisepen.media.domain.entity.MediaMetaEntity.MediaHlsRendition;
+import com.oriole.wisepen.media.domain.entity.MediaMetaEntity;
 import com.oriole.wisepen.media.exception.MediaError;
 import com.oriole.wisepen.media.mq.KafkaMediaEventPublisher;
-import com.oriole.wisepen.media.repository.MediaInfoRepository;
 import com.oriole.wisepen.media.service.IMediaProcessService;
-import com.oriole.wisepen.resource.domain.dto.ResourceCreateReqDTO;
+import com.oriole.wisepen.media.service.IMediaService;
 import com.oriole.wisepen.resource.enums.ResourceType;
-import com.oriole.wisepen.resource.feign.RemoteResourceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -40,9 +41,13 @@ import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Service
@@ -54,154 +59,65 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
             .connectTimeout(Duration.ofSeconds(10))
             .build();
 
-    private final MediaInfoRepository mediaInfoRepository;
-    private final KafkaMediaEventPublisher eventPublisher;
-    private final RemoteResourceService remoteResourceService;
+    private static final Pattern ATTR_BANDWIDTH = Pattern.compile("BANDWIDTH=(\\d+)");
+    private static final Pattern ATTR_RESOLUTION = Pattern.compile("RESOLUTION=([\\dx]+)");
+    private static final Pattern ATTR_CODECS = Pattern.compile("CODECS=\"([^\"]+)\"");
+
     private final RemoteStorageService remoteStorageService;
+    private final IMediaService mediaService;
+
+    private final KafkaMediaEventPublisher eventPublisher;
     private final MediaProperties mediaProperties;
     private final ObjectMapper objectMapper;
 
     @Override
     public void processMedia(MediaProcessTaskMessage message) {
-        // 消费异步处理消息时重新读取媒体记录，避免使用消息里的过期状态做决策
-        String mediaId = message.getMediaId();
-        MediaInfoEntity entity = mediaInfoRepository.findById(mediaId)
-                .orElse(null);
-        if (entity == null) {
-            log.debug("media process skipped because media was deleted. mediaId={}", mediaId);
-            return;
-        }
-        MediaStatusEnum status = entity.getMediaStatus() != null ? entity.getMediaStatus().getStatus() : null;
-
-        // 资源注册阶段失败或超时时，重试只补注册资源，不重复下载和转码源文件
-        if (status == MediaStatusEnum.REGISTERING_RES_TIMEOUT) {
-            finalizeToReady(mediaId);
-            return;
-        }
-        if (status == MediaStatusEnum.REGISTERING_RES) {
-            log.debug("media process skipped because resource registration is in progress. mediaId={}", mediaId);
+        MediaStatus status = mediaService.getMediaStatus(message.getMediaId()).orElse(null);
+        if (status == null) {
+            log.info("media process skipped because media is missing. mediaId={}", message.getMediaId());
             return;
         }
 
         // 只有 UPLOADED 状态允许进入处理，防止重复消费消息导致重复封装或覆盖产物
-        if (status != MediaStatusEnum.UPLOADED) {
-            log.debug("media process skipped because status mismatched. mediaId={} status={}",
-                    entity.getMediaId(), status);
+        if (status.getStatus() != MediaStatusEnum.UPLOADED) {
+            log.debug("media process skipped because status mismatched. mediaId={} status={}", message.getMediaId(), status);
             return;
         }
 
-        if (mediaInfoRepository.updateStatusIfCurrent(
-                mediaId, MediaStatusEnum.UPLOADED, new MediaStatus(MediaStatusEnum.PROCESSING)) == 0) {
-            log.debug("media process claim lost because status changed. mediaId={}", mediaId);
-            return;
-        }
+        mediaService.updateStatus(message.getMediaId(), new MediaStatus(MediaStatusEnum.PROCESSING));
 
-        // processing 读取媒体元数据并生成基础产物：图片预览、视频源 HLS 与封面；音频只读取音频流元数据
-        MediaPackagingResult packagingResult;
-        if (entity.getResourceType() == ResourceType.IMAGE) {
-            packagingResult = packageImage(entity);
-        } else if (entity.getResourceType() == ResourceType.VIDEO) {
-            packagingResult = packageVideo(entity);
-        } else if (entity.getResourceType() == ResourceType.AUDIO) {
-            packagingResult = packageAudio(entity);
-        } else {
-            throw new ServiceException(MediaError.CANNOT_SUPPORT_FILE_TYPE);
-        }
-        mediaInfoRepository.updatePackagingResultById(mediaId,
-                packagingResult.sourceHlsPrefix(),
-                packagingResult.sourceHlsObjectKeys(),
-                packagingResult.previewObjectKey(),
-                packagingResult.durationMs(),
-                packagingResult.width(),
-                packagingResult.height());
+        MediaProcessingResult packagingResult = switch (message.getResourceType()){
+            case ResourceType.IMAGE -> processImage(message);
+            case ResourceType.VIDEO -> processVideo(message);
+            case ResourceType.AUDIO -> processAudio(message);
+            default -> throw new ServiceException(MediaError.CANNOT_SUPPORT_FILE_TYPE);
+        };
+        mediaService.saveMediaProcessResult(message.getMediaId(), packagingResult.previewObjectKey(), packagingResult.hlsObjectKeys(), packagingResult.meta());
 
         // 基础产物和元数据落库后再注册 resource，避免资源服务暴露未完成媒体
-        finalizeToReady(mediaId);
+        mediaService.finalizeToReady(message.getMediaId());
     }
 
-    @Override
-    public void prepareProcessRetry(String mediaId) {
-        // 资源注册阶段、终态和失败态不回拨；这些状态有各自的重试或出口语义
-        MediaInfoEntity entity = mediaInfoRepository.findById(mediaId)
-                .orElse(null);
-        if (entity == null) {
-            log.debug("media failure marking skipped because media was deleted. mediaId={}", mediaId);
-            return;
-        }
-        MediaStatusEnum status = entity.getMediaStatus() != null ? entity.getMediaStatus().getStatus() : null;
-        if (status == MediaStatusEnum.REGISTERING_RES
-                || status == MediaStatusEnum.REGISTERING_RES_TIMEOUT
-                || status == MediaStatusEnum.READY
-                || status == MediaStatusEnum.FAILED) {
-            return;
-        }
-        // 处理链路中的中间态统一回拨到 UPLOADED，后续由异步处理重新推进
-        if (status == null
-                || status == MediaStatusEnum.UPLOADING
-                || status == MediaStatusEnum.UPLOADED
-                || status == MediaStatusEnum.PROCESSING) {
-            if (status != MediaStatusEnum.UPLOADED
-                    && mediaInfoRepository.updateStatusIfCurrent(
-                    mediaId, status, new MediaStatus(MediaStatusEnum.UPLOADED)) == 0) {
-                log.debug("media process retry preparation skipped because status changed. mediaId={}", mediaId);
-            }
-        }
-    }
-
-    @Override
-    public void markProcessFailed(String mediaId, String errorMessage) {
-        // 终态不再覆盖，避免晚到的失败消息污染已经完成或已记录失败的任务
-        MediaInfoEntity entity = mediaInfoRepository.findById(mediaId)
-                .orElse(null);
-        if (entity == null) {
-            log.debug("media failure marking skipped because media was deleted. mediaId={}", mediaId);
-            return;
-        }
-        MediaStatusEnum status = entity.getMediaStatus() != null ? entity.getMediaStatus().getStatus() : null;
-        if (status == MediaStatusEnum.READY
-                || status == MediaStatusEnum.FAILED
-                || status == MediaStatusEnum.REGISTERING_RES_TIMEOUT) {
-            return;
-        }
-        // 注册资源失败保留为可补偿的 REGISTERING_RES_TIMEOUT，而不是普通 FAILED
-        if (status == MediaStatusEnum.REGISTERING_RES) {
-            if (mediaInfoRepository.updateStatusIfCurrent(mediaId, status,
-                    new MediaStatus(MediaStatusEnum.REGISTERING_RES_TIMEOUT, errorMessage)) == 0) {
-                log.debug("media failure marking skipped because status changed. mediaId={}", mediaId);
-            }
-            return;
-        }
-        // 探测、封装等媒体处理失败进入普通失败态
-        if (mediaInfoRepository.updateStatusIfCurrent(mediaId, status, new MediaStatus(errorMessage)) == 0) {
-            log.debug("media failure marking skipped because status changed. mediaId={}", mediaId);
-        }
-    }
-
-    private MediaPackagingResult packageImage(MediaInfoEntity mediaInfo) {
+    private MediaProcessingResult processImage(MediaProcessTaskMessage message) {
         // 图片生成独立低清封面图，用于资源列表和播放封面展示
         File sourceFile = null;
+        File previewFile = null;
         String previewObjectKey = null;
-        Path previewPath = null;
         try {
-            String downloadUrl = remoteStorageService.getDownloadUrl(mediaInfo.getSourceObjectKey(), null, null).getData();
-            String sourceExtension = StrUtil.isNotBlank(mediaInfo.getSourceExtension()) ? mediaInfo.getSourceExtension() : FileUtil.extName(mediaInfo.getSourceObjectKey());
-            sourceFile = downloadSourceFile(downloadUrl, mediaInfo.getMediaId(), sourceExtension);
-            ImageSize imageSize = probeImage(sourceFile.toPath());
+            // 下载文件
+            String sourceUrl = remoteStorageService.getDownloadUrl(message.getSourceObjectKey(), null, null).getData();
+            sourceFile = downloadSourceFile(sourceUrl, message.getMediaId(), message.getExtension());
 
-            previewPath = Files.createTempFile(Paths.get(mediaProperties.getLocalResources().getCachePath()), mediaInfo.getMediaId() + "_preview_", ".jpg");
-            runFfmpegToImagePreview(sourceFile.toPath(), previewPath);
-            // 每次处理使用独立目录，避免上一轮异步清理删除本轮产物。
-            previewObjectKey = StorageSceneEnum.PRIVATE_MEDIA.getPrefix()
-                    + "/" + mediaInfo.getMediaId() + "/" + IdUtil.fastSimpleUUID() + "/preview.jpg";
-            previewObjectKey = uploadFile(previewPath, previewObjectKey, mediaInfo.getMediaId());
+            // 处理图片预览
+            previewFile = createCacheFile(message.getMediaId(), ".jpg");
+            runFfmpegToImagePreview(sourceFile.toPath(), previewFile.toPath());
+            UploadedProduct previewProduct = uploadFile(previewFile.toPath(), message.getMediaId());
+            previewObjectKey = previewProduct.objectKey();
+            confirmUploads(message.getMediaId(), List.of(previewProduct));
 
-            return new MediaPackagingResult(
-                    null,
-                    null,
-                    previewObjectKey,
-                    null,
-                    imageSize.width(),
-                    imageSize.height());
+            MediaMetaEntity meta = probeImage(sourceFile.toPath());
+
+            return new MediaProcessingResult(previewObjectKey, null, meta);
         } catch (Exception e) {
             if (StrUtil.isNotBlank(previewObjectKey)) {
                 eventPublisher.publishFileDeleteEvent(List.of(previewObjectKey));
@@ -209,153 +125,112 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
             throw new ServiceException(MediaError.MEDIA_PROCESS_FAILED);
         } finally {
             // 清理本地缓存
-            if (sourceFile != null) {
-                Path path = sourceFile.toPath();
-                try {
-                    Files.deleteIfExists(path);
-                } catch (Exception e) {
-                    log.warn("media cache file delete failed. path={}", path, e);
-                }
-            }
-            if (previewPath != null) {
-                try {
-                    Files.deleteIfExists(previewPath);
-                } catch (Exception e) {
-                    log.warn("media cache file delete failed. path={}", previewPath, e);
-                }
-            }
+            deleteSilently(sourceFile);
+            deleteSilently(previewFile);
         }
     }
 
-    private MediaPackagingResult packageVideo(MediaInfoEntity mediaInfo) {
-        // 视频处理会产生多个中间文件，使用独立 workDir 便于最后整体清理
-        Path workDir = null;
+    private MediaProcessingResult processVideo(MediaProcessTaskMessage message) {
         File sourceFile = null;
-        List<String> uploadedObjectKeys = new ArrayList<>();
+        File hlsDir = null;
+        File posterFile = null;
+        List<UploadedProduct> uploadedProducts = new ArrayList<>();
         try {
-            Path cacheRoot = Paths.get(mediaProperties.getLocalResources().getCachePath());
-            Files.createDirectories(cacheRoot);
-            workDir = Files.createTempDirectory(cacheRoot, mediaInfo.getMediaId() + "_");
+            // 下载文件
+            String sourceUrl = remoteStorageService.getDownloadUrl(message.getSourceObjectKey(), null, null).getData();
+            sourceFile = downloadSourceFile(sourceUrl, message.getMediaId(), message.getExtension());
 
-            // 把源视频下载到缓存目录
-            String sourceUrl = remoteStorageService.getDownloadUrl(mediaInfo.getSourceObjectKey(), null, null).getData();
-            String sourceExtension = StrUtil.isNotBlank(mediaInfo.getSourceExtension()) ? mediaInfo.getSourceExtension() : FileUtil.extName(mediaInfo.getSourceObjectKey());
-            sourceFile = downloadSourceFile(sourceUrl, mediaInfo.getMediaId(), sourceExtension);
-            Path sourcePath = workDir.resolve(sourceFile.getName());
-            Files.move(sourceFile.toPath(), sourcePath);
+            // HLS 输出目录
+            // ffmpeg 的 init/分片/清单全部写入其中
+            hlsDir = createCacheDir(message.getMediaId() + "_HLS");
 
-            // 先探测视频元数据
-            VideoProbe probe = probeVideo(sourcePath);
-            Path hlsDir = workDir.resolve("hls");
-            Files.createDirectories(hlsDir);
-            runFfmpegToHls(sourcePath, hlsDir, probe);
+            // 探测视频元数据
+            // hasAudio 决定 HLS 转码是否映射音轨
+            VideoProbe probe = probeVideo(sourceFile.toPath());
+            MediaMetaEntity meta = probe.meta();
+            runFfmpegToHls(sourceFile.toPath(), hlsDir.toPath(), meta, probe.hasAudio());
 
-            // HLS 产物统一上传到 private media 目录，播放时再由 manifest 服务签发分片 URL
-            String hlsPrefix = StorageSceneEnum.PRIVATE_MEDIA.getPrefix()
-                    + "/" + mediaInfo.getMediaId() + "/" + IdUtil.fastSimpleUUID() + "/source-hls";
-            List<String> hlsObjectKeys = new ArrayList<>();
-            try (var stream = Files.list(hlsDir)) {
+            // HLS 清单由播放阶段按结构化描述即时生成，这里只上传 init 与分片
+            Map<String, String> objectKeyByFilename = new HashMap<>();
+            Map<String, String> m3u8Texts = new HashMap<>();
+            try (var stream = Files.list(hlsDir.toPath())) {
                 for (Path file : stream.filter(Files::isRegularFile).toList()) {
-                    String objectKey = hlsPrefix + "/" + file.getFileName();
-                    uploadedObjectKeys.add(objectKey);
-                    uploadFile(file, objectKey, mediaInfo.getMediaId());
-                    hlsObjectKeys.add(objectKey);
+                    String filename = file.getFileName().toString();
+                    if (filename.endsWith(".m3u8")) {
+                        m3u8Texts.put(filename, Files.readString(file));
+                    } else {
+                        UploadedProduct product = uploadFile(file, message.getMediaId());
+                        uploadedProducts.add(product);
+                        objectKeyByFilename.put(filename, product.objectKey());
+                    }
                 }
             }
+            ParsedHls parsedHls = parseHlsManifest(m3u8Texts, objectKeyByFilename);
 
             String previewObjectKey = null;
-            Path posterPath = workDir.resolve("poster.jpg");
+            posterFile = createCacheFile(message.getMediaId(), ".jpg");
             try {
                 // 封面
-                runFfmpegToPoster(sourcePath, posterPath);
-                previewObjectKey = hlsPrefix + "/poster.jpg";
-                uploadedObjectKeys.add(previewObjectKey);
-                previewObjectKey = uploadFile(posterPath, previewObjectKey, mediaInfo.getMediaId());
+                runFfmpegToPoster(sourceFile.toPath(), posterFile.toPath());
+                UploadedProduct posterProduct = uploadFile(posterFile.toPath(), message.getMediaId());
+                uploadedProducts.add(posterProduct);
+                previewObjectKey = posterProduct.objectKey();
             } catch (Exception e) {
-                log.warn("media poster generation failed. mediaId={}", mediaInfo.getMediaId(), e);
+                log.warn("media poster generation failed. mediaId={}", message.getMediaId(), e);
             }
 
-            // 返回视频可播放所需的 HLS 前缀、文件清单、封面和基础元数据
-            return new MediaPackagingResult(
-                    hlsPrefix,
-                    hlsObjectKeys,
+            // 所有产物直传成功后一次性确认存储记录
+            confirmUploads(message.getMediaId(), uploadedProducts);
+
+            // 返回视频可播放所需的 HLS 描述、封面和基础元数据
+            return new MediaProcessingResult(
                     previewObjectKey,
-                    probe.durationMs(),
-                    probe.width(),
-                    probe.height());
+                    parsedHls.objectKeys(),
+                    MediaMetaEntity.builder()
+                            .durationMs(meta.getDurationMs())
+                            .width(meta.getWidth())
+                            .height(meta.getHeight())
+                            .hls(parsedHls.renditions())
+                            .build());
         } catch (Exception e) {
-            log.error("packageVideo failed. mediaId={}, sourceObjectKey={}, uploadedObjectKeys={}",
-                    mediaInfo.getMediaId(), mediaInfo.getSourceObjectKey(), uploadedObjectKeys, e);
-            if (!uploadedObjectKeys.isEmpty()) {
-                eventPublisher.publishFileDeleteEvent(uploadedObjectKeys);
-            }
+            List<String> uploadedObjectKeys = uploadedProducts.stream().map(UploadedProduct::objectKey).toList();
+            log.error("processVideo failed. mediaId={}, sourceObjectKey={}, uploadedObjectKeys={}",
+                    message.getMediaId(), message.getSourceObjectKey(), uploadedObjectKeys, e);
+            if (!uploadedObjectKeys.isEmpty()) eventPublisher.publishFileDeleteEvent(uploadedObjectKeys);
             throw new ServiceException(MediaError.MEDIA_PROCESS_FAILED);
         } finally {
-            if (sourceFile != null) {
-                try {
-                    Files.deleteIfExists(sourceFile.toPath());
-                } catch (Exception e) {
-                    log.warn("media cache file delete failed. path={}", sourceFile, e);
-                }
-            }
-            // 视频处理目录包含源文件、HLS 分片和封面临时文件，需要递归清理
-            if (workDir != null) {
-                try (var paths = Files.walk(workDir)) {
-                    paths.sorted(Comparator.reverseOrder()).forEach(path -> {
-                        try {
-                            Files.deleteIfExists(path);
-                        } catch (Exception e) {
-                            log.warn("media cache file delete failed. path={}", path, e);
-                        }
-                    });
-                } catch (Exception e) {
-                    log.warn("media cache directory delete failed. path={}", workDir, e);
-                }
-            }
+            deleteSilently(sourceFile);
+            deleteSilently(hlsDir);
+            deleteSilently(posterFile);
         }
     }
 
-    private MediaPackagingResult packageAudio(MediaInfoEntity mediaInfo) {
+    private MediaProcessingResult processAudio(MediaProcessTaskMessage message) {
         // 音频不生成播放衍生产物，播放时直接签发源文件 URL，这里仅探测时长
         File sourceFile = null;
         try {
-            String downloadUrl = remoteStorageService.getDownloadUrl(mediaInfo.getSourceObjectKey(), null, null).getData();
-            String sourceExtension = StrUtil.isNotBlank(mediaInfo.getSourceExtension()) ? mediaInfo.getSourceExtension() : FileUtil.extName(mediaInfo.getSourceObjectKey());
-            sourceFile = downloadSourceFile(downloadUrl, mediaInfo.getMediaId(), sourceExtension);
-            AudioProbe probe = probeAudio(sourceFile.toPath());
-            return new MediaPackagingResult(
-                    null,
-                    null,
-                    null,
-                    probe.durationMs(),
-                    null,
-                    null);
+            String downloadUrl = remoteStorageService.getDownloadUrl(message.getSourceObjectKey(), null, null).getData();
+            sourceFile = downloadSourceFile(downloadUrl, message.getMediaId(), message.getExtension());
+            MediaMetaEntity meta = probeAudio(sourceFile.toPath());
+            return new MediaProcessingResult(null, null, meta);
         } catch (Exception e) {
             throw new ServiceException(MediaError.MEDIA_PROCESS_FAILED);
         } finally {
             // 音频探测完成后删除临时源文件
-            if (sourceFile != null) {
-                Path path = sourceFile.toPath();
-                try {
-                    Files.deleteIfExists(path);
-                } catch (Exception e) {
-                    log.warn("media cache file delete failed. path={}", path, e);
-                }
-            }
+            deleteSilently(sourceFile);
         }
     }
 
+    /** 流式下载源文件到本地缓存目录 */
     private File downloadSourceFile(String url, String mediaId, String extension) throws IOException, InterruptedException {
-        // 所有媒体源文件先落到本地缓存目录
         Path dir = Paths.get(mediaProperties.getLocalResources().getCachePath());
         Files.createDirectories(dir);
-        Path target = Files.createTempFile(dir, mediaId + "_source_", "." + extension);
+        Path target = dir.resolve(mediaId + "_source." + extension);
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
+        HttpRequest request = HttpRequest.newBuilder().uri(URI.create(url))
                 .timeout(Duration.ofMillis(mediaProperties.getProcessingRuntime().getHttpRequestTimeoutMs()))
-                .GET()
-                .build();
+                .GET().build();
+
         HttpResponse<Path> response;
         try {
             response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofFile(target));
@@ -370,37 +245,88 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
         return target.toFile();
     }
 
-    private ImageSize probeImage(Path sourcePath) throws IOException {
-        // ffprobe 读取图片首帧尺寸，覆盖 webp/gif 等 ImageIO 默认支持不稳定的格式
+    /** 在缓存目录下创建临时文件 */
+    private File createCacheFile(String prefix, String suffix) throws IOException {
+        Path dir = Paths.get(mediaProperties.getLocalResources().getCachePath());
+        Files.createDirectories(dir);
+        return Files.createTempFile(dir, prefix + "_", suffix).toFile();
+    }
+
+    /** 在缓存目录下创建临时目录 */
+    private File createCacheDir(String prefix) throws IOException {
+        Path dir = Paths.get(mediaProperties.getLocalResources().getCachePath());
+        Files.createDirectories(dir);
+        return Files.createTempDirectory(dir, prefix + "_").toFile();
+    }
+
+    /** 静默删除本地临时文件或目录（目录递归删除），失败仅打印警告，不影响主流程 */
+    private void deleteSilently(File file) {
+        if (file == null || !file.exists()) {
+            return;
+        }
+        Path path = file.toPath();
+        if (!Files.isDirectory(path)) {
+            try {
+                Files.deleteIfExists(path);
+            } catch (IOException e) {
+                log.warn("cache file delete failed. path={}", path, e);
+            }
+            return;
+        }
+        try (var paths = Files.walk(path)) {
+            paths.sorted(Comparator.reverseOrder()).forEach(p -> {
+                try {
+                    Files.deleteIfExists(p);
+                } catch (IOException e) {
+                    log.warn("cache file delete failed. path={}", p, e);
+                }
+            });
+        } catch (IOException e) {
+            log.warn("cache directory delete failed. path={}", path, e);
+        }
+    }
+
+    private MediaMetaEntity probeImage(Path sourcePath) throws IOException {
+        // 用 ffprobe 读取图片首帧宽高
         String output = runCommand(List.of(
                 mediaProperties.getLocalResources().getFfprobePath(),
-                "-v", "error",
-                "-select_streams", "v:0",
-                "-show_entries", "stream=width,height",
-                "-of", "json",
+                "-v", "error", // 只输出错误
+                "-select_streams", "v:0", // 只取第一条视频流（图片通常只有一条）
+                "-show_entries", "stream=width,height", // 只返回 width/height
+                "-of", "json", // JSON 输出
                 sourcePath.toString()
         ), Duration.ofMillis(mediaProperties.getProcessingRuntime().getFfmpegTimeoutMs()));
+
         JsonNode root = objectMapper.readTree(output);
         JsonNode stream = root.path("streams").isArray() && !root.path("streams").isEmpty()
                 ? root.path("streams").get(0) : objectMapper.createObjectNode();
+        // 检查尺寸是否合法
         if (stream.path("width").isMissingNode() || stream.path("height").isMissingNode()) {
             throw new ServiceException(MediaError.MEDIA_PROCESS_FAILED, "图片尺寸读取失败");
         }
-        return new ImageSize(stream.path("width").asInt(), stream.path("height").asInt());
+
+        return MediaMetaEntity.builder()
+                .width(stream.path("width").asInt())
+                .height(stream.path("height").asInt())
+                .build();
     }
 
     private VideoProbe probeVideo(Path sourcePath) throws IOException {
-        // 同时探测音轨，生成无声视频的 variant 时不能引用不存在的音频流。
+        // 用 ffprobe 读取视频流宽高、音轨存在性、容器时长
         String output = runCommand(List.of(
                 mediaProperties.getLocalResources().getFfprobePath(),
-                "-v", "error",
-                "-show_entries", "stream=codec_type,width,height:format=duration",
-                "-of", "json",
+                "-v", "error", // 只输出错误
+                "-show_entries", "stream=codec_type,width,height:format=duration", // 遍历所有流，区分视频/音频，取容器级时长（秒），调用方转毫秒
+                "-of", "json", // JSON 输出
                 sourcePath.toString()
         ), Duration.ofMillis(mediaProperties.getProcessingRuntime().getFfmpegTimeoutMs()));
         JsonNode root = objectMapper.readTree(output);
         JsonNode videoStream = null;
+
+        // 音轨是否存在
+        // 供 runFfmpegToHls 使用，无声视频不能 -map 0:a:0，否则 ffmpeg 因音轨不存在而报错
         boolean hasAudio = false;
+
         for (JsonNode stream : root.path("streams")) {
             if (videoStream == null && "video".equals(stream.path("codec_type").asText())) {
                 videoStream = stream;
@@ -409,26 +335,28 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
                 hasAudio = true;
             }
         }
+        // 检查尺寸是否合法
         if (videoStream == null || videoStream.path("width").asInt() < 2 || videoStream.path("height").asInt() < 2) {
             throw new ServiceException(MediaError.MEDIA_PROCESS_FAILED, "视频尺寸无效");
         }
+        // 时长转换
         double durationSeconds = root.path("format").path("duration").asDouble(0D);
-        return new VideoProbe(
-                Math.round(durationSeconds * 1000D),
-                videoStream.path("width").asInt(),
-                videoStream.path("height").asInt(),
-                hasAudio
-        );
+        MediaMetaEntity meta = MediaMetaEntity.builder()
+                .durationMs(Math.round(durationSeconds * 1000D))
+                .width(videoStream.path("width").asInt())
+                .height(videoStream.path("height").asInt())
+                .build();
+        return new VideoProbe(meta, hasAudio);
     }
 
-    private AudioProbe probeAudio(Path sourcePath) throws IOException {
-        // ffprobe 只选择第一条音频流；没有音频流说明文件不符合音频媒体预期
+    private MediaMetaEntity probeAudio(Path sourcePath) throws IOException {
+        // 用 ffprobe 读取音频容器时长
         String output = runCommand(List.of(
                 mediaProperties.getLocalResources().getFfprobePath(),
-                "-v", "error",
-                "-select_streams", "a:0",
-                "-show_entries", "stream=codec_type:format=duration",
-                "-of", "json",
+                "-v", "error", // 只输出错误
+                "-select_streams", "a:0", // 只选第一条音频流；没有音频流说明文件不是有效音频媒体
+                "-show_entries", "stream=codec_type:format=duration", // 取容器级时长（秒），调用方转毫秒
+                "-of", "json", // JSON 输出
                 sourcePath.toString()
         ), Duration.ofMillis(mediaProperties.getProcessingRuntime().getFfmpegTimeoutMs()));
         JsonNode root = objectMapper.readTree(output);
@@ -436,25 +364,33 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
         if (!streams.isArray() || streams.isEmpty()) {
             throw new ServiceException(MediaError.MEDIA_PROCESS_FAILED, "音频流不存在");
         }
+        // 时长转换
         double durationSeconds = root.path("format").path("duration").asDouble(0D);
-        // 当前音频播放走源文件直出，只需要记录时长
-        return new AudioProbe(Math.round(durationSeconds * 1000D));
+        return MediaMetaEntity.builder().durationMs(Math.round(durationSeconds * 1000D)).build();
     }
 
-    private void runFfmpegToHls(Path sourcePath, Path hlsDir, VideoProbe probe) {
+    private void runFfmpegToHls(Path sourcePath, Path hlsDir, MediaMetaEntity meta, boolean hasAudio) {
+        // 用 ffmpeg 把源视频转成多档位 fMP4 HLS 自适应码率输出，产物包括：
+        //   - index.m3u8      主清单（master），每个档位一行 STREAM-INF + 指向该档 %v.m3u8
+        //   - %v.m3u8         档位媒体清单（如 480p.m3u8），引用 init 段与分片
+        //   - init-*.mp4      各档 fMP4 初始化段（fMP4 解码参数）
+        //   - %v-seg-*.m4s    各档分片
         int segmentSeconds = mediaProperties.getProcessingRuntime().getHlsSegmentSeconds();
         if (segmentSeconds <= 0) {
             throw new ServiceException(MediaError.MEDIA_PROCESS_FAILED, "HLS 分片时长必须为正数");
         }
-        // 按短边选择档位，兼顾竖屏；最后一档保留不超过 1080 的源尺寸，不放大小视频。
-        int sourceShortSide = Math.min(probe.width(), probe.height()) / 2 * 2;
+        // 取源视频的短边，档位判断与方向无关
+        // 例如，横屏（1920×1080）和竖屏（1080×1920）都得到 1080
+        int sourceShortSide = Math.min(meta.getWidth(), meta.getHeight()) / 2 * 2; // 向下取最近的偶数，短边必须对齐偶数，否则会出现奇数边导致编码报错
         List<HlsRendition> renditions = new ArrayList<>();
         for (HlsRendition target : List.of(
-                new HlsRendition(480, 1000), new HlsRendition(720, 2500), new HlsRendition(1080, 5000))) {
+                // 三个固定档位：480p@1000k、720p@2500k、1080p@5000k，从低到高排列
+                new HlsRendition(480, 1000),
+                new HlsRendition(720, 2500),
+                new HlsRendition(1080, 5000))
+        ) {
             renditions.add(new HlsRendition(Math.min(sourceShortSide, target.shortSide()), target.bitrateKbps()));
-            if (sourceShortSide <= target.shortSide()) {
-                break;
-            }
+            if (sourceShortSide <= target.shortSide()) break; // 一旦源的短边 ≤ 当前档位，就不再生成更高档
         }
 
         List<String> command = new ArrayList<>(List.of(
@@ -464,19 +400,23 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
         for (int i = 0; i < renditions.size(); i++) {
             HlsRendition rendition = renditions.get(i);
             String shortSide = String.valueOf(rendition.shortSide());
+            // 每个档位各映射一份视频流
             command.addAll(List.of("-map", "0:v:0"));
-            if (probe.hasAudio()) {
+            if (hasAudio) {
+                // 音频流仅在有音轨时映射，避免引用不存在的流
                 command.addAll(List.of("-map", "0:a:0"));
             }
-            // FFmpeg 自动应用旋转信息后再缩放；长边按比例计算并取偶数，保留画面比例。
             command.addAll(List.of(
+                    // scale：长边按短边比例计算并取偶数（-2），自动应用旋转信息，保留画面比例
                     "-filter:v:" + i, "scale=w='if(gte(iw,ih),-2," + shortSide
                             + ")':h='if(gte(iw,ih)," + shortSide + ",-2)'",
                     "-b:v:" + i, rendition.bitrateKbps() + "k",
+                    // 码率：maxrate=目标码率、bufsize=2x，用 VBV 约束避免码率瞬时飙升
                     "-maxrate:v:" + i, rendition.bitrateKbps() + "k",
                     "-bufsize:v:" + i, (rendition.bitrateKbps() * 2) + "k"));
-            variants.add("v:" + i + (probe.hasAudio() ? ",a:" + i : "") + ",name:" + shortSide + "p");
+            variants.add("v:" + i + (hasAudio ? ",a:" + i : "") + ",name:" + shortSide + "p");
         }
+        // 视频编码统一 H.264 + yuv420p（兼容性最好）；+cgop + sc_threshold 0 强制封闭 GOP
         command.addAll(List.of(
                 "-c:v", "libx264",
                 "-preset", "veryfast",
@@ -503,7 +443,9 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
     }
 
     private void runFfmpegToImagePreview(Path sourcePath, Path previewPath) {
-        // 图片预览统一输出 jpg，并限制长边，避免列表和详情页直接加载原图
+        // 图片预览统一转成 jpg 并限制长边 1280：列表/详情页只需缩略图，直接加载原图浪费带宽。
+        // scale 表达式：横图限宽 1280、高按比例取偶数；竖图限高 1280、宽按比例取偶数。
+        // -frames:v 1 只输出一帧；-q:v 3 是 jpg 质量（值越小质量越高）。
         runCommand(List.of(
                 mediaProperties.getLocalResources().getFfmpegPath(),
                 "-y",
@@ -516,7 +458,9 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
     }
 
     private void runFfmpegToPoster(Path sourcePath, Path posterPath) {
-        // 从第 1 秒截取单帧作为视频封面，避免首帧黑屏的常见情况
+        // 从第 1 秒截取单帧作封面：视频首帧常是黑屏，1 秒处通常已有画面。
+        // -ss 放在 -i 之前是 input seeking，直接跳到目标位置解码，速度更快。
+        // -q:v 2 比预览图质量略高，封面在列表里需要更清晰。
         runCommand(List.of(
                 mediaProperties.getLocalResources().getFfmpegPath(),
                 "-y",
@@ -558,17 +502,18 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
         }
     }
 
-    private String uploadFile(Path file, String objectKey, String mediaId) {
+    private UploadedProduct uploadFile(Path file, String mediaId) {
         try {
-            // 先向存储服务创建目标记录并申请 PUT URL；md5 支持秒传复用已有对象
+            // 向存储服务申请上传凭证；objectKey 由存储服务下发，md5 支持秒传复用已有对象
             String extension = FileUtil.extName(file.getFileName().toString());
+            String md5 = SecureUtil.md5(file.toFile());
+            long size = Files.size(file);
             UploadInitRespDTO uploadInitResp = remoteStorageService.initUpload(UploadInitReqDTO.builder()
-                    .md5(SecureUtil.md5(file.toFile()))
+                    .md5(md5)
                     .extension(extension)
                     .scene(StorageSceneEnum.PRIVATE_MEDIA)
                     .bizTag(mediaId)
-                    .targetObjectKey(objectKey)
-                    .expectedSize(Files.size(file))
+                    .expectedSize(size)
                     .isNeedCallback(false)
                     .build()).getData();
             if (!Boolean.TRUE.equals(uploadInitResp.getFlashUploaded())) {
@@ -584,93 +529,140 @@ public class MediaProcessServiceImpl implements IMediaProcessService {
                     throw new IllegalStateException("媒体产物上传失败 StatusCode=" + response.statusCode());
                 }
             }
-            // 返回存储服务确认后的 objectKey，避免调用方依赖本地拼接结果
-            return uploadInitResp.getObjectKey();
+            return new UploadedProduct(uploadInitResp.getObjectKey(), md5, size);
         } catch (Exception e) {
-            log.error("media product upload failed. objectKey={}, mediaId={}", objectKey, mediaId, e);
+            log.error("media product upload failed. mediaId={} file={}", mediaId, file.getFileName(), e);
             throw new ServiceException(MediaError.MEDIA_PROCESS_FAILED);
         }
     }
 
-    @Override
-    public void finalizeToReady(String mediaId) {
-        // finalize 可被正常处理和注册补偿重试共同调用，因此保持幂等
-        MediaInfoEntity entity = mediaInfoRepository.findById(mediaId)
-                .orElseThrow(() -> new ServiceException(MediaError.MEDIA_NOT_FOUND));
-        MediaStatusEnum currentStatus = entity.getMediaStatus() != null ? entity.getMediaStatus().getStatus() : null;
-        if (currentStatus == MediaStatusEnum.READY) {
-            return;
-        }
-        if (currentStatus != MediaStatusEnum.PROCESSING
-                && currentStatus != MediaStatusEnum.REGISTERING_RES_TIMEOUT) {
-            log.debug("media resource registration skipped because status is not claimable. mediaId={} status={}",
-                    mediaId, currentStatus);
-            return;
-        }
+    private ParsedHls parseHlsManifest(Map<String, String> m3u8Texts, Map<String, String> objectKeyByFilename) {
+        // 解析 ffmpeg 生成的主清单（index.m3u8），把每个档位拆成两部分
+        //   - MediaHlsRendition：档位结构（bandwidth/resolution/codecs/分片时长），存 MediaMetaEntity.hls
+        //   - MediaHlsRenditionObjectKeys：init/分片 objectKey，存 MediaEntity.hlsObjectKeys
 
-        // 进入资源注册阶段后，如果远程资源服务失败，会留下 REGISTERING_RES_TIMEOUT 供重试
-        if (mediaInfoRepository.updateStatusIfCurrent(
-                mediaId, currentStatus, new MediaStatus(MediaStatusEnum.REGISTERING_RES)) == 0) {
-            log.debug("media resource registration claim lost. mediaId={}", mediaId);
-            return;
+        // 主清单结构：每个档位先一行 #EXT-X-STREAM-INF:BANDWIDTH=...，紧跟一行该档媒体清单文件名
+        String masterText = m3u8Texts.get(MediaConstants.MASTER_PLAYLIST_NAME);
+        if (StrUtil.isBlank(masterText)) {
+            throw new ServiceException(MediaError.MEDIA_PROCESS_FAILED, "HLS 主清单缺失");
         }
-        String resourceId = entity.getResourceId();
-        if (StrUtil.isBlank(resourceId)) {
-            try {
-                // 只有基础产物确定后才注册 resource，避免资源服务暴露未完成媒体
-                String result = null;
-                // 资源服务的 preview 存 objectKey：图片使用预览图，视频使用封面，音频不提供预览图
-                if (entity.getResourceType() == ResourceType.IMAGE || entity.getResourceType() == ResourceType.VIDEO) {
-                    result = entity.getPreviewObjectKey();
-                }
-                resourceId = remoteResourceService.createResource(ResourceCreateReqDTO.builder()
-                        .resourceName(entity.getOriginalFilename())
-                        .resourceType(entity.getResourceType())
-                        .ownerId(String.valueOf(entity.getOwnerId()))
-                        .ownerGroupRoles(entity.getUploaderGroupRoles())
-                        .mountTargetTagId(entity.getMountTargetTagId())
-                        .preview(result)
-                        .size(entity.getSize())
-                        .build()).getData();
-            } catch (Exception e) {
-                if (mediaInfoRepository.updateStatusIfCurrent(
-                        mediaId, MediaStatusEnum.REGISTERING_RES,
-                        new MediaStatus(MediaStatusEnum.REGISTERING_RES_TIMEOUT)) == 0) {
-                    log.debug("media resource registration failure ignored because status changed. mediaId={}", mediaId);
-                }
-                throw new ServiceException(MediaError.MEDIA_REGISTER_RESOURCE_FAILED);
+        List<MediaHlsRendition> renditions = new ArrayList<>();
+        List<MediaHlsRenditionObjectKeys> objectKeys = new ArrayList<>();
+        String pendingAttrs = null;
+        for (String line : masterText.split("\\R")) {
+            if (StrUtil.isBlank(line)) {
+                continue;
             }
-            if (mediaInfoRepository.updateResourceIdIfCurrent(
-                    mediaId, MediaStatusEnum.REGISTERING_RES, resourceId) == 0) {
-                log.debug("media resource registration result ignored because status changed. mediaId={}", mediaId);
-                return;
+            if (line.startsWith("#EXT-X-STREAM-INF:")) {
+                pendingAttrs = line;
+            } else if (!line.startsWith("#") && pendingAttrs != null) {
+                String playlistName = line.trim();
+                String playlistText = m3u8Texts.get(playlistName);
+                if (StrUtil.isBlank(playlistText)) {
+                    throw new ServiceException(MediaError.MEDIA_PROCESS_FAILED, "HLS 媒体清单缺失: " + playlistName);
+                }
+                Matcher bandwidthMatcher = ATTR_BANDWIDTH.matcher(pendingAttrs);
+                Matcher resolutionMatcher = ATTR_RESOLUTION.matcher(pendingAttrs);
+                Matcher codecsMatcher = ATTR_CODECS.matcher(pendingAttrs);
+                RenditionParse parsed = parseMediaPlaylist(playlistName, playlistText, objectKeyByFilename);
+                renditions.add(MediaHlsRendition.builder()
+                        .playlistName(playlistName)
+                        .bandwidth(bandwidthMatcher.find() ? bandwidthMatcher.group(1) : null)
+                        .resolution(resolutionMatcher.find() ? resolutionMatcher.group(1) : null)
+                        .codecs(codecsMatcher.find() ? codecsMatcher.group(1) : null)
+                        .segmentDurations(parsed.durations())
+                        .build());
+                objectKeys.add(MediaHlsRenditionObjectKeys.builder()
+                        .playlistName(playlistName)
+                        .initObjectKey(parsed.initObjectKey())
+                        .segmentObjectKeys(parsed.segmentObjectKeys())
+                        .build());
+                pendingAttrs = null;
             }
         }
+        if (renditions.isEmpty()) {
+            throw new ServiceException(MediaError.MEDIA_PROCESS_FAILED, "HLS 档位为空");
+        }
+        return new ParsedHls(renditions, objectKeys);
+    }
 
-        // 资源 ID 存在后才能将媒体标记为 READY
-        if (mediaInfoRepository.updateStatusIfCurrent(
-                mediaId, MediaStatusEnum.REGISTERING_RES, new MediaStatus(MediaStatusEnum.READY)) > 0) {
-            log.info("media ready finalized. mediaId={} resourceId={}", mediaId, resourceId);
+    private RenditionParse parseMediaPlaylist(String playlistName, String playlistText,
+                                              Map<String, String> objectKeyByFilename) {
+        // 解析单个档位的媒体清单，提取 fMP4 的 init 段与每个分片的 objectKey + 精确时长
+        // 结构：
+        //   #EXT-X-MAP:URI="init-480p.mp4" -> init 段（fMP4 解码参数，播放器下载分片前先取它）
+        //   #EXTINF:4.000000,              -> 下一行分片的时长（秒）
+        //   <分片文件名>                    -> 紧跟 EXTINF 的分片 URI，映射到已上传的 objectKey
+        // EXTINF 与分片行成对出现,先用 pendingDuration 暂存时长，遇到分片行再配对入列
+        String initFilename = null;
+        List<Double> durations = new ArrayList<>();
+        List<String> segmentObjectKeys = new ArrayList<>();
+        Double pendingDuration = null;
+        for (String line : playlistText.split("\\R")) {
+            if (StrUtil.isBlank(line)) {
+                continue;
+            }
+            if (line.startsWith("#EXT-X-MAP:")) {
+                int uriStart = line.indexOf("URI=\"");
+                if (uriStart < 0) {
+                    throw new ServiceException(MediaError.MEDIA_PROCESS_FAILED, "HLS init 段缺失: " + playlistName);
+                }
+                int valueStart = uriStart + "URI=\"".length();
+                int valueEnd = line.indexOf('"', valueStart);
+                initFilename = valueEnd < 0 ? null : line.substring(valueStart, valueEnd);
+            } else if (line.startsWith("#EXTINF:")) {
+                int colon = line.indexOf(':');
+                int comma = line.indexOf(',');
+                String value = comma < 0 ? line.substring(colon + 1) : line.substring(colon + 1, comma);
+                pendingDuration = Double.parseDouble(value.trim());
+            } else if (!line.startsWith("#")) {
+                String segmentFilename = line.trim();
+                String objectKey = objectKeyByFilename.get(segmentFilename);
+                if (pendingDuration == null || objectKey == null) {
+                    throw new ServiceException(MediaError.MEDIA_PROCESS_FAILED, "HLS 媒体清单不完整: " + playlistName);
+                }
+                durations.add(pendingDuration);
+                segmentObjectKeys.add(objectKey);
+                pendingDuration = null;
+            }
+        }
+        String initObjectKey = initFilename == null ? null : objectKeyByFilename.get(initFilename);
+        if (initObjectKey == null || segmentObjectKeys.isEmpty()) {
+            throw new ServiceException(MediaError.MEDIA_PROCESS_FAILED, "HLS 媒体清单不完整: " + playlistName);
+        }
+        return new RenditionParse(durations, initObjectKey, segmentObjectKeys);
+    }
+
+    private void confirmUploads(String mediaId, List<UploadedProduct> products) {
+        if (products.isEmpty()) {
+            return;
+        }
+        ConfirmUploadReqDTO req = ConfirmUploadReqDTO.builder()
+                .items(products.stream().map(p -> ConfirmUploadReqDTO.Item.builder()
+                        .objectKey(p.objectKey()).md5(p.md5()).size(p.size()).build()).toList())
+                .build();
+        try {
+            remoteStorageService.confirmUpload(req);
+        } catch (Exception e) {
+            log.warn("media product upload confirm failed, ignored. mediaId={}", mediaId, e);
         }
     }
 
-    private record ImageSize(Integer width, Integer height) {
+    private record UploadedProduct(String objectKey, String md5, long size) {
     }
 
-    private record VideoProbe(Long durationMs, Integer width, Integer height, boolean hasAudio) {
+    private record VideoProbe(MediaMetaEntity meta, boolean hasAudio) {
     }
 
     private record HlsRendition(int shortSide, int bitrateKbps) {
     }
 
-    private record AudioProbe(Long durationMs) {
+    private record MediaProcessingResult(String previewObjectKey, List<MediaHlsRenditionObjectKeys> hlsObjectKeys, MediaMetaEntity meta) {
     }
 
-    private record MediaPackagingResult(String sourceHlsPrefix,
-                                        List<String> sourceHlsObjectKeys,
-                                        String previewObjectKey,
-                                        Long durationMs,
-                                        Integer width,
-                                        Integer height) {
+    private record ParsedHls(List<MediaHlsRendition> renditions, List<MediaHlsRenditionObjectKeys> objectKeys) {
+    }
+
+    private record RenditionParse(List<Double> durations, String initObjectKey, List<String> segmentObjectKeys) {
     }
 }

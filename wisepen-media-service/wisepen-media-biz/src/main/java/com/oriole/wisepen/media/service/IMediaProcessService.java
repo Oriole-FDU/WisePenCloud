@@ -6,9 +6,4 @@ public interface IMediaProcessService {
 
     void processMedia(MediaProcessTaskMessage message);
 
-    void prepareProcessRetry(String mediaId);
-
-    void markProcessFailed(String mediaId, String errorMessage);
-
-    void finalizeToReady(String mediaId);
 }

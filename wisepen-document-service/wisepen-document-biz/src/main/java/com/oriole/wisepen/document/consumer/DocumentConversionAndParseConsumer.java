@@ -15,6 +15,7 @@ import com.oriole.wisepen.document.service.IDocumentService;
 import com.oriole.wisepen.document.util.MarkdownPageBreakInjector;
 import com.oriole.wisepen.document.util.OnlyOfficeConversionClient;
 import com.oriole.wisepen.document.util.WatermarkPreProcessor;
+import com.oriole.wisepen.file.storage.api.domain.dto.ConfirmUploadReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitRespDTO;
 import com.oriole.wisepen.file.storage.api.enums.StorageSceneEnum;
@@ -39,6 +40,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Set;
 
 import static com.oriole.wisepen.document.api.constant.MqTopicConstants.TOPIC_DOCUMENT_PARSE;
@@ -76,6 +78,14 @@ public class DocumentConversionAndParseConsumer {
             process(msg);
             log.debug("document parse event consumed. topic={} documentId={}",
                     TOPIC_DOCUMENT_PARSE, msg.getDocumentId());
+        } catch (ServiceException e) {
+            log.error("document parse event consumption failed. topic={} documentId={}",
+                    TOPIC_DOCUMENT_PARSE, msg.getDocumentId(), e);
+            if (e.getErrorResult() == DocumentError.DOCUMENT_REGISTER_RESOURCE_FAILED) {
+                // finalizeToReady 已置 REGISTERING_RES_TIMEOUT，跳过
+                return;
+            }
+            documentService.updateStatus(msg.getDocumentId(), new DocumentStatus(e.getMessage()));
         } catch (Exception e) {
             log.error("document parse event consumption failed. topic={} documentId={}",
                     TOPIC_DOCUMENT_PARSE, msg.getDocumentId(), e);
@@ -174,8 +184,18 @@ public class DocumentConversionAndParseConsumer {
         Files.createDirectories(dir);
         Path target = dir.resolve(documentId + "_source." + ext);
 
-        HttpRequest req = HttpRequest.newBuilder().uri(URI.create(url)).GET().build();
-        HTTP_CLIENT.send(req, HttpResponse.BodyHandlers.ofFile(target));
+        HttpRequest request = HttpRequest.newBuilder().uri(URI.create(url)).GET().build();
+        HttpResponse<Path> response;
+        try {
+            response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofFile(target));
+        } catch (Exception e) {
+            Files.deleteIfExists(target);
+            throw e;
+        }
+        if (response.statusCode() / 100 != 2) {
+            Files.deleteIfExists(target);
+            throw new IllegalStateException("媒体源文件下载失败 StatusCode=" + response.statusCode());
+        }
         return target.toFile();
     }
 
@@ -206,6 +226,18 @@ public class DocumentConversionAndParseConsumer {
         HttpResponse<Void> resp = HTTP_CLIENT.send(reqBuilder.build(), HttpResponse.BodyHandlers.discarding());
         if (resp.statusCode() / 100 != 2) {
             throw new IllegalStateException("PDF 上传至 OSS 失败 StatusCode=" + resp.statusCode());
+        }
+
+        // 直传成功后确认存储记录，避免记录长期停在 UPLOADING 靠下载时懒补偿
+        ConfirmUploadReqDTO req = ConfirmUploadReqDTO.builder()
+                .items(List.of(ConfirmUploadReqDTO.Item.builder()
+                        .objectKey(uploadInitRespDTO.getObjectKey()).size(pdfFile.length()).build()))
+                .build();
+        try {
+            remoteStorageService.confirmUpload(req);
+        } catch (Exception e) {
+            // 确认失败不阻断主流程：记录保持 UPLOADING，由下载时的懒补偿兜底
+            log.warn("document preview upload confirm failed, ignored. documentId={}", documentId, e);
         }
         return uploadInitRespDTO.getObjectKey();
     }

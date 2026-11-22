@@ -3,41 +3,41 @@ package com.oriole.wisepen.media.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
-import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
+import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.file.storage.api.domain.dto.StorageRecordDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitReqDTO;
 import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitRespDTO;
-import com.oriole.wisepen.file.storage.api.domain.mq.FileUploadedMessage;
 import com.oriole.wisepen.file.storage.api.enums.StorageSceneEnum;
 import com.oriole.wisepen.file.storage.api.feign.RemoteStorageService;
 import com.oriole.wisepen.media.api.constant.MediaConstants;
+import com.oriole.wisepen.media.api.domain.base.MediaBase;
 import com.oriole.wisepen.media.api.domain.base.MediaStatus;
+import com.oriole.wisepen.media.api.domain.base.MediaUploadMeta;
 import com.oriole.wisepen.media.api.domain.dto.req.MediaUploadInitRequest;
-import com.oriole.wisepen.media.api.domain.dto.res.MediaInfoResponse;
 import com.oriole.wisepen.media.api.domain.dto.res.MediaUploadInitResponse;
 import com.oriole.wisepen.media.api.domain.mq.MediaProcessTaskMessage;
 import com.oriole.wisepen.media.api.enums.MediaStatusEnum;
+import com.oriole.wisepen.media.domain.entity.MediaEntity;
 import com.oriole.wisepen.media.domain.entity.MediaInfoEntity;
+import com.oriole.wisepen.media.domain.entity.MediaMetaEntity;
 import com.oriole.wisepen.media.exception.MediaError;
 import com.oriole.wisepen.media.mq.KafkaMediaEventPublisher;
+import com.oriole.wisepen.media.repository.MediaEntityRepository;
 import com.oriole.wisepen.media.repository.MediaInfoRepository;
-import com.oriole.wisepen.media.service.IMediaProcessService;
+import com.oriole.wisepen.media.repository.MediaMetaRepository;
 import com.oriole.wisepen.media.service.IMediaService;
+import com.oriole.wisepen.resource.domain.dto.ResourceCreateReqDTO;
 import com.oriole.wisepen.resource.enums.ResourceType;
+import com.oriole.wisepen.resource.feign.RemoteResourceService;
 import io.opentelemetry.instrumentation.annotations.WithSpan;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ContentDisposition;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
 import java.nio.charset.StandardCharsets;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import static com.oriole.wisepen.common.core.util.LogIdUtils.summarizeIds;
 
@@ -46,10 +46,14 @@ import static com.oriole.wisepen.common.core.util.LogIdUtils.summarizeIds;
 @RequiredArgsConstructor
 public class MediaServiceImpl implements IMediaService {
 
+    private final MediaEntityRepository mediaEntityRepository;
     private final MediaInfoRepository mediaInfoRepository;
+    private final MediaMetaRepository mediaMetaRepository;
+
     private final KafkaMediaEventPublisher eventPublisher;
+
+    private final RemoteResourceService remoteResourceService;
     private final RemoteStorageService remoteStorageService;
-    private final IMediaProcessService mediaProcessService;
 
     @Override
     @WithSpan("media.upload.initialize")
@@ -94,20 +98,22 @@ public class MediaServiceImpl implements IMediaService {
             }
         }
 
-        MediaInfoEntity entity = MediaInfoEntity.builder()
+        MediaEntity entity = MediaEntity.builder()
                 .mediaId(mediaId)
-                .ownerId(uploaderId)
-                .resourceType(resourceType)
-                .originalFilename(request.getFilename())
-                .sourceExtension(extension)
-                .sourceObjectKey(uploadInitResp.getObjectKey())
-                .mountTargetTagId(request.getMountTargetTagId())
-                .uploaderGroupRoles(uploaderGroupRoles)
-                .size(mediaSize)
+                .uploadMeta(MediaUploadMeta.builder()
+                        .resourceType(resourceType)
+                        .originalFilename(request.getFilename())
+                        .sourceExtension(extension)
+                        .size(mediaSize)
+                        .uploaderId(uploaderId)
+                        .uploaderGroupRoles(uploaderGroupRoles)
+                        .mountTargetTagId(request.getMountTargetTagId())
+                        .build())
                 .mediaStatus(new MediaStatus(Boolean.TRUE.equals(uploadInitResp.getFlashUploaded())
                         ? MediaStatusEnum.UPLOADED : MediaStatusEnum.UPLOADING))
+                .sourceObjectKey(uploadInitResp.getObjectKey())
                 .build();
-        mediaInfoRepository.save(entity);
+        mediaEntityRepository.save(entity);
 
         log.info("media upload initialized. mediaId={} objectKey={} flashUploaded={}",
                 mediaId, uploadInitResp.getObjectKey(), uploadInitResp.getFlashUploaded());
@@ -127,8 +133,8 @@ public class MediaServiceImpl implements IMediaService {
     }
 
     @Override
-    public List<MediaInfoResponse> listPendingMedia(Long uploaderId) {
-        List<MediaInfoEntity> entities = mediaInfoRepository.findByOwnerIdAndStatusIn(
+    public List<MediaBase> listPendingMedia(Long uploaderId) {
+        List<MediaEntity> entities = mediaEntityRepository.findByUploaderIdAndStatusIn(
                 uploaderId,
                 List.of(MediaStatusEnum.UPLOADING,
                         MediaStatusEnum.UPLOADED,
@@ -138,12 +144,17 @@ public class MediaServiceImpl implements IMediaService {
                         MediaStatusEnum.PROCESSING,
                         MediaStatusEnum.FAILED)
         );
-        return entities.stream().map(entity -> BeanUtil.copyProperties(entity, MediaInfoResponse.class)).toList();
+        return new ArrayList<>(entities);
+    }
+
+    @Override
+    public Optional<MediaStatus> getMediaStatus(String mediaId){
+        return mediaEntityRepository.findById(mediaId).map(MediaEntity::getMediaStatus);
     }
 
     @Override
     public MediaStatus refreshMediaStatus(String mediaId) {
-        MediaInfoEntity entity = mediaInfoRepository.findById(mediaId)
+        MediaEntity entity = mediaEntityRepository.findById(mediaId)
                 .orElseThrow(() -> new ServiceException(MediaError.MEDIA_NOT_FOUND));
 
         if (entity.getMediaStatus() == null || entity.getMediaStatus().getStatus() != MediaStatusEnum.UPLOADING) {
@@ -160,46 +171,35 @@ public class MediaServiceImpl implements IMediaService {
         }
 
         if (storageRecord != null) {
-            long updated = mediaInfoRepository.markUploadedIfCurrent(
-                    mediaId,
-                    MediaStatusEnum.UPLOADING,
-                    new MediaStatus(MediaStatusEnum.UPLOADED),
-                    storageRecord.getSize() != null ? storageRecord.getSize() : entity.getSize(),
-                    storageRecord.getObjectKey());
-            if (updated > 0) {
-                eventPublisher.publishProcessTask(MediaProcessTaskMessage.builder()
-                        .mediaId(entity.getMediaId())
-                        .sourceObjectKey(storageRecord.getObjectKey())
-                        .resourceType(entity.getResourceType())
-                        .extension(entity.getSourceExtension())
-                        .build());
-                entity.setMediaStatus(new MediaStatus(MediaStatusEnum.UPLOADED));
-            } else {
-                return mediaInfoRepository.findById(mediaId)
-                        .map(MediaInfoEntity::getMediaStatus)
-                        .orElse(null);
-            }
+            entity.getUploadMeta().setSize(storageRecord.getSize() != null ? storageRecord.getSize() : entity.getUploadMeta().getSize());
+            mediaEntityRepository.save(entity);
+            mediaEntityRepository.updateStatusById(mediaId, new MediaStatus(MediaStatusEnum.UPLOADED));
+            eventPublisher.publishProcessTask(MediaProcessTaskMessage.builder()
+                    .mediaId(entity.getMediaId())
+                    .sourceObjectKey(storageRecord.getObjectKey())
+                    .resourceType(entity.getUploadMeta().getResourceType())
+                    .extension(entity.getUploadMeta().getSourceExtension())
+                    .build());
+            entity.setMediaStatus(new MediaStatus(MediaStatusEnum.UPLOADED));
         }
         return entity.getMediaStatus();
     }
 
     @Override
     public void retryMediaProcess(String mediaId) {
-        MediaInfoEntity entity = mediaInfoRepository.findById(mediaId)
+        MediaEntity entity = mediaEntityRepository.findById(mediaId)
                 .orElseThrow(() -> new ServiceException(MediaError.MEDIA_NOT_FOUND));
         MediaStatusEnum status = entity.getMediaStatus() != null ? entity.getMediaStatus().getStatus() : null;
         if (status == MediaStatusEnum.FAILED) {
-            if (mediaInfoRepository.updateStatusIfCurrent(
-                    mediaId, MediaStatusEnum.FAILED, new MediaStatus(MediaStatusEnum.UPLOADED)) > 0) {
-                eventPublisher.publishProcessTask(MediaProcessTaskMessage.builder()
-                        .mediaId(entity.getMediaId())
-                        .sourceObjectKey(entity.getSourceObjectKey())
-                        .resourceType(entity.getResourceType())
-                        .extension(entity.getSourceExtension())
-                        .build());
-            }
+            mediaEntityRepository.updateStatusById(mediaId, new MediaStatus(MediaStatusEnum.UPLOADED));
+            eventPublisher.publishProcessTask(MediaProcessTaskMessage.builder()
+                    .mediaId(entity.getMediaId())
+                    .sourceObjectKey(entity.getSourceObjectKey())
+                    .resourceType(entity.getUploadMeta().getResourceType())
+                    .extension(entity.getUploadMeta().getSourceExtension())
+                    .build());
         } else if (status == MediaStatusEnum.REGISTERING_RES_TIMEOUT) {
-            mediaProcessService.finalizeToReady(mediaId);
+            finalizeToReady(mediaId);
         } else {
             throw new ServiceException(MediaError.CANNOT_RETRY_MEDIA_PROCESS_IN_CURRENT_STATE);
         }
@@ -209,110 +209,53 @@ public class MediaServiceImpl implements IMediaService {
 
     @Override
     public void cancelMediaProcess(String mediaId) {
-        MediaInfoEntity entity = mediaInfoRepository.findById(mediaId)
+        MediaEntity entity = mediaEntityRepository.findById(mediaId)
                 .orElseThrow(() -> new ServiceException(MediaError.MEDIA_NOT_FOUND));
         MediaStatusEnum status = entity.getMediaStatus() != null ? entity.getMediaStatus().getStatus() : null;
         if (status == MediaStatusEnum.READY) {
             throw new ServiceException(MediaError.CANNOT_CANCEL_READY_MEDIA_PROCESS);
         }
-        if (status == MediaStatusEnum.PROCESSING || status == MediaStatusEnum.REGISTERING_RES) {
+        if (status == MediaStatusEnum.PROCESSING) {
             throw new ServiceException(MediaError.CANNOT_CANCEL_MEDIA_PROCESS_IN_CURRENT_STATE);
         }
 
-        // 与消费者抢占状态互斥；只有成功删除当前状态的记录后才能清理文件。
-        if (mediaInfoRepository.deleteIfStatusCurrent(mediaId, status) == 0) {
-            throw new ServiceException(MediaError.CANNOT_CANCEL_MEDIA_PROCESS_IN_CURRENT_STATE);
-        }
-
-        Set<String> objectKeys = new LinkedHashSet<>();
-        if (StrUtil.isNotBlank(entity.getSourceObjectKey())) {
-            objectKeys.add(entity.getSourceObjectKey());
-        }
-        if (entity.getSourceHlsObjectKeys() != null) {
-            entity.getSourceHlsObjectKeys().stream()
-                    .filter(StrUtil::isNotBlank)
-                    .forEach(objectKeys::add);
-        }
-        if (StrUtil.isNotBlank(entity.getPreviewObjectKey())) {
-            objectKeys.add(entity.getPreviewObjectKey());
-        }
-        if (!objectKeys.isEmpty()) {
-            eventPublisher.publishFileDeleteEvent(new ArrayList<>(objectKeys));
-        }
-        log.info("media process cancelled. mediaId={} resourceId={} status={} objectKeys={}",
-                mediaId, entity.getResourceId(), status, summarizeIds(new ArrayList<>(objectKeys)));
+        // NOTE：在PROCESSING或READY时不能终止
+        // 但由于PROCESSING可能意外失败而未能进入READY，仍需清理所有PROCESSING可能产生的资产
+        deletedMediaEntity(List.of(entity));
+        log.info("media process cancelled. mediaId={}", mediaId);
     }
 
     @Override
     public void assertMediaUploader(String mediaId, Long uploaderId) {
-        MediaInfoEntity entity = mediaInfoRepository.findById(mediaId)
+        MediaEntity entity = mediaEntityRepository.findById(mediaId)
                 .orElseThrow(() -> new ServiceException(MediaError.MEDIA_NOT_FOUND));
-        if (!uploaderId.equals(entity.getOwnerId())) {
+        if (!uploaderId.equals(entity.getUploadMeta().getUploaderId())) {
             throw new ServiceException(MediaError.MEDIA_PERMISSION_DENIED);
         }
     }
 
     @Override
-    public void handleFileUploaded(FileUploadedMessage message) {
-        if (message.getScene() != StorageSceneEnum.PRIVATE_MEDIA || Boolean.TRUE.equals(message.getFlashUploaded())) {
-            log.debug("media file upload event skipped. objectKey={} scene={} flashUploaded={} reason=\"scene mismatch or flash upload\"",
-                    message.getObjectKey(), message.getScene(), message.getFlashUploaded());
-            return;
-        }
-
-        MediaInfoEntity entity = mediaInfoRepository.findByStorageObjectKey(message.getObjectKey()).orElse(null);
-        if (entity == null) {
-            eventPublisher.publishFileDeleteEvent(List.of(message.getObjectKey()));
-            log.warn("media file upload compensated for missing media. objectKey={}", message.getObjectKey());
-            return;
-        }
-
-        if (entity.getMediaStatus() == null || entity.getMediaStatus().getStatus() != MediaStatusEnum.UPLOADING) {
-            log.debug("media file upload event skipped. mediaId={} resourceId={} objectKey={} reason=\"status mismatch\" status={}",
-                    entity.getMediaId(), entity.getResourceId(), message.getObjectKey(),
-                    entity.getMediaStatus() != null ? entity.getMediaStatus().getStatus() : null);
-            return;
-        }
-
-        long updated = mediaInfoRepository.markUploadedIfCurrent(
-                entity.getMediaId(),
-                MediaStatusEnum.UPLOADING,
-                new MediaStatus(MediaStatusEnum.UPLOADED),
-                message.getSize() != null ? message.getSize() : entity.getSize(),
-                message.getObjectKey());
-        if (updated == 0) {
-            log.debug("media upload completion ignored because status changed. mediaId={} objectKey={}",
-                    entity.getMediaId(), message.getObjectKey());
-            return;
-        }
-
-        eventPublisher.publishProcessTask(MediaProcessTaskMessage.builder()
-                .mediaId(entity.getMediaId())
-                .sourceObjectKey(message.getObjectKey())
-                .resourceType(entity.getResourceType())
-                .extension(entity.getSourceExtension())
-                .build());
-        log.info("media file upload finished. mediaId={} resourceId={} objectKey={} size={}",
-                entity.getMediaId(), entity.getResourceId(), message.getObjectKey(), message.getSize());
+    public MediaInfoEntity getMediaInfo(String resourceId) {
+        return mediaInfoRepository.findByResourceId(resourceId)
+                .orElseThrow(() -> new ServiceException(MediaError.MEDIA_NOT_FOUND));
     }
 
     @Override
-    public MediaInfoResponse getMediaInfo(String resourceId) {
-        MediaInfoEntity entity = mediaInfoRepository.findByResourceId(resourceId)
+    public MediaEntity getMedia(String resourceId) {
+        return mediaEntityRepository.findByResourceId(resourceId)
                 .orElseThrow(() -> new ServiceException(MediaError.MEDIA_NOT_FOUND));
-        return BeanUtil.copyProperties(entity, MediaInfoResponse.class);
     }
 
     @Override
     public String getOriginalDownloadUrl(String resourceId) {
-        MediaInfoEntity mediaInfo = mediaInfoRepository.findByResourceId(resourceId)
+        MediaEntity entity = mediaEntityRepository.findByResourceId(resourceId)
                 .orElseThrow(() -> new ServiceException(MediaError.MEDIA_NOT_FOUND));
-        if (mediaInfo.getMediaStatus() == null || mediaInfo.getMediaStatus().getStatus() != MediaStatusEnum.READY) {
+        if (entity.getMediaStatus() == null || entity.getMediaStatus().getStatus() != MediaStatusEnum.READY) {
             throw new ServiceException(MediaError.MEDIA_PREVIEW_NOT_READY);
         }
-        String filename = StrUtil.isNotBlank(mediaInfo.getOriginalFilename())
-                ? mediaInfo.getOriginalFilename().trim() : "media";
-        String extension = StrUtil.trim(mediaInfo.getSourceExtension());
+        String filename = StrUtil.isNotBlank(entity.getUploadMeta().getOriginalFilename())
+                ? entity.getUploadMeta().getOriginalFilename().trim() : "media";
+        String extension = StrUtil.trim(entity.getUploadMeta().getSourceExtension());
         if (StrUtil.isNotBlank(extension)
                 && !filename.toLowerCase(Locale.ROOT).endsWith("." + extension.toLowerCase(Locale.ROOT))) {
             filename = filename + "." + extension;
@@ -320,30 +263,102 @@ public class MediaServiceImpl implements IMediaService {
         String contentDisposition = ContentDisposition.attachment()
                 .filename(filename, StandardCharsets.UTF_8)
                 .build().toString();
-        return remoteStorageService.getDownloadUrl(mediaInfo.getSourceObjectKey(), null, contentDisposition).getData();
+        return remoteStorageService.getDownloadUrl(entity.getSourceObjectKey(), null, contentDisposition).getData();
     }
 
     @Override
-    public void deleteMediaByResourceIds(List<String> resourceIds) {
-        List<MediaInfoEntity> mediaInfos = mediaInfoRepository.findByResourceIdIn(resourceIds);
-        Set<String> objectKeys = new LinkedHashSet<>();
-        for (MediaInfoEntity mediaInfo : mediaInfos) {
-            if (StrUtil.isNotBlank(mediaInfo.getSourceObjectKey())) {
-                objectKeys.add(mediaInfo.getSourceObjectKey());
-            }
-            if (mediaInfo.getSourceHlsObjectKeys() != null) {
-                mediaInfo.getSourceHlsObjectKeys().stream()
-                        .filter(StrUtil::isNotBlank)
-                        .forEach(objectKeys::add);
-            }
-            if (StrUtil.isNotBlank(mediaInfo.getPreviewObjectKey())) {
-                objectKeys.add(mediaInfo.getPreviewObjectKey());
-            }
-        }
-        if (!objectKeys.isEmpty()) {
-            eventPublisher.publishFileDeleteEvent(new ArrayList<>(objectKeys));
-        }
+    public void deleteMedia(List<String> resourceIds) {
+        List<MediaEntity> entities = mediaEntityRepository.findByResourceIdIn(resourceIds);
+        deletedMediaEntity(entities);
         mediaInfoRepository.deleteByResourceIdIn(resourceIds);
         log.info("media resources deleted. count={} resourceIds={}", resourceIds.size(), summarizeIds(resourceIds));
+    }
+
+    private void deletedMediaEntity(Iterable<MediaEntity> entities) {
+        List<String> mediaIds = new ArrayList<>();
+        List<String> allObjectKeys = new ArrayList<>();
+
+        for (MediaEntity entity : entities) {
+            mediaIds.add(entity.getMediaId());
+            allObjectKeys.addAll(entity.collectObjectKeys());
+        }
+
+        // 发送 OSS 文件删除消息
+        if (!allObjectKeys.isEmpty()) {
+            eventPublisher.publishFileDeleteEvent(allObjectKeys);
+        }
+
+        // 一次操作删除所有关联记录
+        mediaMetaRepository.deleteAllById(mediaIds);
+        mediaEntityRepository.deleteAllById(mediaIds);
+
+        log.info("document versions deleted. count={} mediaIds={}", mediaIds.size(), summarizeIds(mediaIds));
+    }
+
+    @Override
+    public void updateStatus(String documentId, MediaStatus status) {
+        MediaEntity mediaEntity = mediaEntityRepository.findById(documentId)
+                .orElseThrow(() -> new ServiceException(MediaError.MEDIA_NOT_FOUND));
+        MediaStatusEnum from = mediaEntity.getMediaStatus() != null ? mediaEntity.getMediaStatus().getStatus() : null;
+        mediaEntityRepository.updateStatusById(documentId, status);
+        log.info("document status changed. documentId={} resourceId={} from={} to={}",
+                documentId, mediaEntity.getResourceId(), from, status.getStatus());
+    }
+
+    public void saveMediaProcessResult(String mediaId, String previewObjectKey,
+                                       List<MediaEntity.MediaHlsRenditionObjectKeys> hlsObjectKeys,
+                                       MediaMetaEntity meta){
+        MediaEntity entity = mediaEntityRepository.findById(mediaId)
+                .orElseThrow(() -> new ServiceException(MediaError.MEDIA_NOT_FOUND));
+        mediaEntityRepository.updatePreviewObjectKeyById(mediaId, previewObjectKey, hlsObjectKeys);
+        meta.setMediaId(mediaId);
+        mediaMetaRepository.save(meta);
+    }
+
+    @Override
+    public void finalizeToReady(String mediaId) {
+        // finalize 可被正常处理和注册补偿重试共同调用，因此保持幂等
+        MediaEntity entity = mediaEntityRepository.findById(mediaId)
+                .orElseThrow(() -> new ServiceException(MediaError.MEDIA_NOT_FOUND));
+        MediaStatusEnum currentStatus = entity.getMediaStatus() != null ? entity.getMediaStatus().getStatus() : null;
+        if (currentStatus == MediaStatusEnum.READY) {
+            return;
+        }
+        // 进入资源注册阶段后，如果远程资源服务失败，会留下 REGISTERING_RES_TIMEOUT 供重试
+        updateStatus(mediaId, new MediaStatus(MediaStatusEnum.REGISTERING_RES));
+        String resourceId = entity.getResourceId();
+        if (StrUtil.isBlank(resourceId)) {
+            try {
+                // 只有基础产物确定后才注册 resource，避免资源服务暴露未完成媒体
+                String preview = null;
+                // 资源服务的 preview 存 objectKey：图片使用预览图，视频使用封面，音频不提供预览图
+                if (entity.getUploadMeta().getResourceType() == ResourceType.IMAGE
+                        || entity.getUploadMeta().getResourceType() == ResourceType.VIDEO) {
+                    preview = entity.getPreviewObjectKey();
+                }
+                resourceId = remoteResourceService.createResource(ResourceCreateReqDTO.builder()
+                        .resourceName(entity.getUploadMeta().getOriginalFilename())
+                        .resourceType(entity.getUploadMeta().getResourceType())
+                        .ownerId(String.valueOf(entity.getUploadMeta().getUploaderId()))
+                        .ownerGroupRoles(entity.getUploadMeta().getUploaderGroupRoles())
+                        .mountTargetTagId(entity.getUploadMeta().getMountTargetTagId())
+                        .preview(preview)
+                        .size(entity.getUploadMeta().getSize())
+                        .build()).getData();
+            } catch (Exception e) {
+                updateStatus(mediaId, new MediaStatus(MediaStatusEnum.REGISTERING_RES_TIMEOUT));
+                throw new ServiceException(MediaError.MEDIA_REGISTER_RESOURCE_FAILED);
+            }
+            // 对齐 document：首次上传注册资源后新建资源级信息，再回写 resourceId
+            mediaInfoRepository.save(MediaInfoEntity.builder()
+                    .resourceId(resourceId)
+                    .ownerId(entity.getUploadMeta().getUploaderId())
+                    .build());
+            mediaEntityRepository.updateResourceIdById(mediaId, resourceId);
+        }
+
+        // 资源 ID 存在后才能将媒体标记为 READY
+        updateStatus(mediaId, new MediaStatus(MediaStatusEnum.READY));
+        log.info("media ready finalized. mediaId={} resourceId={}", mediaId, resourceId);
     }
 }
