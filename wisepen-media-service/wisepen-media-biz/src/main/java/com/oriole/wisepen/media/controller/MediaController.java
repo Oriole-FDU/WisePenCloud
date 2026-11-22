@@ -8,7 +8,6 @@ import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.media.api.constant.MediaValidationMsg;
-import com.oriole.wisepen.media.api.domain.base.MediaBase;
 import com.oriole.wisepen.media.api.domain.base.MediaStatus;
 import com.oriole.wisepen.media.api.domain.dto.req.MediaUploadInitRequest;
 import com.oriole.wisepen.media.api.domain.dto.res.MediaInfoResponse;
@@ -83,7 +82,7 @@ public class MediaController {
                     """
     )
     @GetMapping("/listPendingMedia")
-    public R<List<MediaBase>> listPendingMedia() {
+    public R<List<MediaResponse>> listPendingMedia() {
         return R.ok(mediaService.listPendingMedia(SecurityContextHolder.getUserId()));
     }
 

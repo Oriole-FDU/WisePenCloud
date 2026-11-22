@@ -11,10 +11,10 @@ import com.oriole.wisepen.file.storage.api.domain.dto.UploadInitRespDTO;
 import com.oriole.wisepen.file.storage.api.enums.StorageSceneEnum;
 import com.oriole.wisepen.file.storage.api.feign.RemoteStorageService;
 import com.oriole.wisepen.media.api.constant.MediaConstants;
-import com.oriole.wisepen.media.api.domain.base.MediaBase;
 import com.oriole.wisepen.media.api.domain.base.MediaStatus;
 import com.oriole.wisepen.media.api.domain.base.MediaUploadMeta;
 import com.oriole.wisepen.media.api.domain.dto.req.MediaUploadInitRequest;
+import com.oriole.wisepen.media.api.domain.dto.res.MediaResponse;
 import com.oriole.wisepen.media.api.domain.dto.res.MediaUploadInitResponse;
 import com.oriole.wisepen.media.api.domain.mq.MediaProcessTaskMessage;
 import com.oriole.wisepen.media.api.enums.MediaStatusEnum;
@@ -133,7 +133,7 @@ public class MediaServiceImpl implements IMediaService {
     }
 
     @Override
-    public List<MediaBase> listPendingMedia(Long uploaderId) {
+    public List<MediaResponse> listPendingMedia(Long uploaderId) {
         List<MediaEntity> entities = mediaEntityRepository.findByUploaderIdAndStatusIn(
                 uploaderId,
                 List.of(MediaStatusEnum.UPLOADING,
@@ -144,7 +144,9 @@ public class MediaServiceImpl implements IMediaService {
                         MediaStatusEnum.PROCESSING,
                         MediaStatusEnum.FAILED)
         );
-        return new ArrayList<>(entities);
+        return entities.stream()
+                .map(entity -> BeanUtil.copyProperties(entity, MediaResponse.class))
+                .toList();
     }
 
     @Override

@@ -7,4 +7,5 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 @Data
 public class MediaResponse extends MediaBase {
+    private String mediaId;
 }

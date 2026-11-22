@@ -10,7 +10,6 @@ import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.document.api.constant.DocumentConstants;
-import com.oriole.wisepen.document.api.domain.base.DocumentVersionBase;
 import com.oriole.wisepen.document.api.domain.base.DocumentStatus;
 import com.oriole.wisepen.document.api.domain.dto.req.DocumentCreateRequest;
 import com.oriole.wisepen.document.api.domain.dto.req.DocumentForkRequest;
@@ -148,7 +147,7 @@ public class DocumentController {
                     """
     )
     @GetMapping("/listPendingDocs")
-    public R<List<DocumentVersionBase>> listPendingDocs() {
+    public R<List<DocumentVersionInfoResponse>> listPendingDocs() {
         Long uploaderId = SecurityContextHolder.getUserId();
         return R.ok(documentService.listPendingDocs(uploaderId));
     }

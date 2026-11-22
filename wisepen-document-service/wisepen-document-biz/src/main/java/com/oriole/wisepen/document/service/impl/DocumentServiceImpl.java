@@ -7,7 +7,6 @@ import com.oriole.wisepen.common.core.domain.PageR;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.document.api.constant.DocumentConstants;
-import com.oriole.wisepen.document.api.domain.base.DocumentVersionBase;
 import com.oriole.wisepen.document.api.domain.base.DocumentStatus;
 import com.oriole.wisepen.document.api.domain.base.DocumentUploadMeta;
 import com.oriole.wisepen.document.api.domain.dto.req.DocumentCreateRequest;
@@ -234,7 +233,7 @@ public class DocumentServiceImpl implements IDocumentService {
     }
 
     @Override
-    public List<DocumentVersionBase> listPendingDocs(Long uploaderId) {
+    public List<DocumentVersionInfoResponse> listPendingDocs(Long uploaderId) {
         List<DocumentVersionEntity> entities = documentVersionRepository.findByUploaderIdAndStatusIn(
                 uploaderId,
                 List.of(DocumentStatusEnum.UPLOADING,
@@ -245,7 +244,9 @@ public class DocumentServiceImpl implements IDocumentService {
                         DocumentStatusEnum.FAILED
                 )
         );
-        return new ArrayList<>(entities);
+        return entities.stream()
+                .map(entity -> BeanUtil.copyProperties(entity, DocumentVersionInfoResponse.class))
+                .toList();
     }
 
     @Override

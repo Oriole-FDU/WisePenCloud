@@ -1,6 +1,5 @@
 package com.oriole.wisepen.document.service;
 
-import com.oriole.wisepen.document.api.domain.base.DocumentVersionBase;
 import com.oriole.wisepen.document.api.domain.base.DocumentStatus;
 import com.oriole.wisepen.document.api.domain.dto.req.DocumentCreateRequest;
 import com.oriole.wisepen.document.api.domain.dto.req.DocumentForkRequest;
@@ -35,7 +34,7 @@ public interface IDocumentService {
     DocumentUploadInitResponse initUploadDocumentByOnlyOffice(DocumentUploadInitRequest request, Long uploaderId, Boolean isVersioned);
 
     // 获取未就绪文档列表
-    List<DocumentVersionBase> listPendingDocs(Long uploaderId);
+    List<DocumentVersionInfoResponse> listPendingDocs(Long uploaderId);
 
     // 获取文档状态
     Optional<DocumentStatus> getDocumentStatus(String documentId);

@@ -1,8 +1,8 @@
 package com.oriole.wisepen.media.service;
 
-import com.oriole.wisepen.media.api.domain.base.MediaBase;
 import com.oriole.wisepen.media.api.domain.base.MediaStatus;
 import com.oriole.wisepen.media.api.domain.dto.req.MediaUploadInitRequest;
+import com.oriole.wisepen.media.api.domain.dto.res.MediaResponse;
 import com.oriole.wisepen.media.api.domain.dto.res.MediaUploadInitResponse;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.media.domain.entity.MediaEntity;
@@ -20,7 +20,7 @@ public interface IMediaService {
                                             Map<Long, GroupRoleType> uploaderGroupRoles);
 
     // 获取未就绪媒体列表
-    List<MediaBase> listPendingMedia(Long uploaderId);
+    List<MediaResponse> listPendingMedia(Long uploaderId);
 
     // 获取媒体状态
     Optional<MediaStatus> getMediaStatus(String mediaId);
