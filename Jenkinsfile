@@ -242,7 +242,7 @@ pipeline {
                     }
                     steps {
                         script {
-                            sh "docker build -t ${DOCKER_REGISTRY}/${PROJECT_NAME}-media:${IMAGE_TAG} -f Dockerfile --build-arg MODULE_NAME=wisepen-media-service/wisepen-media-biz ."
+                            sh "docker build -t ${DOCKER_REGISTRY}/${PROJECT_NAME}-media:${IMAGE_TAG} -f Dockerfile.media --build-arg MODULE_NAME=wisepen-media-service/wisepen-media-biz ."
                         }
                     }
                 }

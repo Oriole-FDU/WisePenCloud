@@ -1,0 +1,25 @@
+FROM openjdk:21-jdk-slim
+
+WORKDIR /app
+
+# media 服务需要 FFmpeg/FFprobe 做音视频探测与转码（含 HLS 切片）
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# 接收构建参数：传入模块的相对路径
+ARG MODULE_NAME
+
+# 复制业务 Jar 包
+COPY ${MODULE_NAME}/app.jar app.jar
+
+COPY opentelemetry-javaagent.jar /app/agent.jar
+
+# 暴露端口
+EXPOSE 8080
+
+# 使用环境变量来动态配置服务名
+ENTRYPOINT ["java", \
+            "-javaagent:/app/agent.jar", \
+            "-Dotel.traces.sampler=always_on", \
+            "-jar", "/app/app.jar"]
