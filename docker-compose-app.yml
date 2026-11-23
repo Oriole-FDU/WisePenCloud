@@ -133,6 +133,50 @@ services:
         aliases:
           - file-storage-service
 
+  media-service:
+    image: ${DOCKER_REGISTRY}/wisepencloud-media:${APP_VERSION}
+    container_name: wisepen-media-service
+    restart: always
+    environment:
+      - TZ=Asia/Shanghai
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=nacos:8848
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=nacos:8848
+      - OTEL_SERVICE_NAME=wisepen-media-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS=
+      - NACOS_USERNAME=${NACOS_USERNAME}
+      - NACOS_PASSWORD=${NACOS_PASSWORD}
+    volumes:
+      - ../logs/media:/logs
+    networks:
+      wisepen-net:
+        aliases:
+          - media-service
+
+  questionnaire-service:
+    image: ${DOCKER_REGISTRY}/wisepencloud-questionnaire:${APP_VERSION}
+    container_name: wisepen-questionnaire-service
+    restart: always
+    environment:
+      - TZ=Asia/Shanghai
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=nacos:8848
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=nacos:8848
+      - OTEL_SERVICE_NAME=wisepen-questionnaire-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - SPRING_CLOUD_INETUTILS_PREFERRED_NETWORKS=
+      - NACOS_USERNAME=${NACOS_USERNAME}
+      - NACOS_PASSWORD=${NACOS_PASSWORD}
+    volumes:
+      - ../logs/questionnaire:/logs
+    networks:
+      wisepen-net:
+        aliases:
+          - questionnaire-service
+
   fudan-extension-service:
     image: ${DOCKER_REGISTRY}/wisepencloud-fudan-extension:${APP_VERSION}
     container_name: wisepen-fudan-extension-service

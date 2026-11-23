@@ -29,6 +29,8 @@ pipeline {
         booleanParam(name: 'DEPLOY_AI_ASSET_SERVICE', defaultValue: true, description: '构建并部署 ai-asset-service')
         booleanParam(name: 'DEPLOY_WEB_APP_SERVICE', defaultValue: true, description: '构建并部署 web-app-service')
         booleanParam(name: 'DEPLOY_FILE_STORAGE_SERVICE', defaultValue: true, description: '构建并部署 file-storage-service')
+        booleanParam(name: 'DEPLOY_MEDIA_SERVICE', defaultValue: true, description: '构建并部署 media-service')
+        booleanParam(name: 'DEPLOY_QUESTIONNAIRE_SERVICE', defaultValue: true, description: '构建并部署 questionnaire-service')
         booleanParam(name: 'DEPLOY_FUDAN_EXTENSION_SERVICE', defaultValue: true, description: '构建并部署 fudan-extension-service')
     }
 
@@ -78,6 +80,12 @@ pipeline {
                     }
                     if (params.DEPLOY_FILE_STORAGE_SERVICE) {
                         selectedServices << 'file-storage-service'
+                    }
+                    if (params.DEPLOY_MEDIA_SERVICE) {
+                        selectedServices << 'media-service'
+                    }
+                    if (params.DEPLOY_QUESTIONNAIRE_SERVICE) {
+                        selectedServices << 'questionnaire-service'
                     }
                     if (params.DEPLOY_FUDAN_EXTENSION_SERVICE) {
                         selectedServices << 'fudan-extension-service'
@@ -228,6 +236,26 @@ pipeline {
                         }
                     }
                 }
+                stage('Media Service') {
+                    when {
+                        expression { return params.DEPLOY_MEDIA_SERVICE }
+                    }
+                    steps {
+                        script {
+                            sh "docker build -t ${DOCKER_REGISTRY}/${PROJECT_NAME}-media:${IMAGE_TAG} -f Dockerfile --build-arg MODULE_NAME=wisepen-media-service/wisepen-media-biz ."
+                        }
+                    }
+                }
+                stage('Questionnaire Service') {
+                    when {
+                        expression { return params.DEPLOY_QUESTIONNAIRE_SERVICE }
+                    }
+                    steps {
+                        script {
+                            sh "docker build -t ${DOCKER_REGISTRY}/${PROJECT_NAME}-questionnaire:${IMAGE_TAG} -f Dockerfile --build-arg MODULE_NAME=wisepen-questionnaire-service/wisepen-questionnaire-biz ."
+                        }
+                    }
+                }
                 stage('Fudan Extension Service') {
                     when {
                         expression { return params.DEPLOY_FUDAN_EXTENSION_SERVICE }
@@ -283,6 +311,8 @@ pipeline {
                                     ai-asset-service) image_name=ai-asset ;;
                                     web-app-service) image_name=web-app ;;
                                     file-storage-service) image_name=file-storage ;;
+                                    media-service) image_name=media ;;
+                                    questionnaire-service) image_name=questionnaire ;;
                                     fudan-extension-service) image_name=fudan-extension ;;
                                     *) echo "未知服务: $service"; exit 1 ;;
                                 esac
@@ -332,6 +362,8 @@ pipeline {
                             ai-asset-service) container_name=wisepen-ai-asset-service ;;
                             web-app-service) container_name=wisepen-web-app-service ;;
                             file-storage-service) container_name=wisepen-file-storage-service ;;
+                            media-service) container_name=wisepen-media-service ;;
+                            questionnaire-service) container_name=wisepen-questionnaire-service ;;
                             fudan-extension-service) container_name=wisepen-fudan-extension-service ;;
                             *) echo "未知 Compose 服务: \$service"; exit 1 ;;
                         esac
