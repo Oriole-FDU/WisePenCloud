@@ -27,6 +27,9 @@ public class ResourceInlineCommentItemBase {
     @Builder.Default
     private List<String> mentionUserIds = new ArrayList<>();
 
+    /** true 表示该消息由 AI 代笔生成 */
+    private Boolean aiAuthored;
+
     @Builder.Default
     private Map<String, List<ResourceInlineCommentItemReactionBase>> reactions = new HashMap<>();
 

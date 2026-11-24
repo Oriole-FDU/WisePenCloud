@@ -62,6 +62,7 @@ public class ResourceCommentServiceImpl implements IResourceCommentService {
                 .resourceId(resourceId).authorId(operatorUserId)
                 .content(request.getContent()).imageUrls(request.getImageUrls())
                 .commentType(CommentType.COMMENT)
+                .aiAuthored(request.getAiAuthored())
                 .build();
         comment = commentRepository.save(comment);
         // 新增资源评论计数
@@ -101,6 +102,7 @@ public class ResourceCommentServiceImpl implements IResourceCommentService {
                 .content(request.getContent()).imageUrls(request.getImageUrls())
                 .replyToUserId(replyToComment.getAuthorId()).replyTo(replyToComment.getCommentId()).rootCommentId(rootCommentId)
                 .commentType(replyType)
+                .aiAuthored(request.getAiAuthored())
                 .build();
         reply = commentRepository.save(reply);
 

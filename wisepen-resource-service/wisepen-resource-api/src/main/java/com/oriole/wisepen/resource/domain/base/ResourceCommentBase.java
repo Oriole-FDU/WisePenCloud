@@ -30,4 +30,7 @@ public class ResourceCommentBase {
     private Integer replyCount = 0;
 
     private CommentType commentType;
+
+    /** true 表示该评论由 AI 代笔生成 */
+    private Boolean aiAuthored;
 }

@@ -13,4 +13,7 @@ public class CommentCreateRequest {
     @NotBlank
     private String content;
     private List<String> imageUrls = new ArrayList<>();
+
+    /** true 表示该评论由 AI 代笔生成 */
+    private Boolean aiAuthored;
 }

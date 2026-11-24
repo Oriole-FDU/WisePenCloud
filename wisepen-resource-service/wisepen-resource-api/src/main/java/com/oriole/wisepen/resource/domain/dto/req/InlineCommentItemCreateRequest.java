@@ -22,4 +22,7 @@ public class InlineCommentItemCreateRequest {
     private List<String> imageUrls = new ArrayList<>();
 
     private List<String> mentionUserIds = new ArrayList<>();
+
+    /** true 表示该消息由 AI 代笔生成 */
+    private Boolean aiAuthored;
 }

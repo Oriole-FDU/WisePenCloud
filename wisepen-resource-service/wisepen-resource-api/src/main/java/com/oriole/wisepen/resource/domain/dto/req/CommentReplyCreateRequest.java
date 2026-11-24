@@ -16,4 +16,7 @@ public class CommentReplyCreateRequest {
     @NotBlank
     private String content;
     private List<String> imageUrls = new ArrayList<>();
+
+    /** true 表示该回复由 AI 代笔生成 */
+    private Boolean aiAuthored;
 }
