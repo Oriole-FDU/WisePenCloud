@@ -205,7 +205,7 @@ public class SingleHtmlPageController {
                     - 用途：读取页面当前版本或指定历史版本的完整 HTML，供受控页面容器加载。
                     - 请求：resourceId 指定页面资源；targetVersion 可选，未传时读取当前版本。
                     - 约束：当前用户必须已登录并拥有目标版本 VIEW 动作；指定版本必须存在。
-                    - 处理：通过资源服务校验 VIEW 权限，从对象存储读取并校验内容摘要后输出 HTML 正文，同时附加 sandbox CSP、禁止缓存和禁止 MIME 嗅探等安全响应头；不修改页面或版本。
+                    - 处理：通过资源服务校验 VIEW 权限，从对象存储读取并校验内容摘要后输出 HTML 正文；输出前将 WisePen UI 样式外链内联进正文，同时附加 sandbox CSP、禁止缓存和禁止 MIME 嗅探等安全响应头；不修改页面或版本。
                     - 失败：没有 VIEW 动作 -> WebAppError.SINGLE_HTML_PAGE_PERMISSION_DENIED；页面不存在 -> WebAppError.SINGLE_HTML_PAGE_NOT_FOUND；版本不存在 -> WebAppError.SINGLE_HTML_PAGE_VERSION_NOT_FOUND；对象存储内容读取或摘要校验失败 -> WebAppError.SINGLE_HTML_PAGE_CONTENT_READ_FAILED。
                     - 响应：返回 text/html;charset=UTF-8 的页面正文。
                     """

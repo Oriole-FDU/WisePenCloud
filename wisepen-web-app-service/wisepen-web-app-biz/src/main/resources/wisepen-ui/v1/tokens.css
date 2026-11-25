@@ -1,6 +1,6 @@
 /*
  * WisePen UI v1 tokens and component styles.
- * 由 Web App Service 以固定版本提供；内嵌 HTML 只引用样式地址，不复制或改写本文件。
+ * 由 Web App Service 以固定版本提供；平台 HTML 只引用样式地址，服务端输出时内联当前版本内容。
  * v1 发布后保持向后兼容；不兼容调整应新增版本。
  */
 

@@ -28,6 +28,7 @@ import com.oriole.wisepen.web.app.exception.WebAppError;
 import com.oriole.wisepen.web.app.repository.SingleHtmlPageRepository;
 import com.oriole.wisepen.web.app.repository.SingleHtmlPageVersionRepository;
 import com.oriole.wisepen.web.app.service.ISingleHtmlPageService;
+import com.oriole.wisepen.web.app.util.WisePenUiStyleInliner;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -55,6 +56,7 @@ public class SingleHtmlPageServiceImpl implements ISingleHtmlPageService {
     private final RemoteResourceService remoteResourceService;
     private final RemoteStorageService remoteStorageService;
     private final WebAppProperties webAppProperties;
+    private final WisePenUiStyleInliner wisePenUiStyleInliner;
 
     @Override
     public String createSingleHtmlPage(SingleHtmlPageCreateRequest request, Long ownerUserId,
@@ -278,7 +280,7 @@ public class SingleHtmlPageServiceImpl implements ISingleHtmlPageService {
         if (content == null) {
             throw new ServiceException(WebAppError.SINGLE_HTML_PAGE_CONTENT_READ_FAILED);
         }
-        return new String(content, StandardCharsets.UTF_8);
+        return wisePenUiStyleInliner.inline(new String(content, StandardCharsets.UTF_8));
     }
 
     @Override
