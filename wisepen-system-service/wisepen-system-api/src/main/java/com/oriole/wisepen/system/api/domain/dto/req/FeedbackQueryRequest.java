@@ -2,7 +2,6 @@ package com.oriole.wisepen.system.api.domain.dto.req;
 
 import com.oriole.wisepen.system.api.enums.FeedbackStatus;
 import com.oriole.wisepen.system.api.enums.FeedbackType;
-import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -23,7 +22,6 @@ public class FeedbackQueryRequest {
     @Max(100)
     private int size = 20;
 
-    @Schema(description = "反馈类型集合，命中任一类型即可；不传或空集合时不限类型")
     private Set<@NotNull FeedbackType> type;
     private FeedbackStatus status;
 
@@ -37,7 +35,6 @@ public class FeedbackQueryRequest {
     private LocalDateTime endTime;
 
     @AssertTrue(message = "开始时间不能晚于结束时间")
-    @Schema(hidden = true)
     public boolean isTimeRangeValid() {
         return startTime == null || endTime == null || !startTime.isAfter(endTime);
     }
