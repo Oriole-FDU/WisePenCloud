@@ -4,9 +4,11 @@ import com.oriole.wisepen.common.core.context.SecurityContextHolder;
 import com.oriole.wisepen.common.core.domain.R;
 import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.core.domain.enums.IdentityType;
+import com.oriole.wisepen.common.core.exception.ServiceException;
 import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.security.annotation.CheckRole;
 import com.oriole.wisepen.note.api.domain.dto.res.NoteSnapshotResponse;
+import com.oriole.wisepen.note.exception.NoteError;
 import com.oriole.wisepen.note.service.INoteVersionService;
 import com.oriole.wisepen.resource.domain.dto.req.MarketSaleVersionCheckRequest;
 import com.oriole.wisepen.resource.feign.RemoteResourceService;
@@ -41,7 +43,7 @@ public class AdminNoteController {
                     - 请求：resourceId 与 marketGroupId 指定集市资源；offerVersion 指定售卖版本。
                     - 约束：当前用户必须是平台管理员；集市销售信息必须存在且 offerVersion 必须匹配当前版本；笔记指定版本必须存在。
                     - 处理：先校验集市资源版本，再返回该版本对应的最近 FULL 快照及后续 DELTA 链；不修改笔记内容或资源权限。
-                    - 失败：当前身份不是平台管理员 -> PermissionError.UNAUTHORIZED；资源不存在 -> ResourceError.RESOURCE_NOT_FOUND；集市销售信息不存在 -> ResourceError.MARKET_SALE_INFO_NOT_FOUND；售卖版本已变化 -> ResourceError.MARKET_AUDIT_VERSION_CONFLICT；笔记或指定版本不存在 -> NoteError.NOTE_NOT_FOUND。
+                    - 失败：当前身份不是平台管理员 -> PermissionError.UNAUTHORIZED；资源不存在、集市销售信息不存在或售卖版本已变化 -> NoteError.NOTE_MARKET_VERSION_CHECK_FAILED；笔记或指定版本不存在 -> NoteError.NOTE_NOT_FOUND。
                     - 响应：返回 Base64 编码的 fullSnapshot 和 deltas，供笔记客户端恢复该版本。
                     """
     )
@@ -52,11 +54,14 @@ public class AdminNoteController {
             @RequestParam(value = "resourceId") @NotBlank String resourceId,
             @RequestParam(value = "marketGroupId") @NotBlank String marketGroupId,
             @RequestParam(value = "offerVersion") @Min(1) Integer offerVersion) {
-        remoteResourceService.assertMarketSaleVersion(MarketSaleVersionCheckRequest.builder()
+        R<Void> versionCheck = remoteResourceService.assertMarketSaleVersion(MarketSaleVersionCheckRequest.builder()
                 .resourceId(resourceId)
                 .marketGroupId(marketGroupId)
                 .offerVersion(offerVersion)
                 .build());
+        if (versionCheck == null || versionCheck.getCode() == null || versionCheck.getCode() != 200) {
+            throw new ServiceException(NoteError.NOTE_MARKET_VERSION_CHECK_FAILED);
+        }
 
         String operatorId = SecurityContextHolder.getUserId().toString();
         log.info("admin market note snapshot accessed. resourceId={} marketGroupId={} offerVersion={} operatorId={}",

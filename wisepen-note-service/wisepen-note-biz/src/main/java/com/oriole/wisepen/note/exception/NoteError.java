@@ -20,6 +20,7 @@ public enum NoteError implements IResult {
     NOTE_PERMISSION_DENIED(8121, new ResultKey(BusinessDomain.NOTE, NoteSubject.NOTE, ErrorReason.PERMISSION_DENIED), "无权访问或操作该资源"),
     NOTE_REGISTER_RESOURCE_FAILED(8131, new ResultKey(BusinessDomain.NOTE, NoteSubject.NOTE, ErrorReason.FAILED), "注册笔记资源失败"),
     NOTE_FORK_FAILED(8132, new ResultKey(BusinessDomain.NOTE, NoteSubject.NOTE, ErrorReason.FAILED), "笔记复制失败"),
+    NOTE_MARKET_VERSION_CHECK_FAILED(8133, new ResultKey(BusinessDomain.NOTE, NoteSubject.NOTE, ErrorReason.FAILED), "集市笔记版本校验失败"),
     CANNOT_SUPPORT_NOTE_RESOURCE_TYPE(8141, new ResultKey(BusinessDomain.NOTE, NoteSubject.NOTE, ErrorReason.UNSUPPORTED), "不能处理该资源类型");
 
     private final Integer code;
