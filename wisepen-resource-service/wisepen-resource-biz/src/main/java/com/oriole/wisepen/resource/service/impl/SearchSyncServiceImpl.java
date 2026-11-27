@@ -14,7 +14,6 @@ import com.oriole.wisepen.resource.domain.entity.ResourceItemEntity;
 import com.oriole.wisepen.resource.enums.ResourceType;
 import com.oriole.wisepen.resource.enums.UpsertField;
 import com.oriole.wisepen.resource.exception.ResourceError;
-import com.oriole.wisepen.resource.repository.ESIndexRepository;
 import com.oriole.wisepen.resource.repository.MarketESIndexRepository;
 import com.oriole.wisepen.resource.service.ISearchSyncService;
 import com.oriole.wisepen.resource.util.SearchTextSanitizer;
@@ -26,6 +25,7 @@ import org.springframework.data.elasticsearch.core.document.Document;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
 import org.springframework.data.elasticsearch.core.query.Criteria;
 import org.springframework.data.elasticsearch.core.query.CriteriaQuery;
+import org.springframework.data.elasticsearch.core.query.ScriptType;
 import org.springframework.data.elasticsearch.core.query.UpdateQuery;
 import org.springframework.stereotype.Service;
 
@@ -41,7 +41,6 @@ import java.util.Map;
 public class SearchSyncServiceImpl implements ISearchSyncService {
 
     private final ElasticsearchOperations elasticsearchOperations;
-    private final ESIndexRepository esIndexRepository;
     private final MarketESIndexRepository marketESIndexRepository;
     private final RemoteDocumentService remoteDocumentService;
     private final RemoteNoteService remoteNoteService;
@@ -62,11 +61,78 @@ public class SearchSyncServiceImpl implements ISearchSyncService {
     @Override
     public void deleteResourceIndex(String resourceId) {
         try {
-            esIndexRepository.deleteById(resourceId);
+            elasticsearchOperations.update(UpdateQuery.builder(resourceId)
+                    .withScript("ctx._source.clear(); ctx._source.deleted = true;")
+                    .withScriptType(ScriptType.INLINE)
+                    .withUpsert(Document.create())
+                    .withScriptedUpsert(true)
+                    .withRetryOnConflict(3)
+                    .build(), INDEX);
             log.info("search document deleted. resourceId={}", resourceId);
         } catch (Exception e) {
             log.warn("search document delete failed. resourceId={}", resourceId, e);
         }
+    }
+
+    public void prepareCourseSearchMapping() {
+        IndexOperations index = elasticsearchOperations.indexOps(ESIndexEntity.class);
+        boolean acknowledged = index.exists() ? index.putMapping() : index.createWithMapping();
+        if (!acknowledged) {
+            throw new ServiceException(ResourceError.RESOURCE_SEARCH_FAILED);
+        }
+    }
+
+    public void backfillCourseMetadata(ResourceItemEntity resource) {
+        ESIndexEntity entity = new ESIndexEntity(resource);
+        Map<String, Object> defaults = new HashMap<>();
+        defaults.put("resourceId", entity.getResourceId());
+        defaults.put("resourceName", entity.getResourceName());
+        defaults.put("resourceType", entity.getResourceType());
+        defaults.put("updateTime", entity.getUpdateTime().truncatedTo(ChronoUnit.MILLIS)
+                .format(DateTimeFormatter.ofPattern(SearchConstants.ES_DATE_FORMAT_PATTERN)));
+        writeIndexFields(entity.getResourceId(), Map.of(), courseFields(entity), defaults);
+    }
+
+    private Map<String, Object> courseFields(ESIndexEntity entity) {
+        return Map.of(
+                "courseSpecifiedUsers", entity.getCourseSpecifiedUsers(),
+                "courseDiscoverUsers", entity.getCourseDiscoverUsers(),
+                "courseViewUsers", entity.getCourseViewUsers(),
+                "courseGroupBinds", entity.getCourseGroupBinds(),
+                "courseProjectionVersion", entity.getCourseProjectionVersion(),
+                "ownerId", entity.getOwnerId());
+    }
+
+    private void writeIndexFields(String id, Map<String, Object> fields, Map<String, Object> course,
+                                  Map<String, Object> defaults) {
+        // 已删除的资源 ID 不会重用。保留删除标记，避免迟到事件或回填重新写出索引。
+        var update = UpdateQuery.builder(id).withScript("""
+                if (ctx._source.deleted == true) {
+                  ctx.op = 'noop';
+                } else {
+                  for (entry in params.defaults.entrySet()) {
+                    if (ctx._source[entry.getKey()] == null) {
+                      ctx._source[entry.getKey()] = entry.getValue();
+                    }
+                  }
+                  ctx._source.putAll(params.fields);
+                  if (!params.course.isEmpty()) {
+                    def version = ctx._source.courseProjectionVersion;
+                    def sourceVersion = params.course.courseProjectionVersion;
+                    if (version == null || version < sourceVersion
+                        || (!params.fields.isEmpty() && version == sourceVersion)) {
+                      ctx._source.putAll(params.course);
+                    }
+                  }
+                }
+                """)
+                .withScriptType(ScriptType.INLINE)
+                .withParams(Map.of("fields", fields, "course", course, "defaults", defaults))
+                .withUpsert(Document.create())
+                .withScriptedUpsert(true)
+                .withRetryOnConflict(3)
+                .build();
+        elasticsearchOperations.update(update, INDEX);
     }
 
     private void executeESUpsert(ESIndexEntity entity, EnumSet<UpsertField> fields) {
@@ -98,18 +164,13 @@ public class SearchSyncServiceImpl implements ISearchSyncService {
             if (fields.contains(UpsertField.CONTENT) && entity.getContent() != null) {
                 doc.put("content", entity.getContent());
             }
+            Map<String, Object> acl = Map.of();
             if (fields.contains(UpsertField.ACL)) {
-                doc.put("ownerId", entity.getOwnerId());
-                doc.put("specifiedDiscoverUsers", entity.getSpecifiedDiscoverUsers());
-                doc.put("computedGroupAcls", entity.getComputedGroupAcls());
+                acl = new HashMap<>(courseFields(entity));
+                acl.put("specifiedDiscoverUsers", entity.getSpecifiedDiscoverUsers());
+                acl.put("computedGroupAcls", entity.getComputedGroupAcls());
             }
-
-            UpdateQuery updateQuery = UpdateQuery.builder(entity.getResourceId())
-                    .withDocument(Document.from(doc))
-                    .withDocAsUpsert(true)
-                    .build();
-
-            elasticsearchOperations.update(updateQuery, INDEX);
+            writeIndexFields(entity.getResourceId(), doc, acl, Map.of());
             log.debug("search document upsert succeeded. resourceId={} fields={}", entity.getResourceId(), fields);
         } catch (Exception e) {
             log.error("search document upsert failed. resourceId={} fields={}", entity.getResourceId(), fields, e);

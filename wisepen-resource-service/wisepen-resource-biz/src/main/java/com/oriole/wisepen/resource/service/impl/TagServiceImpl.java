@@ -163,12 +163,17 @@ public class TagServiceImpl implements ITagService {
             }
             int taggedResourceGrantedActionsMask = entity.getTaggedResourceGrantedActionsMask() == null ? 0 : entity.getTaggedResourceGrantedActionsMask();
             tagTreeResponse.setGrantedActions(ResourceAction.permissionCodeToActions(taggedResourceGrantedActionsMask));
-            tagTreeResponse.setChildren(new ArrayList<>());
             return tagTreeResponse;
         }).collect(Collectors.toList());
 
-        // 在内存中组装树状结构 (比在 DB 中递归查快得多)
-        return buildTree(tagTreeResponseList, "0");
+        Map<String, List<TagTreeResponse>> childrenByParent = new HashMap<>();
+        for (TagTreeResponse node : tagTreeResponseList) {
+            childrenByParent.computeIfAbsent(node.getParentId(), key -> new ArrayList<>()).add(node);
+        }
+        for (TagTreeResponse node : tagTreeResponseList) {
+            node.setChildren(childrenByParent.getOrDefault(node.getTagId(), Collections.emptyList()));
+        }
+        return childrenByParent.getOrDefault("0", Collections.emptyList());
     }
 
     @Override
@@ -559,14 +564,6 @@ public class TagServiceImpl implements ITagService {
 
     private static boolean isSystemPathTagName(String tagName) {
         return ResourceConstants.PERSONAL_SYSTEM_PATH_TAG_NAMES.contains(tagName);
-    }
-
-    // 内存组装树
-    private List<TagTreeResponse> buildTree(List<TagTreeResponse> allNodes, String parentId) {
-        return allNodes.stream()
-                .filter(node -> parentId.equals(node.getParentId()))
-                .peek(node -> node.setChildren(buildTree(allNodes, node.getTagId())))
-                .collect(Collectors.toList());
     }
 
     private void afterTagNodeChanged(String groupId, String tagId, Boolean isPersonalTag) {
