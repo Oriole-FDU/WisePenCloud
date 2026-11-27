@@ -7,12 +7,14 @@ import com.oriole.wisepen.common.core.domain.enums.BusinessType;
 import com.oriole.wisepen.common.core.domain.enums.GroupRoleType;
 import com.oriole.wisepen.common.log.annotation.Log;
 import com.oriole.wisepen.common.security.annotation.CheckRole;
+import com.oriole.wisepen.resource.domain.dto.res.CourseResourceSearchResponse;
 import com.oriole.wisepen.resource.domain.dto.res.MarketSearchHitItemResponse;
 import com.oriole.wisepen.resource.domain.dto.res.SearchHitItemResponse;
 import com.oriole.wisepen.resource.enums.MarketSaleStatus;
 import com.oriole.wisepen.resource.enums.ResourceType;
 import com.oriole.wisepen.resource.enums.SearchScope;
 import com.oriole.wisepen.resource.service.ISearchQueryService;
+import com.oriole.wisepen.resource.service.impl.CourseOutlineResourceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +34,26 @@ import java.util.Map;
 public class SearchController {
 
     private final ISearchQueryService searchQueryService;
+    private final CourseOutlineResourceService courseOutlineResourceService;
 
+    @Operation(summary = "搜索课内资源", description = """
+            - 用途：检索当前课程大纲下的可见资源。
+            - 请求：groupId 和 keyword 必填。关键词去除首尾空白后长度须为 1 至 200。cursor 为同一查询上一页返回的游标。size 默认为 20，范围为 1 至 100。
+            - 约束：调用者须为课程组成员。
+            - 处理：按当前大纲挂载和权限返回结果，有阅读权限时搜索正文并返回片段。
+            - 失败：不是课程组成员 -> PermissionError.PERMISSION_DENIED。关键词、游标或分页大小无效 -> CommonError.REQUEST_PARAM_INVALID。课程大纲根标签失效 -> ResourceError.TAG_NODE_NOT_FOUND。搜索服务执行失败 -> ResourceError.RESOURCE_SEARCH_FAILED。
+            - 响应：资源列表和下一页游标。尚未设置大纲时返回空列表。游标为 null 表示搜索结束，空列表带游标时仍可继续查询。
+            """)
+    @GetMapping("/searchCourseResources")
+    public R<CourseResourceSearchResponse> searchCourseResources(
+            @RequestParam("groupId") Long groupId,
+            @RequestParam("keyword") String keyword,
+            @RequestParam(value = "cursor", required = false) String cursor,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
+        GroupRoleType role = SecurityContextHolder.assertInGroup(groupId);
+        return R.ok(courseOutlineResourceService.search(groupId,
+                SecurityContextHolder.getUserId().toString(), role, keyword, cursor, size));
+    }
     @Operation(
             summary = "全文搜索资源",
             description = """

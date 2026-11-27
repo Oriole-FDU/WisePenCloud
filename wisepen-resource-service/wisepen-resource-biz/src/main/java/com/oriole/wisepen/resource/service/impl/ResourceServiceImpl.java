@@ -44,6 +44,7 @@ import com.oriole.wisepen.user.api.feign.RemoteUserService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.bson.Document;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Lazy;
@@ -51,6 +52,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -61,6 +63,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -870,15 +873,37 @@ public class ResourceServiceImpl implements IResourceService {
     public Optional<ResourceItemEntity> calculateResourceGroupAcl(String resourceId) {
         long start = System.currentTimeMillis();
         log.debug("acl recalculation started. resourceId={}", resourceId);
-        // 获取资源绑定记录
-        ResourceItemEntity bindEntity = resourceItemRepository.findByResourceId(resourceId)
-                .orElse(null);
+        Query activeResource = Query.query(Criteria.where("_id").is(resourceId).and("deletedAt").is(null));
+        for (int attempt = 0; attempt < 3; attempt++) {
+            Document source = mongoTemplate.query(ResourceItemEntity.class).as(Document.class)
+                    .matching(activeResource).firstValue();
+            if (source == null) return Optional.empty();
 
-        if (bindEntity == null) {
-            log.warn("acl recalculation skipped. resourceId={}", resourceId);
-            return Optional.empty();
+            ResourceItemEntity resource = mongoTemplate.getConverter().read(ResourceItemEntity.class, source);
+            Map<String, ComputedGroupAcl> computedGroupAcls = computeGroupAcls(resource);
+            LocalDateTime latest = LocalDateTime.now().truncatedTo(ChronoUnit.MILLIS);
+            LocalDateTime previous = resource.getUpdateTime();
+            if (previous != null && !latest.isAfter(previous)) latest = previous.plus(1, ChronoUnit.MILLIS);
+            // 用原始字段做条件更新，旧文档可能没有 Java 模型中的默认字段。
+            Query query = Query.query(Criteria.where("_id").is(source.get("_id"))
+                    .and("deletedAt").is(null)
+                    .and("updateTime").is(source.get("updateTime"))
+                    .and("groupBinds").is(source.get("groupBinds"))
+                    .and("overrideGrantedActionsMask").is(source.get("overrideGrantedActionsMask"))
+                    .and("specifiedUsersGrantedActionsMask").is(source.get("specifiedUsersGrantedActionsMask")));
+            Update update = new Update().set("computedGroupAcls", computedGroupAcls).set("updateTime", latest);
+            ResourceItemEntity updated = mongoTemplate.findAndModify(query, update,
+                    FindAndModifyOptions.options().returnNew(true), ResourceItemEntity.class);
+            if (updated != null) {
+                log.debug("acl recalculation finished. resourceId={} groupCount={} costMs={}",
+                        resourceId, computedGroupAcls.size(), System.currentTimeMillis() - start);
+                return Optional.of(updated);
+            }
         }
+        throw new IllegalStateException("ACL recalculation conflicted for resourceId=" + resourceId);
+    }
 
+    Map<String, ComputedGroupAcl> computeGroupAcls(ResourceItemEntity bindEntity) {
         Map<String, ComputedGroupAcl> computedGroupAcls = new HashMap<>();
 
         if (bindEntity.getGroupBinds() != null && !bindEntity.getGroupBinds().isEmpty()) {
@@ -920,10 +945,6 @@ public class ResourceServiceImpl implements IResourceService {
                 // 查询所有 Tag 详情
                 List<TagEntity> tags = tagRepository.findAllById(groupBind.getTagIds());
 
-                // Tag 详情传递至 groupBind，供后续使用
-                // TODO: groupBind.tags 暂无后续使用
-                groupBind.setTags(tags);
-
                 // 提取首标
                 TagEntity primaryTag = tags.stream().filter(
                         tagEntity -> tagEntity.getTagId().equals(groupBind.getTagIds().getFirst())
@@ -961,17 +982,7 @@ public class ResourceServiceImpl implements IResourceService {
             }
         }
 
-        Query query = new Query(Criteria.where("_id").is(resourceId));
-        Update update = new Update()
-                .set("computedGroupAcls", computedGroupAcls)
-                .set("updateTime", LocalDateTime.now());
-        mongoTemplate.updateFirst(query, update, ResourceItemEntity.class);
-        log.debug("acl recalculation finished. resourceId={} groupCount={} costMs={}",
-                resourceId, computedGroupAcls.size(), System.currentTimeMillis() - start);
-
-        bindEntity.setComputedGroupAcls(computedGroupAcls);
-        bindEntity.setUpdateTime(LocalDateTime.now());
-        return Optional.of(bindEntity);
+        return computedGroupAcls;
     }
 
     @Override
@@ -1096,25 +1107,49 @@ public class ResourceServiceImpl implements IResourceService {
 
             ResolvedTagPermission resolved = resolveTagAclGrantConfig(primaryTag, defaultActions);
 
-            // 使用 TaggedResourceAclGrantScope 判断用户是否能获取当前组的权限掩码
-            boolean isEligibleForMask = (resolved.taggedResourceAclGrantScope == AccessControlScope.ALL ||
-                    (resolved.taggedResourceAclGrantScope == AccessControlScope.WHITELIST && resolved.taggedResourceAclGrantSpecifiedUsers.contains(dto.getUserId().toString())) ||
-                    (resolved.taggedResourceAclGrantScope == AccessControlScope.BLACKLIST && !resolved.taggedResourceAclGrantSpecifiedUsers.contains(dto.getUserId().toString())));
-
-            if (isEligibleForMask && resolved.taggedResourceGrantedActionsMask != 0 ) {
+            int memberMask = grantedTagActions(resolved, dto.getUserId().toString());
+            if (memberMask != 0) {
                 // 只要有一个组能下发权限（无权限(0)不在此列），基础身份就是 GROUP_MEMBER
                 if (resourceAccessRole == ResourceAccessRole.NONE) {
                     resourceAccessRole = ResourceAccessRole.GROUP_MEMBER;
                 }
                 permissionSources.add(groupBind.getGroupId());
                 // 累加普通成员在不同小组下获得的权限 (按位或)
-                actionsMask |= resolved.taggedResourceGrantedActionsMask;
+                actionsMask |= memberMask;
             }
         }
 
         // 合并 actionsMask 和 marketActionsMask
         return logResolved(dto, new ResourceCheckPermissionResDTO(resourceAccessRole, permissionSources,
                 ResourceAction.permissionCodeToActions(actionsMask | marketActionsMask)));
+    }
+
+    public int getCourseResourceActions(ResourceItemEntity entity, GroupTagBind bind, String userId,
+                                        GroupRoleType role, int defaultActions, Map<String, TagEntity> tags) {
+        if (userId.equals(entity.getOwnerId())) return ResourceAction.ALL_ACTIONS;
+
+        Integer specified = entity.getSpecifiedUsersGrantedActionsMask() == null ? null
+                : entity.getSpecifiedUsersGrantedActionsMask().get(userId);
+        if (specified != null) return specified;
+        if (role == GroupRoleType.OWNER || role == GroupRoleType.ADMIN) return ResourceAction.ALL_ACTIONS;
+
+        Integer override = entity.getOverrideGrantedActionsMask() == null ? null
+                : entity.getOverrideGrantedActionsMask().get(bind.getGroupId());
+        if (override != null) return override;
+
+        TagEntity primaryTag = tags.get(bind.getTagIds().getFirst());
+        if (primaryTag == null) return 0;
+        return grantedTagActions(resolveTagAclGrantConfig(primaryTag, defaultActions, tags), userId);
+    }
+
+    private int grantedTagActions(ResolvedTagPermission resolved, String userId) {
+        boolean allowed = switch (resolved.taggedResourceAclGrantScope) {
+            case ALL -> true;
+            case ONLY_ADMIN -> false;
+            case WHITELIST -> resolved.taggedResourceAclGrantSpecifiedUsers.contains(userId);
+            case BLACKLIST -> !resolved.taggedResourceAclGrantSpecifiedUsers.contains(userId);
+        };
+        return allowed ? resolved.taggedResourceGrantedActionsMask : 0;
     }
 
     /**
@@ -1146,7 +1181,12 @@ public class ResourceServiceImpl implements IResourceService {
     }
 
     private ResolvedTagPermission resolveTagAclGrantConfig(TagEntity node, Integer defaultActions) {
-        ResolvedTagPermission result = resolveTagPermission(node);
+        return resolveTagAclGrantConfig(node, defaultActions, null);
+    }
+
+    private ResolvedTagPermission resolveTagAclGrantConfig(TagEntity node, Integer defaultActions,
+                                                           Map<String, TagEntity> loadedTags) {
+        ResolvedTagPermission result = resolveTagPermission(node, loadedTags);
         // 无论是根节点本身没配权限，还是遍历完所有祖先都没找到配置，都会在这里被安全拦截
         // 如果未解析到动作权限，则使用默认动作权限
         if (!result.isTaggedResourceGrantedActionsMaskResolved()) {
@@ -1160,7 +1200,7 @@ public class ResourceServiceImpl implements IResourceService {
     }
 
     private ResolvedTagPermission resolveTagMountConfig(TagEntity node) {
-        ResolvedTagPermission result = resolveTagPermission(node);
+        ResolvedTagPermission result = resolveTagPermission(node, null);
         // 如果未解析到资源挂载模式，则使用默认挂载模式（ALL）
         if (!result.isTagMountPermissionScopeResolved()) {
             result.tagMountPermissionScope = AccessControlScope.ALL;
@@ -1171,7 +1211,7 @@ public class ResourceServiceImpl implements IResourceService {
     /**
      * 单次向上遍历标签树，分别捕获 ACL授予模式 和 授予动作掩码 最近的非空配置
      */
-    private ResolvedTagPermission resolveTagPermission(TagEntity node) {
+    private ResolvedTagPermission resolveTagPermission(TagEntity node, Map<String, TagEntity> loadedTags) {
         ResolvedTagPermission result = new ResolvedTagPermission();
 
         // 先尝试从当前节点捕获
@@ -1183,12 +1223,12 @@ public class ResourceServiceImpl implements IResourceService {
             List<String> ancestors = node.getAncestors();
             if (ancestors != null && !ancestors.isEmpty()) {
 
-                // 批量查询祖先节点
-                Iterable<TagEntity> ancestorEntities = tagRepository.findAllById(ancestors);
-
-                Map<String, TagEntity> ancestorMap = new HashMap<>();
-                for (TagEntity entity : ancestorEntities) {
-                    ancestorMap.put(entity.getTagId(), entity); // 建立TagID与实体的映射
+                Map<String, TagEntity> ancestorMap = loadedTags;
+                if (ancestorMap == null) {
+                    ancestorMap = new HashMap<>();
+                    for (TagEntity entity : tagRepository.findAllById(ancestors)) {
+                        ancestorMap.put(entity.getTagId(), entity);
+                    }
                 }
 
                 for (int i = ancestors.size() - 1; i >= 0; i--) { // 从 ancestors 列表的最后一个元素开始往回遍历到第一个元素

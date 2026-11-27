@@ -152,6 +152,7 @@ public class SearchQueryServiceImpl implements ISearchQueryService {
         }
         // [filter] ACL 可见性过滤
         bool.filter(buildAclFilter(userId, groupRoleMap));
+        bool.mustNot(q -> q.term(t -> t.field("deleted").value(true)));
 
         return Query.of(q -> q.bool(bool.build()));
     }
@@ -262,7 +263,7 @@ public class SearchQueryServiceImpl implements ISearchQueryService {
         return Query.of(q -> q.bool(aclFilter.build()));
     }
 
-    private HighlightQuery buildHighlightQuery(Class<?> entityClass, String contentField) {
+    static HighlightQuery buildHighlightQuery(Class<?> entityClass, String contentField) {
         // 配置为返回若干命中的片段
         HighlightFieldParameters fieldParams = HighlightFieldParameters.builder()
                 .withFragmentSize(SearchConstants.HIGHLIGHT_FRAGMENT_SIZE)
@@ -307,7 +308,7 @@ public class SearchQueryServiceImpl implements ISearchQueryService {
         return res;
     }
 
-    private String getHighlightText(SearchHit<?> hit, String fieldName, String fallback) {
+    static String getHighlightText(SearchHit<?> hit, String fieldName, String fallback) {
         List<String> fragments = hit.getHighlightFields().get(fieldName);
         return fragments != null && !fragments.isEmpty() ?
                 fragments.stream()

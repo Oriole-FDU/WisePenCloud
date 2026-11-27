@@ -16,13 +16,15 @@ import com.oriole.wisepen.resource.constant.ResourceValidationMsg;
 import com.oriole.wisepen.resource.domain.dto.req.BatchResourceUpdateTagsRequest;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceAiBillingApprovalUpdateRequest;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceDeleteRequest;
+import com.oriole.wisepen.resource.domain.dto.req.ResourceRenameRequest;
 import com.oriole.wisepen.resource.domain.dto.req.ResourceUpdateActionPermissionRequest;
+import com.oriole.wisepen.resource.domain.dto.res.CourseOutlineResourceResponse;
 import com.oriole.wisepen.resource.domain.dto.res.ResourceBaseInfoResponse;
 import com.oriole.wisepen.resource.domain.dto.res.ResourceItemResponse;
-import com.oriole.wisepen.resource.domain.dto.req.ResourceRenameRequest;
 import com.oriole.wisepen.resource.enums.ResourceSortBy;
 import com.oriole.wisepen.resource.exception.ResourceError;
 import com.oriole.wisepen.resource.service.IResourceService;
+import com.oriole.wisepen.resource.service.impl.CourseOutlineResourceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -44,6 +46,25 @@ import java.util.Map;
 public class ResourceItemController {
 
     private final IResourceService resourceService;
+    private final CourseOutlineResourceService courseOutlineResourceService;
+
+    @Operation(summary = "解析课程大纲资源", description = """
+            - 用途：打开课程大纲中的指定资源。
+            - 请求：groupId、tagId 和 resourceId 必填。
+            - 约束：调用者须为课程组成员，并拥有发现和阅读权限。
+            - 处理：校验当前大纲及资源挂载，查询当前用户的已读状态。
+            - 失败：不是课程组成员 -> PermissionError.PERMISSION_DENIED。课程大纲根标签失效 -> ResourceError.TAG_NODE_NOT_FOUND。资源或挂载不存在、资源无法发现 -> ResourceError.RESOURCE_NOT_FOUND。资源可发现但无阅读权限 -> ResourceError.RESOURCE_PERMISSION_DENIED。
+            - 响应：章节 ID、资源基础信息和已读状态。
+            """)
+    @GetMapping("/getCourseOutlineResource")
+    public R<CourseOutlineResourceResponse> getCourseOutlineResource(
+            @RequestParam("groupId") Long groupId,
+            @RequestParam("tagId") String tagId,
+            @RequestParam("resourceId") String resourceId) {
+        GroupRoleType role = SecurityContextHolder.assertInGroup(groupId);
+        return R.ok(courseOutlineResourceService.resolve(groupId,
+                SecurityContextHolder.getUserId().toString(), role, tagId, resourceId));
+    }
 
     @Operation(
             summary = "获取资源基础信息",
