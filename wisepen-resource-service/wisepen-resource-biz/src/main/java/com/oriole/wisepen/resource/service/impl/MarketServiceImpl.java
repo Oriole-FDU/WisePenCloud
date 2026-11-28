@@ -11,6 +11,7 @@ import com.oriole.wisepen.resource.domain.base.MarketSaleTierBase;
 import com.oriole.wisepen.resource.domain.dto.req.MarketSaleAuditRequest;
 import com.oriole.wisepen.resource.domain.dto.req.MarketSaleOffShelfRequest;
 import com.oriole.wisepen.resource.domain.dto.req.MarketSalePublishRequest;
+import com.oriole.wisepen.resource.domain.dto.req.MarketSaleVersionCheckRequest;
 import com.oriole.wisepen.resource.domain.dto.req.MarketPurchaseRequest;
 import com.oriole.wisepen.resource.domain.dto.res.MarketOrderResponse;
 import com.oriole.wisepen.resource.domain.entity.MarketOrderEntity;
@@ -35,6 +36,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -227,6 +229,15 @@ public class MarketServiceImpl implements IMarketService {
     }
 
     @Override
+    public void assertMarketSaleVersion(MarketSaleVersionCheckRequest request) {
+        ResourceItemEntity resource = resourceService.getResourceEntity(request.getResourceId());
+        MarketSaleInfo marketSaleInfo = getmarketSaleInfo(resource, request.getMarketGroupId());
+        if (!Objects.equals(marketSaleInfo.getOfferVersion(), request.getOfferVersion())) {
+            throw new ServiceException(ResourceError.MARKET_AUDIT_VERSION_CONFLICT);
+        }
+    }
+
+    @Override
     public MarketOrderResponse purchaseResource(MarketPurchaseRequest request, String buyerId) {
         ResourceItemEntity resource = resourceService.getResourceEntity(request.getResourceId());
         String marketGroupId = request.getMarketGroupId();
@@ -294,8 +305,10 @@ public class MarketServiceImpl implements IMarketService {
 
     @Override
     public PageR<MarketOrderResponse> listOrders(String buyerId, int page, int size) {
-        Pageable pageable = PageRequest.of(Math.max(page - 1, 0), size);
-        Page<MarketOrderEntity> entityPage = marketOrderRepository.findByBuyerId(buyerId, pageable);
+        Pageable pageable = PageRequest.of(Math.max(page - 1, 0), size, Sort.by(Sort.Direction.DESC, "createTime"));
+        Page<MarketOrderEntity> entityPage = StringUtils.hasText(buyerId)
+                ? marketOrderRepository.findByBuyerId(buyerId, pageable)
+                : marketOrderRepository.findAll(pageable);
         PageR<MarketOrderResponse> pageR = new PageR<>(entityPage.getTotalElements(), page, size);
 
         pageR.addAll(entityPage.getContent().stream()

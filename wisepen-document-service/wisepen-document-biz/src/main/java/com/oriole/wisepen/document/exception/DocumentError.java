@@ -30,6 +30,7 @@ public enum DocumentError implements IResult {
     DOCUMENT_REGISTER_RESOURCE_FAILED(6144, new ResultKey(BusinessDomain.DOCUMENT, DocumentSubject.DOCUMENT, ErrorReason.FAILED),"注册文档资源失败"),
     DOCUMENT_FORK_FAILED(6145, new ResultKey(BusinessDomain.DOCUMENT, DocumentSubject.DOCUMENT, ErrorReason.FAILED),"文档复制失败"),
     DOCUMENT_DOWNLOAD_FAILED(6146, new ResultKey(BusinessDomain.DOCUMENT, DocumentSubject.DOCUMENT, ErrorReason.FAILED),"文档下载失败"),
+    DOCUMENT_MARKET_VERSION_CHECK_FAILED(6147, new ResultKey(BusinessDomain.DOCUMENT, DocumentSubject.DOCUMENT, ErrorReason.FAILED),"集市文档版本校验失败"),
     DOCUMENT_EDIT_SAVE_FAILED(6155, new ResultKey(BusinessDomain.DOCUMENT, DocumentSubject.DOCUMENT, ErrorReason.FAILED),"文档编辑保存失败"),
     DOCUMENT_VERSION_DUPLICATED(6161, new ResultKey(BusinessDomain.DOCUMENT, DocumentSubject.DOCUMENT, ErrorReason.CONFLICT), "文档版本冲突"),
 
